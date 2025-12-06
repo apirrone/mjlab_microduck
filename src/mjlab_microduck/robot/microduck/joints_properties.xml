@@ -1,0 +1,8 @@
+<default>
+    <default class="perfect_actuator">
+        <geom contype="0" conaffinity="0"/>
+        <joint damping="0.15" frictionloss="0.1" armature="0.001"/>
+        <position kp="10.0" kv="0.1" forcerange="-20.0 20.0"/>
+        <default class="chosen_actuator"></default>
+    </default>
+</default>

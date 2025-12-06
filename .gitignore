@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.python-version
+uv.lock
+
+# Virtual environments
+.venv
+
+# Logs and databases
+wandb
+logs
+agents
+
+*.pch
+nohup.out

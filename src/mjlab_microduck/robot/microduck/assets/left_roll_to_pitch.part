@@ -1,0 +1,13 @@
+{
+    "configuration": "default",
+    "documentId": "804927696f06d877f3f1803e",
+    "documentMicroversion": "1141338fbe0cbe0dfa31a107",
+    "elementId": "6a7320ab42427c3c6d1a75ee",
+    "fullConfiguration": "default",
+    "id": "M2F4vgz57pN20MDso",
+    "isStandardContent": false,
+    "name": "left_roll_to_pitch <1>",
+    "partId": "RUED",
+    "suppressed": false,
+    "type": "Part"
+}

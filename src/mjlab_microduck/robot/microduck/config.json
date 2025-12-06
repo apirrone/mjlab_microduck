@@ -1,0 +1,21 @@
+{
+    "url": "https://cad.onshape.com/documents/804927696f06d877f3f1803e/w/12cb1084d6a5622fc1b3935e/e/eee1ab796d84f4ff324d3a02",
+    "outputFormat": "mujoco",
+    "robot_name": "microduck",
+    "output_filename": "robot",
+    "simplify_stls": true,
+    "max_stl_size": 1.0,
+    "ignore": {
+        "*": "collision",
+        "!foot": "collision"
+    },
+    "additional_xml": [
+        "joints_properties.xml",
+        "sensors.xml"
+    ],
+    "joint_properties": {
+        "default": {
+            "class": "chosen_actuator"
+        }
+    }
+}

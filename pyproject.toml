@@ -1,0 +1,27 @@
+[build-system]
+requires = ["uv_build>=0.8.19,<0.9.0"]
+build-backend = "uv_build"
+
+[project]
+name = "mjlab-microduck"
+version = "0.1.0"
+description = "Training microduck to walk in MJLab"
+readme = "README.md"
+requires-python = ">=3.12, <3.14"
+dependencies = [
+    "mjlab",
+]
+
+[project.entry-points."mjlab.tasks"]
+mjlab_microduck = "mjlab_microduck.tasks"
+  
+[tool.ruff]
+src = ["src"]  # Helpful for recognizing first-party imports.
+indent-width = 4
+exclude = [
+  "src/mjlab/third_party",
+  "typings",
+]
+
+[tool.uv.sources]
+mjlab = { git = "https://github.com/mujocolab/mjlab.git", rev = "d1d32d8b86e68fe317356de2561f4efc63ffcc29" }
