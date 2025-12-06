@@ -127,9 +127,11 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     #     print(env.scene.sensors["feet_ground_contact_left_foot_link_force"].data)
     #   cfg.events["log_debug"] = EventTermCfg(mode="interval", func=log_debug, interval_range_s=(0.0, 0.0))
 
-    cfg.actions["joint_pos"].actuator_names = (r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",)
+    cfg.actions["joint_pos"].actuator_names = (
+        r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",
+    )
 
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.1, 0.15)
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.05, 0.1)
 
     cfg.commands["twist"].viz.z_offset = 1.0
 
@@ -180,6 +182,10 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 1
     cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+
+    cfg.commands["twist"].ranges.ang_vel_z = (0.5, 0.5)
+    cfg.commands["twist"].ranges.lin_vel_y = (-0.15, 0.15)
+    cfg.commands["twist"].ranges.lin_vel_x = (-0.15, 0.15)
 
     if play:
         # Disabling push
