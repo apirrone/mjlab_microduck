@@ -40,7 +40,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # Lower body
         r".*hip_yaw.*": 0.3,
         r".*hip_roll.*": 0.2,
-        r".*hip_pitch.*": -0.4,
+        r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
         r".*ankle.*": 0.15,
         # Head
@@ -99,6 +99,11 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.03
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.03
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
+
     cfg.observations["critic"].terms["foot_height"].params[
         "asset_cfg"
     ].site_names = site_names
@@ -127,11 +132,11 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     #     print(env.scene.sensors["feet_ground_contact_left_foot_link_force"].data)
     #   cfg.events["log_debug"] = EventTermCfg(mode="interval", func=log_debug, interval_range_s=(0.0, 0.0))
 
-    cfg.actions["joint_pos"].actuator_names = (
-        r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",
-    )
+    # cfg.actions["joint_pos"].actuator_names = (
+    #     r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",
+    # )
 
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.05, 0.1)
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.15, 0.16)
 
     cfg.commands["twist"].viz.z_offset = 1.0
 
@@ -147,8 +152,8 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     #   cfg.sim.njmax = 512
 
     cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-0.1, 0.1),
-        "y": (-0.1, 0.1),
+        "x": (-0.8, 0.8),
+        "y": (-0.8, 0.8),
     }
 
     # Slightly increased L2 action rate penalty
@@ -161,7 +166,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     #   cfg.rewards["vel_l2"] = RewardTermCfg(func=joint_vel_l2, weight=-1e-3)
 
     # Disabling self-collision
-    # cfg.rewards["self_collisions"].weight = 0.0
+    cfg.rewards["self_collisions"].weight = 0.0
 
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
@@ -183,22 +188,22 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
-    cfg.commands["twist"].ranges.ang_vel_z = (0.5, 0.5)
-    cfg.commands["twist"].ranges.lin_vel_y = (-0.15, 0.15)
-    cfg.commands["twist"].ranges.lin_vel_x = (-0.15, 0.15)
+    cfg.commands["twist"].ranges.ang_vel_z = (-1.0, 1.0)
+    cfg.commands["twist"].ranges.lin_vel_y = (-0.5, 0.5)
+    cfg.commands["twist"].ranges.lin_vel_x = (-0.5, 0.5)
 
-    if play:
-        # Disabling push
-        cfg.events["push_robot"].params["velocity_range"] = {
-            "x": (0.0, 0.0),
-            "y": (0.0, 0.0),
-        }
+    # if play:
+    # Disabling push
+    # cfg.events["push_robot"].params["velocity_range"] = {
+    #     "x": (0.0, 0.0),
+    #     "y": (0.0, 0.0),
+    # }
 
-        # Custom command
-        # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
-        # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
-        # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
-        # cfg.commands["twist"].rel_standing_envs = 0.0
+    # Custom command
+    # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
+    # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
+    # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
+    # cfg.commands["twist"].rel_standing_envs = 0.0
 
     return cfg
 

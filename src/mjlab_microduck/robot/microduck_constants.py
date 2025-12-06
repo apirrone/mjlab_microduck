@@ -33,9 +33,9 @@ HOME_FRAME = EntityCfg.InitialStateCfg(
 
 FULL_COLLISION = CollisionCfg(
     geom_names_expr=[".*_collision"],
-    condim={r"^(Left|Right)_Foot_collision$": 3, ".*_collision": 1},
-    priority={r"^(Left|Right)_Foot_collision$": 1},
-    friction={r"^(Left|Right)_Foot_collision$": (0.6,)},
+    condim={r"^(left|right)_foot_collision$": 3, ".*_collision": 1},
+    priority={r"^(left|right)_foot_collision$": 1},
+    friction={r"^(left|right)_foot_collision$": (0.6,)},
 )
 
 actuators = DelayedActuatorCfg(
@@ -49,7 +49,7 @@ actuators = DelayedActuatorCfg(
 MICRODUCK_ROBOT_CFG = EntityCfg(
     spec_fn=get_spec,
     init_state=HOME_FRAME,
-    # collisions=(FULL_COLLISION,),
+    collisions=(FULL_COLLISION,),
     articulation=EntityArticulationInfoCfg(
         actuators=(actuators,),
         soft_joint_pos_limit_factor=0.9,
