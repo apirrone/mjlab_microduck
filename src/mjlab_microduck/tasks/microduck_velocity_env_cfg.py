@@ -136,7 +136,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     #     r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",
     # )
 
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.15, 0.16)
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
 
     cfg.commands["twist"].viz.z_offset = 1.0
 
@@ -157,7 +157,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     }
 
     # Slightly increased L2 action rate penalty
-    cfg.rewards["action_rate_l2"].weight = -1.0
+    cfg.rewards["action_rate_l2"].weight = -0.5
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)

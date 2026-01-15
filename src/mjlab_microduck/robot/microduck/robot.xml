@@ -42,7 +42,7 @@
   </sensor>
   <worldbody>
     <!-- Link trunk_base -->
-    <body name="trunk_base" pos="0 0 0.15" quat="1 0 0 0" childclass="microduck">
+    <body name="trunk_base" pos="0 0 0.12" quat="1 0 0 0" childclass="microduck">
       <freejoint name="trunk_base_freejoint"/>
       <inertial pos="-0.0177814 -0.00080064 0.00856726" mass="0.31075" fullinertia="0.000323366 0.000422121 0.000263929 -3.21169e-06 -5.86873e-06 -8.80394e-07"/>
       <!-- Part ubec_8v_5v_dc_dc -->
