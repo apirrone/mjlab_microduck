@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "804927696f06d877f3f1803e",
-    "documentMicroversion": "a724e7b1fb7ae18257a1fbed",
+    "documentMicroversion": "d2a516ebfb1a475a8b42cb03",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
     "id": "MNUKnv87KXMRyzf91",
     "isStandardContent": false,
     "name": "head_pitch_to_yaw <1>",
-    "partId": "RdFD",
+    "partId": "RlFD",
     "suppressed": false,
     "type": "Part"
 }

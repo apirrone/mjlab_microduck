@@ -4,10 +4,10 @@
     "documentMicroversion": "d2a516ebfb1a475a8b42cb03",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
-    "id": "MBAOk9g7UWUwzVrNF",
+    "id": "MrtZFFz5hAG6CBKsD",
     "isStandardContent": false,
-    "name": "head_yaw_to_roll <1>",
-    "partId": "RFGD",
+    "name": "spacer <1>",
+    "partId": "RHJD",
     "suppressed": false,
     "type": "Part"
 }

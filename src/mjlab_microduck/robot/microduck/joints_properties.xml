@@ -6,10 +6,12 @@
     </default>
 
     <default class="xc330m288t">
-        <!-- probably wrong, would need to re-identify -->
-        <geom contype="0" conaffinity="0"/>
-        <joint damping="0.095" frictionloss="0.058" armature="0.0018"/>
-        <position kp="2.54" kv="0.0" forcerange="-0.8 0.8"/>
-        <default class="chosen_actuator"></default>
+      <geom contype="0" conaffinity="0"/>
+      <joint damping="0.035" frictionloss="0.021" armature="0.0017"/>
+      <!-- kp 600 -->
+      <!-- <position kp="0.97" kv="0.0" forcerange="-0.66 0.66"/> -->
+      <!-- kp 400 -->
+      <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/>
+      <default class="chosen_actuator"/>
     </default>
 </default>

@@ -66,8 +66,8 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     self_collision_cfg = ContactSensorCfg(
         name="self_collision",
-        primary=ContactMatch(mode="subtree", pattern="trunk", entity="robot"),
-        secondary=ContactMatch(mode="subtree", pattern="trunk", entity="robot"),
+        primary=ContactMatch(mode="subtree", pattern="trunk_base", entity="robot"),
+        secondary=ContactMatch(mode="subtree", pattern="trunk_base", entity="robot"),
         fields=("found",),
         reduce="none",
         num_slots=1,
@@ -80,9 +80,9 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg = make_velocity_env_cfg()
 
-    cfg.viewer.body_name = "trunk"
-    cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk",)
-    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk",)
+    cfg.viewer.body_name = "trunk_base"
+    cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
+    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
     cfg.scene.entities = {"robot": MICRODUCK_ROBOT_CFG}
 
@@ -157,7 +157,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     }
 
     # Slightly increased L2 action rate penalty
-    cfg.rewards["action_rate_l2"].weight = -0.4
+    cfg.rewards["action_rate_l2"].weight = -1.0
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)
