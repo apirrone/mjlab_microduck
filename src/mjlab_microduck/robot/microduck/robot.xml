@@ -23,12 +23,15 @@
       <position kp="10.0" kv="0.1" forcerange="-20.0 20.0"/>
     </default>
     <default class="xc330m288t">
+      <!-- m1 -->
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.035" frictionloss="0.021" armature="0.0017"/>
       <!-- kp 600 -->
       <!-- <position kp="0.97" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 400 -->
-      <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/>
+      <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
+      <!-- kp 200 -->
+      <position kp="0.32" kv="0.0" forcerange="-0.66 0.66"/>
       <default class="chosen_actuator"/>
     </default>
   </default>

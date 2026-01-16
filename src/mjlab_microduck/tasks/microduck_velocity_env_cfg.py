@@ -192,18 +192,18 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.commands["twist"].ranges.lin_vel_y = (-0.5, 0.5)
     cfg.commands["twist"].ranges.lin_vel_x = (-0.5, 0.5)
 
-    # if play:
-    # Disabling push
-    # cfg.events["push_robot"].params["velocity_range"] = {
-    #     "x": (0.0, 0.0),
-    #     "y": (0.0, 0.0),
-    # }
+    if play:
+        #Disabling push
+        cfg.events["push_robot"].params["velocity_range"] = {
+            "x": (0.0, 0.0),
+            "y": (0.0, 0.0),
+        }
 
-    # Custom command
-    # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
-    # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
-    # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
-    # cfg.commands["twist"].rel_standing_envs = 0.0
+        # Custom command
+        # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
+        # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
+        # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
+        # cfg.commands["twist"].rel_standing_envs = 0.0
 
     return cfg
 

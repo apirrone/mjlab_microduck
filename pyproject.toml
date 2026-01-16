@@ -23,5 +23,10 @@ exclude = [
   "typings",
 ]
 
+[tool.uv]
+override-dependencies = [
+    "mujoco",
+]
+
 [tool.uv.sources]
 mjlab = { git = "https://github.com/mujocolab/mjlab.git", rev = "d1d32d8b86e68fe317356de2561f4efc63ffcc29" }
