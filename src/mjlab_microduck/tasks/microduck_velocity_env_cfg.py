@@ -122,7 +122,10 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["air_time"].weight = 0.0
+    cfg.rewards["air_time"].weight = 0.5
+
+    cfg.rewards["track_linear_velocity"].weight = 4.0  # Was 2.0
+    cfg.rewards["track_angular_velocity"].weight = 4.0  # Was 2.0
 
     # Removing base lin velocity observation
     del cfg.observations["policy"].terms["base_lin_vel"]
@@ -170,7 +173,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.25
+    command.rel_standing_envs = 0.15  # Was 0.25
     command.rel_heading_envs = 0.0
 
     cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
