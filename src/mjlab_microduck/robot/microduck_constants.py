@@ -19,12 +19,12 @@ HOME_FRAME = EntityCfg.InitialStateCfg(
         # Lower body
         r".*hip_yaw.*": 0.0,
         r".*hip_roll.*": 0.0,
-        r".*left_hip_pitch.*": -0.6,
-        r".*right_hip_pitch.*": 0.6,
-        r".*left_knee.*": 1.2,
-        r".*right_knee.*": -1.2,
-        r".*left_ankle.*": -0.6,
-        r".*right_ankle.*": 0.6,
+        r".*left_hip_pitch.*": 0.6,
+        r".*right_hip_pitch.*": -0.6,
+        r".*left_knee.*": -1.2,
+        r".*right_knee.*": 1.2,
+        r".*left_ankle.*": 0.6,
+        r".*right_ankle.*": -0.6,
         # Head
         r".*neck.*": 0.0,
         r".*head.*": 0.0,

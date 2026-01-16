@@ -44,8 +44,8 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         r".*knee.*": 0.4,
         r".*ankle.*": 0.15,
         # Head
-        r".*neck.*": 0.3,
-        r".*head.*": 0.3,
+        r".*neck.*": 0.1,
+        r".*head.*": 0.1,
     }
 
     site_names = ["left_foot", "right_foot"]
@@ -157,7 +157,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     }
 
     # Slightly increased L2 action rate penalty
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = -0.7
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)
