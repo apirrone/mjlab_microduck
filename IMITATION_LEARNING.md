@@ -103,7 +103,7 @@ The imitation reward is a weighted sum of:
 - **Angular velocity Z** (weight=0.5): Exponential reward
 - **Foot contacts** (weight=1.0): Binary matching reward
 
-The reward is only computed when the commanded velocity magnitude exceeds a threshold (default: 0.01).
+The reward is computed for all environments at every timestep, allowing the policy to learn from all commanded velocities including standing.
 
 ### Phase Observation
 
@@ -114,10 +114,13 @@ This provides a continuous, periodic representation of where the robot is in the
 ### Motion Matching
 
 During execution:
-1. The system finds the reference motion closest to the current commanded velocity
-2. The phase is tracked and updated each timestep based on the motion's period
-3. The polynomial is evaluated at the current phase to get the reference state
-4. The reward compares the robot's actual state to the reference state
+1. **Per-environment motion selection**: Each environment independently selects the reference motion closest to its commanded velocity
+2. **Phase tracking**: Each environment maintains its own phase, which updates each timestep based on the motion's period
+3. **Phase reset**: When an environment resets (due to falling/timeout) or switches to a different reference motion, its phase resets to 0.0
+4. **Polynomial evaluation**: The polynomial is evaluated at the current phase to get the reference state
+5. **Reward computation**: The reward compares the robot's actual state to the reference state
+
+This ensures that each of the 2048 parallel environments can track different reference motions simultaneously based on their individual commanded velocities.
 
 ## Files
 

@@ -34,29 +34,38 @@ class ReferenceMotionLoader:
                 dx, dy, dtheta = float(parts[0]), float(parts[1]), float(parts[2])
                 self.velocities[key] = np.array([dx, dy, dtheta])
 
-    def find_closest_motion(self, commanded_vel: torch.Tensor) -> str:
+    def find_closest_motion(self, commanded_vel: torch.Tensor) -> torch.Tensor:
         """
-        Find the reference motion closest to the commanded velocity
+        Find the reference motion closest to the commanded velocity for each environment
 
         Args:
             commanded_vel: (batch, 3) tensor with [vel_x, vel_y, ang_vel_z]
 
         Returns:
-            Key of the closest reference motion
+            Integer tensor (batch,) with motion indices for each environment
         """
-        # Convert to numpy for comparison (use first env in batch)
-        cmd_np = commanded_vel[0].cpu().numpy() if torch.is_tensor(commanded_vel) else commanded_vel[0]
+        # Convert commanded velocities to numpy
+        cmd_np = commanded_vel.cpu().numpy() if torch.is_tensor(commanded_vel) else commanded_vel
 
-        min_dist = float('inf')
-        closest_key = self._motion_keys[0]
+        batch_size = cmd_np.shape[0]
+        motion_indices = np.zeros(batch_size, dtype=np.int32)
 
-        for key, vel in self.velocities.items():
-            dist = np.linalg.norm(cmd_np - vel)
-            if dist < min_dist:
-                min_dist = dist
-                closest_key = key
+        # Pre-compute velocity array for all motions
+        motion_keys_list = list(self.velocities.keys())
+        vel_array = np.array([self.velocities[key] for key in motion_keys_list])  # (num_motions, 3)
 
-        return closest_key
+        # For each environment, find closest motion
+        for i in range(batch_size):
+            # Compute distance to all motions
+            dists = np.linalg.norm(vel_array - cmd_np[i], axis=1)
+            motion_indices[i] = np.argmin(dists)
+
+        return torch.from_numpy(motion_indices).to(commanded_vel.device)
+
+    def get_motion_key(self, motion_idx: int) -> str:
+        """Get motion key from integer index"""
+        motion_keys_list = list(self.velocities.keys())
+        return motion_keys_list[motion_idx]
 
     def evaluate_motion(self, motion_key: str, phase: torch.Tensor, device: str = "cpu") -> Dict[str, torch.Tensor]:
         """
@@ -124,3 +133,72 @@ class ReferenceMotionLoader:
     def get_period(self, motion_key: str) -> float:
         """Get the period of a reference motion in seconds"""
         return self.data[motion_key]["period"]
+
+    def evaluate_motion_batch(self, motion_indices: torch.Tensor, phases: torch.Tensor, device: str = "cpu") -> Dict[str, torch.Tensor]:
+        """
+        Evaluate multiple different motions at given phases (one motion per environment)
+
+        Args:
+            motion_indices: (batch,) tensor with integer motion indices
+            phases: (batch,) tensor with phase values in [0, 1]
+            device: Device to place tensors on
+
+        Returns:
+            Dictionary with batched results for each environment
+        """
+        batch_size = motion_indices.shape[0]
+        motion_keys_list = list(self.velocities.keys())
+
+        # Pre-allocate output tensors
+        joints_pos_batch = torch.zeros((batch_size, 14), device=device)
+        joints_vel_batch = torch.zeros((batch_size, 14), device=device)
+        foot_contacts_batch = torch.zeros((batch_size, 2), device=device)
+        base_linear_vel_batch = torch.zeros((batch_size, 3), device=device)
+        base_angular_vel_batch = torch.zeros((batch_size, 3), device=device)
+
+        # Group environments by motion to reduce redundant evaluations
+        unique_motions = torch.unique(motion_indices)
+
+        for motion_idx in unique_motions:
+            mask = motion_indices == motion_idx
+            env_indices = torch.where(mask)[0]
+
+            motion_key = motion_keys_list[motion_idx.item()]
+            phases_for_motion = phases[env_indices]
+
+            # Evaluate this motion for all environments using it
+            result = self.evaluate_motion(motion_key, phases_for_motion, device=device)
+
+            # Scatter results back to the correct environment indices
+            joints_pos_batch[env_indices] = result["joints_pos"]
+            joints_vel_batch[env_indices] = result["joints_vel"]
+            foot_contacts_batch[env_indices] = result["foot_contacts"]
+            base_linear_vel_batch[env_indices] = result["base_linear_vel"]
+            base_angular_vel_batch[env_indices] = result["base_angular_vel"]
+
+        return {
+            "joints_pos": joints_pos_batch,
+            "joints_vel": joints_vel_batch,
+            "foot_contacts": foot_contacts_batch,
+            "base_linear_vel": base_linear_vel_batch,
+            "base_angular_vel": base_angular_vel_batch,
+        }
+
+    def get_period_batch(self, motion_indices: torch.Tensor) -> torch.Tensor:
+        """
+        Get periods for a batch of motion indices
+
+        Args:
+            motion_indices: (batch,) tensor with integer motion indices
+
+        Returns:
+            Periods tensor (batch,) in seconds
+        """
+        motion_keys_list = list(self.velocities.keys())
+        periods = torch.zeros(motion_indices.shape[0], dtype=torch.float32, device=motion_indices.device)
+
+        for i, idx in enumerate(motion_indices):
+            motion_key = motion_keys_list[idx.item()]
+            periods[i] = self.data[motion_key]["period"]
+
+        return periods

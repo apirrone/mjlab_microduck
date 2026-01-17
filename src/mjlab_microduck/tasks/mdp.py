@@ -18,11 +18,17 @@ class ImitationRewardState:
     def __init__(self, ref_motion_loader: ReferenceMotionLoader):
         self.ref_motion_loader = ref_motion_loader
         self.phase = None  # Will be initialized as (num_envs,) tensor
-        self.current_motion_key = None
+        self.current_motion_idx = None  # (num_envs,) tensor of motion indices
 
     def initialize(self, num_envs: int, device: str):
         """Initialize phase tracking for each environment"""
         self.phase = torch.zeros(num_envs, device=device)
+        self.current_motion_idx = torch.zeros(num_envs, dtype=torch.int32, device=device)
+
+    def reset_phases(self, env_ids: torch.Tensor):
+        """Reset phases for specific environments (e.g., after episode termination)"""
+        if self.phase is not None and len(env_ids) > 0:
+            self.phase[env_ids] = 0.0
 
 
 def imitation_reward(
@@ -60,6 +66,12 @@ def imitation_reward(
 
     asset: Entity = env.scene[asset_cfg.name]
 
+    # Reset phases for environments that just terminated
+    if hasattr(env, '_reset_buf'):
+        reset_env_ids = env._reset_buf.nonzero(as_tuple=False).squeeze(-1)
+        if len(reset_env_ids) > 0:
+            imitation_state.reset_phases(reset_env_ids)
+
     # Get commanded velocity from the environment
     # Assuming velocity command exists with name "twist"
     if "twist" not in env.command_manager._terms:
@@ -67,26 +79,26 @@ def imitation_reward(
 
     cmd = env.command_manager.get_command("twist")
     cmd_vel = cmd[:, :3]  # (num_envs, 3) -> [vel_x, vel_y, ang_vel_z]
-    cmd_norm = torch.linalg.norm(cmd_vel, dim=1)
 
-    # Only reward when command is above threshold
-    active_mask = cmd_norm > command_threshold
+    # Find closest reference motion for each environment
+    new_motion_indices = imitation_state.ref_motion_loader.find_closest_motion(cmd_vel)
 
-    if not active_mask.any():
-        return torch.zeros(env.num_envs, device=env.device)
+    # Detect motion changes and reset phase when motion changes
+    motion_changed = new_motion_indices != imitation_state.current_motion_idx
+    imitation_state.phase[motion_changed] = 0.0
+    imitation_state.current_motion_idx = new_motion_indices
 
-    # Find closest reference motion (use same motion for all envs for now)
-    motion_key = imitation_state.ref_motion_loader.find_closest_motion(cmd_vel)
+    # Get periods for all environments
+    periods = imitation_state.ref_motion_loader.get_period_batch(new_motion_indices)
 
-    # Get period and update phase
-    period = imitation_state.ref_motion_loader.get_period(motion_key)
+    # Update phase for all environments
     dt = env.step_dt
-    imitation_state.phase += dt / period
+    imitation_state.phase += dt / periods
     imitation_state.phase = torch.fmod(imitation_state.phase, 1.0)  # Keep in [0, 1]
 
-    # Evaluate reference motion at current phase
-    ref_data = imitation_state.ref_motion_loader.evaluate_motion(
-        motion_key, imitation_state.phase, device=env.device
+    # Evaluate reference motions at current phases (batched per-environment)
+    ref_data = imitation_state.ref_motion_loader.evaluate_motion_batch(
+        new_motion_indices, imitation_state.phase, device=env.device
     )
 
     # Get current state
@@ -145,9 +157,6 @@ def imitation_reward(
         + ang_vel_z_rew
         + contact_rew
     )
-
-    # Apply mask for active commands only
-    reward = reward * active_mask.float()
 
     return reward
 
