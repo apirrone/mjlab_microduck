@@ -18,10 +18,15 @@ register_mjlab_task(
 
 # Imitation learning task
 # Set the MICRODUCK_REFERENCE_MOTION_PATH environment variable to your .pkl file
-# or modify the path below
+# Default: looks for reference_motions.pkl in the package's data directory
+_default_reference_motion_path = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),  # mjlab_microduck package dir
+    "data",
+    "reference_motions.pkl"
+)
 _reference_motion_path = os.environ.get(
     "MICRODUCK_REFERENCE_MOTION_PATH",
-    os.path.expanduser("~/MISC/mjlab_microduck/src/mjlab_microduck/data/reference_motions.pkl")
+    _default_reference_motion_path
 )
 
 if os.path.exists(_reference_motion_path):
