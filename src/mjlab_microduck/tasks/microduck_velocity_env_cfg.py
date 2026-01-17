@@ -12,7 +12,7 @@ from mjlab.rl import (
     RslRlPpoAlgorithmCfg,
 )
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
-from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg
+from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg, ObservationTermCfg
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 
 from mjlab.sensor import ContactMatch, ContactSensorCfg
@@ -23,6 +23,9 @@ from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.entity import Entity
+
+from mjlab_microduck.tasks import mdp as microduck_mdp
+from mjlab_microduck.reference_motion import ReferenceMotionLoader
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 
@@ -35,7 +38,11 @@ def joint_vel_l2(
     return torch.sum(torch.square(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
 
 
-def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def make_microduck_velocity_env_cfg(
+    play: bool = False,
+    use_imitation: bool = False,
+    reference_motion_path: str = None,
+) -> ManagerBasedRlEnvCfg:
     std_walking = {
         # Lower body
         r".*hip_yaw.*": 0.3,
@@ -208,6 +215,71 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # cfg.commands["twist"].ranges.lin_vel_y = (0.0, 0.0)
         # cfg.commands["twist"].ranges.lin_vel_x = (0.0, 0.0)
         # cfg.commands["twist"].rel_standing_envs = 0.0
+
+    # Imitation learning setup
+    if use_imitation and reference_motion_path:
+        import os
+        if not os.path.exists(reference_motion_path):
+            raise FileNotFoundError(f"Reference motion file not found: {reference_motion_path}")
+
+        # Create reference motion loader and imitation state
+        ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
+        imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
+
+        if not play:
+            # Simplified reward set for imitation learning (matching Open Duck Playground)
+            # Disable most rewards and keep only essential ones
+            rewards_to_disable = [
+                "upright", "body_ang_vel", "angular_momentum", "air_time",
+                "pose", "foot_clearance", "foot_swing_height", "foot_slip",
+                "self_collisions", "feet_stumble", "feet_slide", "dof_acc"
+            ]
+            for reward_name in rewards_to_disable:
+                if reward_name in cfg.rewards:
+                    cfg.rewards[reward_name].weight = 0.0
+
+            # Set minimal reward weights
+            cfg.rewards["track_linear_velocity"].weight = 2.5
+            cfg.rewards["track_angular_velocity"].weight = 6.0
+            cfg.rewards["action_rate_l2"].weight = -0.5
+
+            # Add torque penalty (if not already present)
+            if "joint_torques_l2" not in cfg.rewards:
+                cfg.rewards["joint_torques_l2"] = RewardTermCfg(
+                    func=mdp.joint_torques_l2,
+                    weight=-1.0e-3
+                )
+            else:
+                cfg.rewards["joint_torques_l2"].weight = -1.0e-3
+
+            # Add alive bonus
+            cfg.rewards["alive"] = RewardTermCfg(
+                func=microduck_mdp.is_alive,
+                weight=20.0
+            )
+
+            # Add imitation reward
+            cfg.rewards["imitation"] = RewardTermCfg(
+                func=microduck_mdp.imitation_reward,
+                weight=1.0,
+                params={
+                    "imitation_state": imitation_state,
+                    "command_threshold": 0.01,
+                    "weight_joint_pos": 15.0,
+                    "weight_joint_vel": 1e-3,
+                    "weight_lin_vel_xy": 1.0,
+                    "weight_lin_vel_z": 1.0,
+                    "weight_ang_vel_xy": 0.5,
+                    "weight_ang_vel_z": 0.5,
+                    "weight_contact": 1.0,
+                }
+            )
+
+        # Add phase observation to policy (for both training and play)
+        cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(
+            func=microduck_mdp.imitation_phase_observation,
+            params={"imitation_state": imitation_state}
+        )
 
     return cfg
 

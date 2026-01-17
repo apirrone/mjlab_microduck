@@ -1,0 +1,2 @@
+# This directory stores reference motion polynomial coefficients
+# Generate them using: scripts/generate_reference_motion_pkl.py
