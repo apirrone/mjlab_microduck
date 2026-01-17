@@ -103,13 +103,43 @@ The imitation reward is a weighted sum of:
 - **Angular velocity Z** (weight=0.5): Exponential reward
 - **Foot contacts** (weight=1.0): Binary matching reward
 
-The reward is computed for all environments at every timestep, allowing the policy to learn from all commanded velocities including standing.
+The reward is only non-zero when the commanded velocity magnitude exceeds a threshold (default: 0.01). This prevents the policy from moving when there is no command.
 
 ### Phase Observation
 
-The policy receives a 2D phase observation: `[cos(phase * 2π), sin(phase * 2π)]`
+The policy (actor) receives a 2D phase observation: `[cos(phase * 2π), sin(phase * 2π)]`
 
 This provides a continuous, periodic representation of where the robot is in the gait cycle, helping it learn coordinated movements.
+
+### Privileged Observations (Critic Only)
+
+During training, the critic receives additional privileged information that is not available to the actor or at deployment:
+
+- **Full reference motion state** (36D):
+  - Reference joint positions (14)
+  - Reference joint velocities (14)
+  - Reference foot contacts (2)
+  - Reference base linear velocity (3)
+  - Reference base angular velocity (3)
+
+This asymmetric actor-critic setup allows the critic to better evaluate states by knowing the complete reference trajectory, while the actor must learn to track the motion using only the phase signal. This is a common technique in imitation learning that improves learning efficiency.
+
+### Observation Dimensions
+
+**Actor (Policy) Observations**: 53D
+- base_ang_vel (3)
+- projected_gravity (3)
+- joint_pos (14)
+- joint_vel (14)
+- actions (14)
+- command (3)
+- imitation_phase (2)
+
+**Critic Observations**: 89D
+- All actor observations (53D)
+- Full reference motion (36D): joint_pos (14) + joint_vel (14) + foot_contacts (2) + base_linear_vel (3) + base_angular_vel (3)
+
+During inference/play, only the 53D actor observations are used.
 
 ### Motion Matching
 

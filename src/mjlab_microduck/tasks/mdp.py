@@ -79,6 +79,10 @@ def imitation_reward(
 
     cmd = env.command_manager.get_command("twist")
     cmd_vel = cmd[:, :3]  # (num_envs, 3) -> [vel_x, vel_y, ang_vel_z]
+    cmd_norm = torch.linalg.norm(cmd_vel, dim=1)
+
+    # Only reward when command is above threshold
+    active_mask = cmd_norm > command_threshold
 
     # Find closest reference motion for each environment
     new_motion_indices = imitation_state.ref_motion_loader.find_closest_motion(cmd_vel)
@@ -158,6 +162,9 @@ def imitation_reward(
         + contact_rew
     )
 
+    # Apply mask: zero reward when command magnitude is below threshold
+    reward = reward * active_mask.float()
+
     return reward
 
 
@@ -186,6 +193,58 @@ def imitation_phase_observation(
     phase_obs = torch.stack([torch.cos(angle), torch.sin(angle)], dim=1)
 
     return phase_obs
+
+
+def reference_motion_observation(
+    env: ManagerBasedRlEnv,
+    imitation_state: Optional[ImitationRewardState] = None,
+) -> torch.Tensor:
+    """
+    Provide full reference motion as privileged observation for the critic
+
+    Args:
+        env: The environment
+        imitation_state: State object holding reference motion loader and phase tracking
+
+    Returns:
+        Reference motion tensor of shape (num_envs, 36) containing:
+        - joints_pos (14): Reference joint positions
+        - joints_vel (14): Reference joint velocities
+        - foot_contacts (2): Reference foot contact states
+        - base_linear_vel (3): Reference base linear velocity
+        - base_angular_vel (3): Reference base angular velocity
+    """
+    if imitation_state is None or imitation_state.ref_motion_loader is None:
+        return torch.zeros((env.num_envs, 36), device=env.device)
+
+    if imitation_state.phase is None:
+        imitation_state.initialize(env.num_envs, env.device)
+
+    # Get commanded velocity to find the reference motion
+    if "twist" not in env.command_manager._terms:
+        return torch.zeros((env.num_envs, 36), device=env.device)
+
+    cmd = env.command_manager.get_command("twist")
+    cmd_vel = cmd[:, :3]
+
+    # Find closest reference motion for each environment
+    motion_indices = imitation_state.ref_motion_loader.find_closest_motion(cmd_vel)
+
+    # Evaluate reference motions at current phases
+    ref_data = imitation_state.ref_motion_loader.evaluate_motion_batch(
+        motion_indices, imitation_state.phase, device=env.device
+    )
+
+    # Concatenate all reference motion data
+    ref_obs = torch.cat([
+        ref_data["joints_pos"],       # 14
+        ref_data["joints_vel"],       # 14
+        ref_data["foot_contacts"],    # 2
+        ref_data["base_linear_vel"],  # 3
+        ref_data["base_angular_vel"], # 3
+    ], dim=1)
+
+    return ref_obs
 
 
 def is_alive(env: ManagerBasedRlEnv) -> torch.Tensor:

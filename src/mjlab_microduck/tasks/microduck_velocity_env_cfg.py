@@ -281,6 +281,13 @@ def make_microduck_velocity_env_cfg(
             params={"imitation_state": imitation_state}
         )
 
+        # Add reference motion to critic privileged observations (training only)
+        if not play:
+            cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
+                func=microduck_mdp.reference_motion_observation,
+                params={"imitation_state": imitation_state}
+            )
+
     return cfg
 
 
