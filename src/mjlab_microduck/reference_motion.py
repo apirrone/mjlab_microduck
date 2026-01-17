@@ -48,6 +48,24 @@ class ReferenceMotionLoader:
         self._period_array_np = period_array
         self._period_tensor = None  # Will be created on device when needed
 
+        # Precompute polynomial coefficients for all motions and all dimensions
+        # Shape: (num_motions, num_dims, num_coeffs)
+        num_motions = len(motion_keys_list)
+        first_motion = self.data[motion_keys_list[0]]
+        num_dims = len(first_motion["coefficients"])
+        num_coeffs = len(first_motion["coefficients"]["dim_0"])
+
+        coeff_array = np.zeros((num_motions, num_dims, num_coeffs), dtype=np.float32)
+
+        for i, key in enumerate(motion_keys_list):
+            coeffs = self.data[key]["coefficients"]
+            for dim in range(num_dims):
+                coeff_array[i, dim, :] = coeffs[f"dim_{dim}"]
+
+        self._coeff_array_np = coeff_array
+        self._coeff_tensor = None  # Will be created on device when needed
+        self._num_dims = num_dims
+
     def find_closest_motion(self, commanded_vel: torch.Tensor) -> torch.Tensor:
         """
         Find the reference motion closest to the commanded velocity for each environment
@@ -153,6 +171,7 @@ class ReferenceMotionLoader:
     def evaluate_motion_batch(self, motion_indices: torch.Tensor, phases: torch.Tensor, device: str = "cpu") -> Dict[str, torch.Tensor]:
         """
         Evaluate multiple different motions at given phases (one motion per environment)
+        Fully vectorized GPU implementation for maximum performance.
 
         Args:
             motion_indices: (batch,) tensor with integer motion indices
@@ -163,41 +182,53 @@ class ReferenceMotionLoader:
             Dictionary with batched results for each environment
         """
         batch_size = motion_indices.shape[0]
-        motion_keys_list = list(self.velocities.keys())
 
-        # Pre-allocate output tensors
-        joints_pos_batch = torch.zeros((batch_size, 14), device=device)
-        joints_vel_batch = torch.zeros((batch_size, 14), device=device)
-        foot_contacts_batch = torch.zeros((batch_size, 2), device=device)
-        base_linear_vel_batch = torch.zeros((batch_size, 3), device=device)
-        base_angular_vel_batch = torch.zeros((batch_size, 3), device=device)
+        # Lazy initialization of GPU tensors
+        if self._coeff_tensor is None or self._coeff_tensor.device != device:
+            self._coeff_tensor = torch.from_numpy(self._coeff_array_np).to(device)
 
-        # Group environments by motion to reduce redundant evaluations
-        unique_motions = torch.unique(motion_indices)
+        # Ensure phase is in [0, 1]
+        phases = torch.clamp(phases, 0.0, 1.0)
 
-        for motion_idx in unique_motions:
-            mask = motion_indices == motion_idx
-            env_indices = torch.where(mask)[0]
+        # Select coefficients for each environment's motion
+        # coeff_tensor: (num_motions, num_dims, num_coeffs)
+        # motion_indices: (batch,)
+        # Result: (batch, num_dims, num_coeffs)
+        coeffs = self._coeff_tensor[motion_indices]  # (batch, num_dims, num_coeffs)
 
-            motion_key = motion_keys_list[motion_idx.item()]
-            phases_for_motion = phases[env_indices]
+        # Evaluate polynomials using Horner's method - fully vectorized
+        # coeffs: (batch, num_dims, num_coeffs) where coeffs are [c0, c1, c2, ..., c_n]
+        # phases: (batch,)
+        # We want to compute: sum(c_i * phase^i) for each (batch, dim)
 
-            # Evaluate this motion for all environments using it
-            result = self.evaluate_motion(motion_key, phases_for_motion, device=device)
+        num_coeffs = coeffs.shape[2]
 
-            # Scatter results back to the correct environment indices
-            joints_pos_batch[env_indices] = result["joints_pos"]
-            joints_vel_batch[env_indices] = result["joints_vel"]
-            foot_contacts_batch[env_indices] = result["foot_contacts"]
-            base_linear_vel_batch[env_indices] = result["base_linear_vel"]
-            base_angular_vel_batch[env_indices] = result["base_angular_vel"]
+        # Initialize result with highest degree coefficient
+        result = coeffs[:, :, -1]  # (batch, num_dims)
+
+        # Horner's method: iterate from high to low degree
+        for i in range(num_coeffs - 2, -1, -1):
+            result = result * phases.unsqueeze(1) + coeffs[:, :, i]  # (batch, num_dims)
+
+        # Split results into components
+        # Order: joints_pos (14), joints_vel (14), foot_contacts (2), base_linear_vel (3), base_angular_vel (3)
+        idx = 0
+        joints_pos = result[:, idx:idx+14]
+        idx += 14
+        joints_vel = result[:, idx:idx+14]
+        idx += 14
+        foot_contacts = result[:, idx:idx+2]
+        idx += 2
+        base_linear_vel = result[:, idx:idx+3]
+        idx += 3
+        base_angular_vel = result[:, idx:idx+3]
 
         return {
-            "joints_pos": joints_pos_batch,
-            "joints_vel": joints_vel_batch,
-            "foot_contacts": foot_contacts_batch,
-            "base_linear_vel": base_linear_vel_batch,
-            "base_angular_vel": base_angular_vel_batch,
+            "joints_pos": joints_pos,
+            "joints_vel": joints_vel,
+            "foot_contacts": foot_contacts,
+            "base_linear_vel": base_linear_vel,
+            "base_angular_vel": base_angular_vel,
         }
 
     def get_period_batch(self, motion_indices: torch.Tensor) -> torch.Tensor:
