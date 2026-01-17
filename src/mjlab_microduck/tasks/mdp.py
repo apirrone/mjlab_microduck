@@ -90,21 +90,16 @@ def imitation_reward(
     )
 
     # Get current state
-    # Joint positions and velocities (exclude neck/head joints)
-    # Joint order (14 total): left_hip_yaw, left_hip_roll, left_hip_pitch, left_knee, left_ankle,
-    #                         neck_pitch, head_pitch, head_yaw, head_roll,
-    #                         right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle
+    # Joint positions and velocities (all 14 joints including head)
+    # Joint order: left_hip_yaw, left_hip_roll, left_hip_pitch, left_knee, left_ankle,
+    #              neck_pitch, head_pitch, head_yaw, head_roll,
+    #              right_hip_yaw, right_hip_roll, right_hip_pitch, right_knee, right_ankle
     joints_pos = asset.data.joint_pos[:, asset_cfg.joint_ids]
     joints_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
 
-    # Remove neck/head joints (indices 5-8) from both robot and reference
-    # Result: 10 joints (left leg 5 + right leg 5)
-    joints_pos_filtered = torch.cat([joints_pos[:, :5], joints_pos[:, 9:]], dim=1)
-    joints_vel_filtered = torch.cat([joints_vel[:, :5], joints_vel[:, 9:]], dim=1)
-
-    # Filter reference motion the same way
-    ref_joints_pos_filtered = torch.cat([ref_data["joints_pos"][:, :5], ref_data["joints_pos"][:, 9:]], dim=1)
-    ref_joints_vel_filtered = torch.cat([ref_data["joints_vel"][:, :5], ref_data["joints_vel"][:, 9:]], dim=1)
+    # Use all 14 joints (including neck/head)
+    ref_joints_pos = ref_data["joints_pos"]
+    ref_joints_vel = ref_data["joints_vel"]
 
     # Base velocities (world frame)
     base_lin_vel = asset.data.root_link_vel_w[:, :3]  # Linear velocity (first 3 components)
@@ -117,11 +112,11 @@ def imitation_reward(
         contacts = torch.zeros((env.num_envs, 2), device=env.device)
 
     # Compute reward components
-    # Joint position: negative squared error
-    joint_pos_rew = -torch.sum(torch.square(joints_pos_filtered - ref_joints_pos_filtered), dim=1) * weight_joint_pos
+    # Joint position: negative squared error (all 14 joints)
+    joint_pos_rew = -torch.sum(torch.square(joints_pos - ref_joints_pos), dim=1) * weight_joint_pos
 
-    # Joint velocity: negative squared error
-    joint_vel_rew = -torch.sum(torch.square(joints_vel_filtered - ref_joints_vel_filtered), dim=1) * weight_joint_vel
+    # Joint velocity: negative squared error (all 14 joints)
+    joint_vel_rew = -torch.sum(torch.square(joints_vel - ref_joints_vel), dim=1) * weight_joint_vel
 
     # Linear velocity XY: exponential reward
     lin_vel_xy_rew = torch.exp(-8.0 * torch.sum(torch.square(base_lin_vel[:, :2] - ref_data["base_linear_vel"][:, :2]), dim=1)) * weight_lin_vel_xy

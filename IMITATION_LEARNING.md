@@ -82,7 +82,10 @@ uv run train Mjlab-Velocity-Flat-MicroDuck-Imitation --env.scene.num-envs 2048
 Each reference motion is keyed by velocity: `"dx_dy_dtheta"` (e.g., `"0.01_0.0_-0.4"`).
 
 The motion contains:
-- **joints_pos** (14 DOF): Joint positions (excluding neck/head)
+- **joints_pos** (14 DOF): Joint positions (all joints including legs and head)
+  - Left leg (5): hip_yaw, hip_roll, hip_pitch, knee, ankle
+  - Head (4): neck_pitch, head_pitch, head_yaw, head_roll
+  - Right leg (5): hip_yaw, hip_roll, hip_pitch, knee, ankle
 - **joints_vel** (14 DOF): Joint velocities
 - **foot_contacts** (2): Binary contact states for left/right feet
 - **base_linear_vel** (3): Base linear velocity in world frame
@@ -144,3 +147,74 @@ You can also adjust the overall imitation reward weight:
 ```python
 cfg.rewards["imitation"].weight = 1.0  # Adjust this value
 ```
+
+## Verifying Reference Motion Playback
+
+To verify that reference motions are played back correctly, use the replay script:
+
+```bash
+# List available motions
+python replay_reference_motion.py ./src/mjlab_microduck/data/reference_motions.pkl --list-motions
+
+# Replay a motion with robot hanging in air (to see leg motion clearly)
+python replay_reference_motion.py ./src/mjlab_microduck/data/reference_motions.pkl \
+    --motion-key "0.01_0.0_-0.4" \
+    --hang
+
+# Replay on ground with gravity
+python replay_reference_motion.py ./src/mjlab_microduck/data/reference_motions.pkl \
+    --motion-key "0.01_0.0_-0.4"
+
+# Replay at different speed
+python replay_reference_motion.py ./src/mjlab_microduck/data/reference_motions.pkl \
+    --motion-key "0.01_0.0_-0.4" \
+    --hang \
+    --speed 0.5
+```
+
+The script:
+- Plays reference motion at 50 Hz (matching training frequency)
+- Shows phase progression and foot contacts
+- Allows verifying that polynomials are evaluated correctly
+- `--hang` mode freezes the robot base in space (pure kinematic replay, no dynamics)
+  - Base position stays fixed
+  - Only leg joints move according to reference motion
+  - Perfect for verifying leg motion patterns
+
+**Interactive keyboard controls:**
+- `↑` (Up Arrow) - Switch to maximum forward motion
+- `↓` (Down Arrow) - Switch to maximum backward motion
+- `←` (Left Arrow) - Switch to maximum left translation
+- `→` (Right Arrow) - Switch to maximum right translation
+- `A` - Switch to maximum rotate left (counterclockwise)
+- `E` - Switch to maximum rotate right (clockwise)
+- `S` - Switch to standing motion (zero velocity)
+- `Space` - Pause/resume playback
+
+The script automatically finds and categorizes motions by velocity, making it easy to interactively explore different reference motions. Phase resets to 0 when switching motions.
+
+## Inference with Imitation
+
+When running inference with a policy trained using imitation learning, you need to enable imitation mode to include the phase observation:
+
+```bash
+python infer_policy.py output.onnx \
+    --imitation \
+    --reference-motion ./src/mjlab_microduck/data/reference_motions.pkl \
+    --lin-vel-x 0.1 \
+    --ang-vel-z 0.0
+```
+
+The `--imitation` flag:
+- Enables phase tracking (updates each timestep based on gait period)
+- Adds the 2D phase observation `[cos(phase * 2π), sin(phase * 2π)]` to the policy input
+- Changes observation size from 51D to 53D
+
+The `--reference-motion` argument is optional - if not provided, a default gait period of 0.72s is used. Providing the reference motion file ensures the phase tracking uses the correct period from your training data.
+
+**Debug mode:**
+```bash
+python infer_policy.py output.onnx --imitation --debug
+```
+
+This will print the phase value and phase observation at each timestep.

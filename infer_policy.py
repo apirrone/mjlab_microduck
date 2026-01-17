@@ -34,10 +34,11 @@ DEFAULT_POSE = np.array([
 
 
 class PolicyInference:
-    def __init__(self, model, data, onnx_path, action_scale=1.0):
+    def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None):
         self.model = model
         self.data = data
         self.action_scale = action_scale
+        self.use_imitation = use_imitation
 
         # Load ONNX model
         print(f"Loading ONNX model from: {onnx_path}")
@@ -75,6 +76,28 @@ class PolicyInference:
 
         # Command (lin_vel_x, lin_vel_y, ang_vel_z)
         self.command = np.zeros(3, dtype=np.float32)
+
+        # Imitation learning phase tracking
+        self.imitation_phase = 0.0
+        self.gait_period = 0.72  # Default period in seconds
+        if self.use_imitation:
+            print(f"\nImitation mode enabled")
+            if reference_motion_path:
+                # Load reference motion to get the actual period
+                import pickle
+                try:
+                    with open(reference_motion_path, 'rb') as f:
+                        ref_data = pickle.load(f)
+                    # Get period from any motion (they should all have similar periods)
+                    first_key = list(ref_data.keys())[0]
+                    self.gait_period = ref_data[first_key]['period']
+                    print(f"  Loaded reference motion from: {reference_motion_path}")
+                    print(f"  Using gait period: {self.gait_period:.3f}s")
+                except Exception as e:
+                    print(f"  Warning: Could not load reference motion: {e}")
+                    print(f"  Using default period: {self.gait_period:.3f}s")
+            else:
+                print(f"  Using default gait period: {self.gait_period:.3f}s")
 
     def quat_rotate_inverse(self, quat, vec):
         """Rotate a vector by the inverse of a quaternion [w, x, y, z].
@@ -133,6 +156,17 @@ class PolicyInference:
         # Default joint vel is 0, so relative vel = absolute vel
         return self.data.qvel[6:6 + self.n_joints].copy().astype(np.float32)
 
+    def get_imitation_phase_obs(self):
+        """Get imitation phase observation [cos(phase * 2π), sin(phase * 2π)]."""
+        angle = self.imitation_phase * 2 * np.pi
+        return np.array([np.cos(angle), np.sin(angle)], dtype=np.float32)
+
+    def update_phase(self, dt):
+        """Update the gait phase based on elapsed time."""
+        if self.use_imitation:
+            self.imitation_phase += dt / self.gait_period
+            self.imitation_phase = self.imitation_phase % 1.0  # Keep in [0, 1]
+
     def get_observations(self):
         """Collect observations matching policy input.
 
@@ -143,8 +177,9 @@ class PolicyInference:
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
         6. command (3D) - velocity command
+        7. imitation_phase (2D) - [cos, sin] (only if use_imitation=True)
 
-        Total: 51D
+        Total: 51D (no imitation) or 53D (with imitation)
         """
         obs = []
 
@@ -169,6 +204,11 @@ class PolicyInference:
 
         # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
         obs.append(self.command)
+
+        # Imitation phase (only if enabled) - 2D
+        if self.use_imitation:
+            phase_obs = self.get_imitation_phase_obs()
+            obs.append(phase_obs)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
@@ -216,6 +256,8 @@ def main():
     parser.add_argument("--lin-vel-y", type=float, default=0.0, help="Linear velocity Y command (m/s)")
     parser.add_argument("--ang-vel-z", type=float, default=0.0, help="Angular velocity Z command (rad/s)")
     parser.add_argument("--action-scale", type=float, default=1.0, help="Action scale (default: 1.0)")
+    parser.add_argument("--imitation", action="store_true", help="Enable imitation mode (adds phase observation)")
+    parser.add_argument("--reference-motion", type=str, default=None, help="Path to reference motion .pkl file (for imitation)")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
     args = parser.parse_args()
@@ -226,7 +268,12 @@ def main():
     data = mujoco.MjData(model)
 
     # Initialize policy
-    policy = PolicyInference(model, data, args.onnx_path, action_scale=args.action_scale)
+    policy = PolicyInference(
+        model, data, args.onnx_path,
+        action_scale=args.action_scale,
+        use_imitation=args.imitation,
+        reference_motion_path=args.reference_motion
+    )
     policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
     # Set initial position to default pose
@@ -251,11 +298,17 @@ def main():
     # Verify observation size
     test_obs = policy.get_observations()
     expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
+    if policy.use_imitation:
+        expected_obs_size += 2  # Add phase observation
+
     if test_obs.size != expected_obs_size:
         print(f"\nWARNING: Observation size mismatch!")
         print(f"  Expected: {expected_obs_size}")
         print(f"  Got: {test_obs.size}")
-        print(f"  Breakdown: 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)")
+        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)"
+        if policy.use_imitation:
+            breakdown += " + 2(imitation_phase)"
+        print(f"  Breakdown: {breakdown}")
         print()
 
     print("\n" + "="*80)
@@ -264,6 +317,8 @@ def main():
     print(f"Control frequency: 50 Hz (decimation: 4)")
     print(f"Simulation timestep: {model.opt.timestep}s")
     print(f"Observation size: {test_obs.size} (expected: {expected_obs_size})")
+    if policy.use_imitation:
+        print(f"Imitation mode: ENABLED (gait period: {policy.gait_period:.3f}s)")
     print("Close viewer window to exit")
     print()
 
@@ -283,6 +338,9 @@ def main():
 
         while viewer.is_running():
             step_start = time.time()
+
+            # Update phase for imitation learning
+            policy.update_phase(control_dt)
 
             # Control loop: run inference and apply action
             action = policy.infer()
@@ -323,6 +381,8 @@ def main():
                     print(f"\n{'='*70}")
                     print(f"Step {control_step_count} DEBUG:")
                     print(f"{'='*70}")
+                    if policy.use_imitation:
+                        print(f"Imitation phase: {policy.imitation_phase:.4f} (period: {policy.gait_period:.3f}s)")
                     print(f"Base state:")
                     print(f"  Position: [{pos[0]:7.4f}, {pos[1]:7.4f}, {pos[2]:7.4f}]")
                     print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
@@ -332,7 +392,10 @@ def main():
                     print(f"  Joint pos [6:20]:     {obs[6:6+policy.n_joints]}")
                     print(f"  Joint vel [20:34]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
                     print(f"  Last action [34:48]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
-                    print(f"  Command [48:51]:      {obs[6+3*policy.n_joints:]}")
+                    cmd_end = 6+3*policy.n_joints+3
+                    print(f"  Command [48:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
+                    if policy.use_imitation:
+                        print(f"  Phase [cos,sin]:      {obs[cmd_end:]}")
                     print(f"\nAction output:")
                     print(f"  Raw action: {action}")
                     print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
