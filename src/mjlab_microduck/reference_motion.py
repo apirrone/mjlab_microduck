@@ -24,6 +24,7 @@ class ReferenceMotionLoader:
         # Cache for motion keys sorted by velocity magnitude
         self._motion_keys = list(self.data.keys())
         self._parse_velocities()
+        self._precompute_gpu_data()
 
     def _parse_velocities(self):
         """Parse dx, dy, dtheta from motion keys"""
@@ -34,9 +35,23 @@ class ReferenceMotionLoader:
                 dx, dy, dtheta = float(parts[0]), float(parts[1]), float(parts[2])
                 self.velocities[key] = np.array([dx, dy, dtheta])
 
+    def _precompute_gpu_data(self):
+        """Precompute data structures for fast GPU operations"""
+        # Velocity array for all motions: (num_motions, 3)
+        motion_keys_list = list(self.velocities.keys())
+        vel_array = np.array([self.velocities[key] for key in motion_keys_list])
+        self._vel_array_np = vel_array  # Keep numpy version for CPU fallback
+        self._vel_tensor = None  # Will be created on device when needed
+
+        # Period array for all motions: (num_motions,)
+        period_array = np.array([self.data[key]["period"] for key in motion_keys_list], dtype=np.float32)
+        self._period_array_np = period_array
+        self._period_tensor = None  # Will be created on device when needed
+
     def find_closest_motion(self, commanded_vel: torch.Tensor) -> torch.Tensor:
         """
         Find the reference motion closest to the commanded velocity for each environment
+        Fully vectorized GPU implementation for performance.
 
         Args:
             commanded_vel: (batch, 3) tensor with [vel_x, vel_y, ang_vel_z]
@@ -44,23 +59,24 @@ class ReferenceMotionLoader:
         Returns:
             Integer tensor (batch,) with motion indices for each environment
         """
-        # Convert commanded velocities to numpy
-        cmd_np = commanded_vel.cpu().numpy() if torch.is_tensor(commanded_vel) else commanded_vel
+        device = commanded_vel.device
 
-        batch_size = cmd_np.shape[0]
-        motion_indices = np.zeros(batch_size, dtype=np.int32)
+        # Lazy initialization of GPU tensors
+        if self._vel_tensor is None or self._vel_tensor.device != device:
+            self._vel_tensor = torch.from_numpy(self._vel_array_np).float().to(device)
 
-        # Pre-compute velocity array for all motions
-        motion_keys_list = list(self.velocities.keys())
-        vel_array = np.array([self.velocities[key] for key in motion_keys_list])  # (num_motions, 3)
+        # Vectorized distance computation on GPU
+        # commanded_vel: (batch, 3)
+        # vel_tensor: (num_motions, 3)
+        # Compute pairwise distances: (batch, num_motions)
+        # Expand dimensions for broadcasting: (batch, 1, 3) - (1, num_motions, 3)
+        diff = commanded_vel.unsqueeze(1) - self._vel_tensor.unsqueeze(0)  # (batch, num_motions, 3)
+        distances = torch.linalg.norm(diff, dim=2)  # (batch, num_motions)
 
-        # For each environment, find closest motion
-        for i in range(batch_size):
-            # Compute distance to all motions
-            dists = np.linalg.norm(vel_array - cmd_np[i], axis=1)
-            motion_indices[i] = np.argmin(dists)
+        # Find closest motion for each environment
+        motion_indices = torch.argmin(distances, dim=1)  # (batch,)
 
-        return torch.from_numpy(motion_indices).to(commanded_vel.device)
+        return motion_indices
 
     def get_motion_key(self, motion_idx: int) -> str:
         """Get motion key from integer index"""
@@ -187,6 +203,7 @@ class ReferenceMotionLoader:
     def get_period_batch(self, motion_indices: torch.Tensor) -> torch.Tensor:
         """
         Get periods for a batch of motion indices
+        Vectorized GPU implementation for performance.
 
         Args:
             motion_indices: (batch,) tensor with integer motion indices
@@ -194,11 +211,13 @@ class ReferenceMotionLoader:
         Returns:
             Periods tensor (batch,) in seconds
         """
-        motion_keys_list = list(self.velocities.keys())
-        periods = torch.zeros(motion_indices.shape[0], dtype=torch.float32, device=motion_indices.device)
+        device = motion_indices.device
 
-        for i, idx in enumerate(motion_indices):
-            motion_key = motion_keys_list[idx.item()]
-            periods[i] = self.data[motion_key]["period"]
+        # Lazy initialization of GPU tensors
+        if self._period_tensor is None or self._period_tensor.device != device:
+            self._period_tensor = torch.from_numpy(self._period_array_np).to(device)
+
+        # Simple indexing operation on GPU - very fast
+        periods = self._period_tensor[motion_indices]
 
         return periods
