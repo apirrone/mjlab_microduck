@@ -181,7 +181,7 @@ def make_microduck_velocity_env_cfg(
 
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.25
+    command.rel_standing_envs = 0.1
     command.rel_heading_envs = 0.0
 
     cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
@@ -230,8 +230,7 @@ def make_microduck_velocity_env_cfg(
             # Simplified reward set for imitation learning (matching Open Duck Playground)
             # Disable most rewards and keep only essential ones
             rewards_to_disable = [
-                "upright", "body_ang_vel", "angular_momentum", "air_time",
-                "pose", "foot_clearance", "foot_swing_height", "foot_slip",
+                "upright", "body_ang_vel", "angular_momentum", "air_time", "foot_clearance", "foot_swing_height", "foot_slip",
                 "self_collisions", "feet_stumble", "feet_slide", "dof_acc"
             ]
             for reward_name in rewards_to_disable:
@@ -281,12 +280,13 @@ def make_microduck_velocity_env_cfg(
             params={"imitation_state": imitation_state}
         )
 
-        # Add reference motion to critic privileged observations (training only)
-        if not play:
-            cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
-                func=microduck_mdp.reference_motion_observation,
-                params={"imitation_state": imitation_state}
-            )
+        # Add reference motion to critic privileged observations
+        # Include in both training and play to keep model architecture consistent
+        # (critic is not used during play, but needs same size to load checkpoint)
+        cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
+            func=microduck_mdp.reference_motion_observation,
+            params={"imitation_state": imitation_state}
+        )
 
     return cfg
 
