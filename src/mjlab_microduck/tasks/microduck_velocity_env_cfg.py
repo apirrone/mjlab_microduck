@@ -26,8 +26,48 @@ from mjlab.entity import Entity
 
 from mjlab_microduck.tasks import mdp as microduck_mdp
 from mjlab_microduck.reference_motion import ReferenceMotionLoader
+import torch
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
+
+
+def debug_joint_properties(env: ManagerBasedRlEnv, env_ids: torch.Tensor, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG):
+    """Debug function to print joint properties on first call."""
+    if not hasattr(debug_joint_properties, "_printed"):
+        print("\n" + "="*70)
+        print("MJLAB JOINT PROPERTIES DEBUG")
+        print("="*70)
+
+        # Get model from the sim
+        model = env.sim.mj_model
+
+        print(f"\nModel timestep: {model.opt.timestep:.6f}s")
+        print(f"Number of actuators: {model.nu}")
+
+        print("\nACTUATOR PROPERTIES:")
+        for i in range(model.nu):
+            import mujoco
+            actuator_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+            joint_id = model.actuator_trnid[i, 0]
+            joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+
+            # Get actuator properties
+            gain = model.actuator_gainprm[i, 0]  # kp
+            bias = model.actuator_biasprm[i, 1]  # kv
+            forcerange = model.actuator_forcerange[i]
+
+            # Get DOF address for this joint (joints can have multiple DOFs)
+            dof_adr = model.jnt_dofadr[joint_id]
+            damping = model.dof_damping[dof_adr]
+            armature = model.dof_armature[dof_adr]
+            frictionloss = model.dof_frictionloss[dof_adr]
+
+            print(f"  {i:2d}. {actuator_name:20s} -> {joint_name:20s}")
+            print(f"      Actuator: kp={gain:6.2f}, kv={bias:6.2f}, force=[{forcerange[0]:6.2f}, {forcerange[1]:6.2f}]")
+            print(f"      Joint:    damping={damping:6.3f}, armature={armature:6.4f}, friction={frictionloss:6.3f}")
+
+        print("="*70 + "\n")
+        debug_joint_properties._printed = True
 
 
 def joint_vel_l2(
@@ -121,6 +161,12 @@ def make_microduck_velocity_env_cfg(
         func=mdp.self_collision_cost,
         weight=-1.0,
         params={"sensor_name": self_collision_cfg.name},
+    )
+
+    # Add debug event to print joint properties at startup
+    cfg.events["debug_joint_properties"] = EventTermCfg(
+        func=debug_joint_properties,
+        mode="startup",
     )
 
     cfg.events["foot_friction"].params[

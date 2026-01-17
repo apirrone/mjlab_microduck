@@ -6,7 +6,7 @@
   <default>
     <default class="microduck">
       <joint frictionloss="0.1" armature="0.005"/>
-      <position kp="50" dampratio="1"/>
+      <position kp="50" kv="0.0"/>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2"/>
       </default>
@@ -32,7 +32,14 @@
       <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 200 -->
       <position kp="0.32" kv="0.0" forcerange="-0.66 0.66"/>
-      <default class="chosen_actuator"/>
+    </default>
+    <!-- Chosen actuator class with explicit properties (based on xc330m288t) -->
+    <!-- This can be easily modified to switch between different actuator models -->
+    <default class="chosen_actuator">
+      <geom contype="0" conaffinity="0"/>
+      <joint damping="0.035" frictionloss="0.021" armature="0.0017"/>
+      <!-- Using kv=0.0 (no velocity feedback), overriding dampratio from parent classes -->
+      <position kp="0.32" kv="0.0" forcerange="-0.66 0.66"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->

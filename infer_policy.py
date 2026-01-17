@@ -34,11 +34,14 @@ DEFAULT_POSE = np.array([
 
 
 class PolicyInference:
-    def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None):
+    def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None,
+                 delay_min_lag=0, delay_max_lag=0):
         self.model = model
         self.data = data
         self.action_scale = action_scale
         self.use_imitation = use_imitation
+        self.delay_min_lag = delay_min_lag
+        self.delay_max_lag = delay_max_lag
 
         # Load ONNX model
         print(f"Loading ONNX model from: {onnx_path}")
@@ -98,6 +101,23 @@ class PolicyInference:
                     print(f"  Using default period: {self.gait_period:.3f}s")
             else:
                 print(f"  Using default gait period: {self.gait_period:.3f}s")
+
+        # Action delay buffer (matches mjlab's DelayedActuatorCfg)
+        self.use_delay = self.delay_max_lag > 0
+        if self.use_delay:
+            buffer_size = self.delay_max_lag + 1
+            self.action_buffer = [np.zeros(self.n_joints, dtype=np.float32) for _ in range(buffer_size)]
+            self.buffer_index = 0
+            # Sample a fixed lag for single-environment inference (matches mjlab behavior)
+            self.current_lag = np.random.randint(self.delay_min_lag, self.delay_max_lag + 1)
+            print(f"\nActuator delay enabled:")
+            print(f"  Min lag: {self.delay_min_lag} timesteps")
+            print(f"  Max lag: {self.delay_max_lag} timesteps")
+            print(f"  Sampled lag: {self.current_lag} timesteps")
+            print(f"  Buffer size: {buffer_size}")
+        else:
+            self.action_buffer = None
+            self.current_lag = 0
 
     def quat_rotate_inverse(self, quat, vec):
         """Rotate a vector by the inverse of a quaternion [w, x, y, z].
@@ -238,14 +258,34 @@ class PolicyInference:
         return action
 
     def apply_action(self, action):
-        """Apply action to MuJoCo controls (NO delay for sim2sim).
+        """Apply action to MuJoCo controls with optional delay.
 
         Motor targets = default_pose + action * action_scale
-        """
-        # Process action: default_pose + action * scale
-        target_positions = self.default_pose + action * self.action_scale
 
-        # Set control targets (no delay for sim2sim testing)
+        If delay is enabled, the action is buffered and a delayed action
+        from T-lag timesteps ago is applied instead (matching mjlab's DelayedActuatorCfg).
+        """
+        if self.use_delay:
+            # Add current action to circular buffer
+            self.action_buffer[self.buffer_index] = action.copy()
+
+            # Calculate index for delayed action (T - lag timesteps ago)
+            # Buffer stores most recent actions in order: [t-2, t-1, t]
+            # If buffer_index=2 and lag=1, we want action at index 1 (t-1)
+            # If buffer_index=2 and lag=2, we want action at index 0 (t-2)
+            delayed_index = (self.buffer_index - self.current_lag) % len(self.action_buffer)
+            delayed_action = self.action_buffer[delayed_index]
+
+            # Advance buffer index (circular)
+            self.buffer_index = (self.buffer_index + 1) % len(self.action_buffer)
+
+            # Use delayed action
+            target_positions = self.default_pose + delayed_action * self.action_scale
+        else:
+            # No delay: use current action directly
+            target_positions = self.default_pose + action * self.action_scale
+
+        # Set control targets
         self.data.ctrl[:] = target_positions
 
 
@@ -258,9 +298,30 @@ def main():
     parser.add_argument("--action-scale", type=float, default=1.0, help="Action scale (default: 1.0)")
     parser.add_argument("--imitation", action="store_true", help="Enable imitation mode (adds phase observation)")
     parser.add_argument("--reference-motion", type=str, default=None, help="Path to reference motion .pkl file (for imitation)")
+    parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
     args = parser.parse_args()
+
+    # Parse delay arguments
+    delay_min_lag = 0
+    delay_max_lag = 0
+    if args.delay is not None:
+        if len(args.delay) == 0:
+            # --delay with no arguments: use mjlab default (1-2 timesteps)
+            delay_min_lag = 1
+            delay_max_lag = 2
+        elif len(args.delay) == 1:
+            # --delay LAG: fixed delay
+            delay_min_lag = args.delay[0]
+            delay_max_lag = args.delay[0]
+        elif len(args.delay) == 2:
+            # --delay MIN MAX: random delay in range
+            delay_min_lag = args.delay[0]
+            delay_max_lag = args.delay[1]
+        else:
+            print("Error: --delay accepts 0, 1, or 2 arguments")
+            return
 
     # Load MuJoCo model
     print(f"Loading MuJoCo model from: {MICRODUCK_XML}")
@@ -272,7 +333,9 @@ def main():
         model, data, args.onnx_path,
         action_scale=args.action_scale,
         use_imitation=args.imitation,
-        reference_motion_path=args.reference_motion
+        reference_motion_path=args.reference_motion,
+        delay_min_lag=delay_min_lag,
+        delay_max_lag=delay_max_lag
     )
     policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
@@ -399,6 +462,8 @@ def main():
                     print(f"\nAction output:")
                     print(f"  Raw action: {action}")
                     print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
+                    if policy.use_delay:
+                        print(f"  Delay: {policy.current_lag} timesteps (buffered)")
                     print(f"  Applied ctrl (first 5): {data.ctrl[:5]}")
                     print(f"  Applied ctrl (last 5):  {data.ctrl[-5:]}")
 
