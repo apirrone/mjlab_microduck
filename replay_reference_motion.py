@@ -200,6 +200,80 @@ class ReferenceMotionPlayer:
 
         return ref
 
+    def compute_imitation_reward(self, ref):
+        """
+        Compute imitation reward components to verify perfect playback.
+        Uses same weights as training (from microduck_velocity_env_cfg.py).
+        """
+        # Get actual state after applying reference motion
+        actual_joints_pos = self.data.qpos[7:7 + self.n_joints]
+        actual_joints_vel = self.data.qvel[6:6 + self.n_joints]
+        actual_base_lin_vel = self.data.qvel[0:3]
+        actual_base_ang_vel = self.data.qvel[3:6]
+
+        # Reference state
+        ref_joints_pos = ref['joints_pos']
+        ref_joints_vel = ref['joints_vel']
+        ref_base_lin_vel = ref['base_linear_vel']
+        ref_base_ang_vel = ref['base_angular_vel']
+        ref_foot_contacts = ref['foot_contacts']
+
+        # Weights from training config
+        weight_joint_pos = 15.0
+        weight_joint_vel = 1e-3
+        weight_lin_vel_xy = 1.0
+        weight_lin_vel_z = 1.0
+        weight_ang_vel_xy = 0.5
+        weight_ang_vel_z = 0.5
+        weight_contact = 1.0
+
+        # Compute errors
+        joint_pos_error = np.sum(np.square(actual_joints_pos - ref_joints_pos))
+        joint_vel_error = np.sum(np.square(actual_joints_vel - ref_joints_vel))
+
+        # Joint rewards (negative squared error)
+        joint_pos_rew = -joint_pos_error * weight_joint_pos
+        joint_vel_rew = -joint_vel_error * weight_joint_vel
+
+        # Velocity rewards (exponential)
+        lin_vel_xy_error = np.sum(np.square(actual_base_lin_vel[:2] - ref_base_lin_vel[:2]))
+        lin_vel_z_error = np.square(actual_base_lin_vel[2] - ref_base_lin_vel[2])
+        ang_vel_xy_error = np.sum(np.square(actual_base_ang_vel[:2] - ref_base_ang_vel[:2]))
+        ang_vel_z_error = np.square(actual_base_ang_vel[2] - ref_base_ang_vel[2])
+
+        lin_vel_xy_rew = np.exp(-8.0 * lin_vel_xy_error) * weight_lin_vel_xy
+        lin_vel_z_rew = np.exp(-8.0 * lin_vel_z_error) * weight_lin_vel_z
+        ang_vel_xy_rew = np.exp(-2.0 * ang_vel_xy_error) * weight_ang_vel_xy
+        ang_vel_z_rew = np.exp(-2.0 * ang_vel_z_error) * weight_ang_vel_z
+
+        # Contact reward (binary match - can't compute without actual contact sensor)
+        # For perfect replay in hang mode, this would be 0 anyway
+        contact_rew = 0.0
+
+        total_rew = (joint_pos_rew + joint_vel_rew +
+                     lin_vel_xy_rew + lin_vel_z_rew +
+                     ang_vel_xy_rew + ang_vel_z_rew + contact_rew)
+
+        return {
+            'total': total_rew,
+            'joint_pos': joint_pos_rew,
+            'joint_vel': joint_vel_rew,
+            'lin_vel_xy': lin_vel_xy_rew,
+            'lin_vel_z': lin_vel_z_rew,
+            'ang_vel_xy': ang_vel_xy_rew,
+            'ang_vel_z': ang_vel_z_rew,
+            'contact': contact_rew,
+            # Also return raw errors for debugging
+            'errors': {
+                'joint_pos': joint_pos_error,
+                'joint_vel': joint_vel_error,
+                'lin_vel_xy': lin_vel_xy_error,
+                'lin_vel_z': lin_vel_z_error,
+                'ang_vel_xy': ang_vel_xy_error,
+                'ang_vel_z': ang_vel_z_error,
+            }
+        }
+
 
 def main():
     parser = argparse.ArgumentParser(description="Replay reference motion in MuJoCo")
@@ -208,6 +282,7 @@ def main():
     parser.add_argument("--list-motions", action="store_true", help="List available motion keys and exit")
     parser.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier (default: 1.0)")
     parser.add_argument("--hang", action="store_true", help="Keep robot hanging in air (disable gravity)")
+    parser.add_argument("--check-reward", action="store_true", help="Compute and display imitation reward components")
     args = parser.parse_args()
 
     # Load reference data to list motions
@@ -275,6 +350,8 @@ def main():
         print("Mode: HANGING (no gravity)")
     else:
         print("Mode: ON GROUND (with gravity)")
+    if args.check_reward:
+        print("Reward checking: ENABLED")
     print("\n" + "="*80)
     print("Keyboard Controls:")
     print("="*80)
@@ -288,6 +365,9 @@ def main():
     print("  Space           - Pause/resume")
     print("="*80)
     print("Close viewer window to exit")
+    if args.check_reward:
+        print("\nWith --check-reward enabled, imitation reward components will be displayed.")
+        print("In hang mode with perfect replay, you should see high reward values and low errors.")
     print()
 
     # Control loop
@@ -367,9 +447,28 @@ def main():
             # Print status every second or when motion changes
             if step_count % 50 == 0 or motion_changed[0]:
                 motion_info = f"{player.motion_key:20s} | dx={player.motion['Placo']['dx']:6.2f} dy={player.motion['Placo']['dy']:6.2f} dtheta={player.motion['Placo']['dtheta']:6.2f}"
-                print(f"Step {step_count:5d} | Phase: {player.phase:.4f} | "
-                      f"Contacts: L={ref['foot_contacts'][0]:.2f} R={ref['foot_contacts'][1]:.2f} | "
-                      f"Motion: {motion_info}")
+                status = (f"Step {step_count:5d} | Phase: {player.phase:.4f} | "
+                          f"Contacts: L={ref['foot_contacts'][0]:.2f} R={ref['foot_contacts'][1]:.2f} | "
+                          f"Motion: {motion_info}")
+
+                if args.check_reward:
+                    # Compute imitation reward
+                    reward_info = player.compute_imitation_reward(ref)
+                    reward_status = (f"\n  Reward: {reward_info['total']:8.3f} | "
+                                     f"Joint Pos: {reward_info['joint_pos']:8.3f} | "
+                                     f"Joint Vel: {reward_info['joint_vel']:8.3f} | "
+                                     f"Lin XY: {reward_info['lin_vel_xy']:6.3f} | "
+                                     f"Lin Z: {reward_info['lin_vel_z']:6.3f} | "
+                                     f"Ang XY: {reward_info['ang_vel_xy']:6.3f} | "
+                                     f"Ang Z: {reward_info['ang_vel_z']:6.3f}")
+                    # Also show raw errors for debugging
+                    error_status = (f"\n  Errors: Joint Pos: {reward_info['errors']['joint_pos']:8.6f} | "
+                                    f"Joint Vel: {reward_info['errors']['joint_vel']:8.6f} | "
+                                    f"Lin XY: {reward_info['errors']['lin_vel_xy']:8.6f} | "
+                                    f"Lin Z: {reward_info['errors']['lin_vel_z']:8.6f}")
+                    status += reward_status + error_status
+
+                print(status)
                 motion_changed[0] = False
 
             # Sleep to maintain timing
