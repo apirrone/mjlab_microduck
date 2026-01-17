@@ -123,6 +123,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
     cfg.rewards["air_time"].weight = 0.5
+    cfg.rewards["air_time"].params["command_threshold"] = 0.01
 
     cfg.rewards["track_linear_velocity"].weight = 4.0  # Was 2.0
     cfg.rewards["track_angular_velocity"].weight = 4.0  # Was 2.0
@@ -160,7 +161,7 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     }
 
     # Slightly increased L2 action rate penalty
-    cfg.rewards["action_rate_l2"].weight = -0.7
+    cfg.rewards["action_rate_l2"].weight = -0.3
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)
@@ -192,8 +193,8 @@ def make_microduck_velocity_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     cfg.commands["twist"].ranges.ang_vel_z = (-1.0, 1.0)
-    cfg.commands["twist"].ranges.lin_vel_y = (-0.5, 0.5)
-    cfg.commands["twist"].ranges.lin_vel_x = (-0.5, 0.5)
+    cfg.commands["twist"].ranges.lin_vel_y = (-1.0, 1.0)
+    cfg.commands["twist"].ranges.lin_vel_x = (-1.0, 1.0)
 
     if play:
         #Disabling push
