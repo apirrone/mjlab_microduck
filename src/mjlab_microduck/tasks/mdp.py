@@ -31,6 +31,73 @@ class ImitationRewardState:
             self.phase[env_ids] = 0.0
 
 
+def reset_action_history(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+):
+    """
+    Reset cached action history for environments that are being reset.
+    This is critical for action rate and acceleration penalty terms.
+
+    This function should be called in the post_reset callback or at episode termination.
+
+    Args:
+        env: The environment
+        env_ids: Indices of environments being reset
+        asset_cfg: Asset configuration
+    """
+    if len(env_ids) == 0:
+        return
+
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Reset leg action rate cache
+    if hasattr(env, '_prev_leg_actions'):
+        # Set to current action (or zero if no action yet)
+        if hasattr(env, 'action_manager') and env.action_manager.action is not None:
+            leg_joint_indices = list(range(0, 5)) + list(range(9, 14))
+            env._prev_leg_actions[env_ids] = env.action_manager.action[env_ids][:, leg_joint_indices]
+        else:
+            env._prev_leg_actions[env_ids] = 0.0
+
+    # Reset neck action rate cache
+    if hasattr(env, '_prev_neck_actions'):
+        if hasattr(env, 'action_manager') and env.action_manager.action is not None:
+            neck_joint_indices = list(range(5, 9))
+            env._prev_neck_actions[env_ids] = env.action_manager.action[env_ids][:, neck_joint_indices]
+        else:
+            env._prev_neck_actions[env_ids] = 0.0
+
+    # Reset leg action acceleration cache
+    if hasattr(env, '_prev_leg_actions_for_acc'):
+        if hasattr(env, 'action_manager') and env.action_manager.action is not None:
+            leg_joint_indices = list(range(0, 5)) + list(range(9, 14))
+            current_action = env.action_manager.action[env_ids][:, leg_joint_indices]
+            env._prev_leg_actions_for_acc[env_ids] = current_action
+            env._prev_prev_leg_actions_for_acc[env_ids] = current_action
+        else:
+            env._prev_leg_actions_for_acc[env_ids] = 0.0
+            env._prev_prev_leg_actions_for_acc[env_ids] = 0.0
+
+    # Reset neck action acceleration cache
+    if hasattr(env, '_prev_neck_actions_for_acc'):
+        if hasattr(env, 'action_manager') and env.action_manager.action is not None:
+            neck_joint_indices = list(range(5, 9))
+            current_action = env.action_manager.action[env_ids][:, neck_joint_indices]
+            env._prev_neck_actions_for_acc[env_ids] = current_action
+            env._prev_prev_neck_actions_for_acc[env_ids] = current_action
+        else:
+            env._prev_neck_actions_for_acc[env_ids] = 0.0
+            env._prev_prev_neck_actions_for_acc[env_ids] = 0.0
+
+    # Reset joint velocity cache for joint accelerations
+    if hasattr(asset.data, '_prev_joint_vel'):
+        # Get current joint velocities for reset environments
+        joint_vel = asset.data.joint_vel[env_ids, :][:, asset_cfg.joint_ids]
+        asset.data._prev_joint_vel[env_ids] = joint_vel
+
+
 def imitation_reward(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,

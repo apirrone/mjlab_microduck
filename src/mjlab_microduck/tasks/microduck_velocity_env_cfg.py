@@ -169,6 +169,13 @@ def make_microduck_velocity_env_cfg(
         mode="startup",
     )
 
+    # Add reset event to clear action history caches
+    # This is critical for action rate and acceleration penalties
+    cfg.events["reset_action_history"] = EventTermCfg(
+        func=microduck_mdp.reset_action_history,
+        mode="reset",
+    )
+
     cfg.events["foot_friction"].params[
         "asset_cfg"
     ].geom_names = foot_frictions_geom_names
@@ -362,6 +369,12 @@ def make_microduck_velocity_env_cfg(
                     "weight_contact": 1.0,  # Σ_i∈{L,R} 1[c_i = ĉ_i]
                 }
             )
+
+        # Add reset event to reset imitation phase
+        cfg.events["reset_imitation_phase"] = EventTermCfg(
+            func=lambda env, env_ids: imitation_state.reset_phases(env_ids),
+            mode="reset",
+        )
 
         # Add phase observation to policy (for both training and play)
         cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(

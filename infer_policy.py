@@ -283,6 +283,7 @@ class PolicyInference:
             target_positions = self.default_pose + delayed_action * self.action_scale
         else:
             # No delay: use current action directly
+            # target_positions = self.default_pose# + action * self.action_scale
             target_positions = self.default_pose + action * self.action_scale
 
         # Set control targets
