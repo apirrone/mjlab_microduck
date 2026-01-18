@@ -371,8 +371,8 @@ def make_microduck_velocity_env_cfg(
                     "weight_neck_joint_pos": 100.0,  # -||q_n - q̂_n||²
                     "weight_leg_joint_vel": 1.0e-3,  # -||q̇_l - q̇̂_l||²
                     "weight_neck_joint_vel": 1.0,    # -||q̇_n - q̇̂_n||²
-                    # Contact tracking
-                    "weight_contact": 1.0,  # Σ_i∈{L,R} 1[c_i = ĉ_i]
+                    # Contact tracking (INCREASED to encourage foot lifting during swing)
+                    "weight_contact": 10.0,  # Was 1.0 - includes -5.0 penalty per wrong contact during swing
                 }
             )
 

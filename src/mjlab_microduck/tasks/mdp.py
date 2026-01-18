@@ -261,10 +261,35 @@ def imitation_reward(
     # Neck joint velocities: negative squared error (4 neck joints)
     neck_joint_vel_rew = -torch.sum(torch.square(neck_joints_vel - ref_neck_joints_vel), dim=1) * weight_neck_joint_vel
 
-    # Contact reward: binary match
+    # Contact reward: binary match with exponential penalty for mismatches
+    # This encourages lifting feet during swing phase
     ref_contacts = (ref_data["foot_contacts"] > 0.5).float()
     contacts_float = contacts.float()
-    contact_rew = torch.sum(contacts_float == ref_contacts, dim=1) * weight_contact
+
+    # Debug: Print contact info once to verify reference motion has swing phases
+    if not hasattr(imitation_reward, "_contact_debug_printed"):
+        print("\n" + "="*70)
+        print("CONTACT REWARD DEBUG (first environment, first call)")
+        print("="*70)
+        print(f"Reference contacts (left, right): {ref_contacts[0].cpu().numpy()}")
+        print(f"Robot contacts (left, right): {contacts_float[0].cpu().numpy()}")
+        print(f"Contact sensor shape: {contacts_float.shape}")
+        print(f"Has swing phase in reference? {torch.any(ref_contacts == 0.0).item()}")
+        print("="*70 + "\n")
+        imitation_reward._contact_debug_printed = True
+
+    # Compute per-foot contact matching (0 if mismatch, 1 if match)
+    contact_matches = (contacts_float == ref_contacts).float()  # (num_envs, 2)
+
+    # Original linear reward (keep for when contacts match)
+    contact_rew_linear = torch.sum(contact_matches, dim=1) * weight_contact
+
+    # Add exponential penalty for wrong contacts (especially for keeping foot down during swing)
+    # When ref says "lift foot" (ref=0) but robot keeps it down (contact=1), add large penalty
+    wrong_contact_penalty = torch.sum((ref_contacts == 0.0) & (contacts_float == 1.0), dim=1)
+
+    # Combined reward: linear bonus for matches, exponential penalty for wrong contacts during swing
+    contact_rew = contact_rew_linear - 5.0 * wrong_contact_penalty
 
     # Total reward
     reward = (
