@@ -347,14 +347,14 @@ def make_microduck_velocity_env_cfg(
             # Survival reward: 1.0, weight 0.5 (REDUCED to not dominate)
             cfg.rewards["alive"] = RewardTermCfg(
                 func=microduck_mdp.is_alive,
-                weight=0.5  # Was 20.0 - reduced to prevent "stand still" local optimum
+                weight=10.0  # Was 20.0 - reduced to prevent "stand still" local optimum
             )
 
             # Imitation reward (BD-X paper Table I)
             # INCREASED outer weight to make imitation dominant
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=10.0,  # Was 1.0 - increased to dominate over other rewards
+                weight=1.0,  # Was 1.0 - increased to dominate over other rewards
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
