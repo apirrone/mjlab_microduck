@@ -297,8 +297,8 @@ def make_microduck_velocity_env_cfg(
 
             # DISABLE velocity tracking rewards - they conflict with imitation learning
             # The imitation reward handles velocity tracking internally
-            cfg.rewards["track_linear_velocity"].weight = 0.0
-            cfg.rewards["track_angular_velocity"].weight = 0.0
+            cfg.rewards["track_linear_velocity"].weight = 3.0
+            cfg.rewards["track_angular_velocity"].weight = 3.0
 
             # Regularization rewards (BD-X paper Table I)
             # Joint torques: -||τ||², weight 1.0·10⁻³
@@ -372,7 +372,7 @@ def make_microduck_velocity_env_cfg(
                     "weight_leg_joint_vel": 1.0e-3,  # -||q̇_l - q̇̂_l||²
                     "weight_neck_joint_vel": 1.0,    # -||q̇_n - q̇̂_n||²
                     # Contact tracking (INCREASED to encourage foot lifting during swing)
-                    "weight_contact": 10.0,  # Was 1.0 - includes -5.0 penalty per wrong contact during swing
+                    "weight_contact": 5.0,  # Was 10
                 }
             )
 
