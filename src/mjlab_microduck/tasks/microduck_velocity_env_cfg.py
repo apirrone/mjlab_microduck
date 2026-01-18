@@ -295,9 +295,10 @@ def make_microduck_velocity_env_cfg(
                 if reward_name in cfg.rewards:
                     cfg.rewards[reward_name].weight = 0.0
 
-            # Basic velocity tracking rewards (minimal weights)
-            cfg.rewards["track_linear_velocity"].weight = 2.5
-            cfg.rewards["track_angular_velocity"].weight = 6.0
+            # DISABLE velocity tracking rewards - they conflict with imitation learning
+            # The imitation reward handles velocity tracking internally
+            cfg.rewards["track_linear_velocity"].weight = 0.0
+            cfg.rewards["track_angular_velocity"].weight = 0.0
 
             # Regularization rewards (BD-X paper Table I)
             # Joint torques: -||τ||², weight 1.0·10⁻³
@@ -316,39 +317,44 @@ def make_microduck_velocity_env_cfg(
             )
 
             # Leg action rate: -||a_l - a_{t-1,l}||², weight 1.5
+            # REDUCED by 10x initially to allow exploration
             cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_rate_l2,
-                weight=-1.5
+                weight=-0.15  # Was -1.5
             )
 
             # Neck action rate: -||a_n - a_{t-1,n}||², weight 5.0
+            # REDUCED by 10x initially to allow exploration
             cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_rate_l2,
-                weight=-5.0
+                weight=-0.5  # Was -5.0
             )
 
             # Leg action acceleration: -||a_l - 2a_{t-1,l} + a_{t-2,l}||², weight 0.45
+            # REDUCED by 10x initially to allow exploration
             cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_acceleration_l2,
-                weight=-0.45
+                weight=-0.045  # Was -0.45
             )
 
             # Neck action acceleration: -||a_n - 2a_{t-1,n} + a_{t-2,n}||², weight 5.0
+            # REDUCED by 10x initially to allow exploration
             cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_acceleration_l2,
-                weight=-5.0
+                weight=-0.5  # Was -5.0
             )
 
-            # Survival reward: 1.0, weight 20.0
+            # Survival reward: 1.0, weight 0.5 (REDUCED to not dominate)
             cfg.rewards["alive"] = RewardTermCfg(
                 func=microduck_mdp.is_alive,
-                weight=20.0
+                weight=0.5  # Was 20.0 - reduced to prevent "stand still" local optimum
             )
 
             # Imitation reward (BD-X paper Table I)
+            # INCREASED outer weight to make imitation dominant
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=1.0,  # Individual weights are specified inside the function
+                weight=10.0,  # Was 1.0 - increased to dominate over other rewards
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
