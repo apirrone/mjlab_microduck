@@ -36,23 +36,37 @@ def imitation_reward(
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
     imitation_state: Optional[ImitationRewardState] = None,
     command_threshold: float = 0.01,
-    weight_joint_pos: float = 15.0,
-    weight_joint_vel: float = 1e-3,
+    weight_torso_pos_xy: float = 1.0,
+    weight_torso_orient: float = 1.0,
     weight_lin_vel_xy: float = 1.0,
     weight_lin_vel_z: float = 1.0,
     weight_ang_vel_xy: float = 0.5,
     weight_ang_vel_z: float = 0.5,
+    weight_leg_joint_pos: float = 15.0,
+    weight_neck_joint_pos: float = 100.0,
+    weight_leg_joint_vel: float = 1e-3,
+    weight_neck_joint_vel: float = 1.0,
     weight_contact: float = 1.0,
 ) -> torch.Tensor:
     """
-    Imitation reward based on reference motion tracking
+    Imitation reward based on reference motion tracking (BD-X paper structure)
 
     Args:
         env: The environment
         asset_cfg: Asset configuration
         imitation_state: State object holding reference motion loader and phase tracking
         command_threshold: Minimum command magnitude to apply reward
-        weight_*: Weights for different reward components
+        weight_torso_pos_xy: Weight for torso position xy tracking
+        weight_torso_orient: Weight for torso orientation tracking
+        weight_lin_vel_xy: Weight for linear velocity xy tracking
+        weight_lin_vel_z: Weight for linear velocity z tracking
+        weight_ang_vel_xy: Weight for angular velocity xy tracking
+        weight_ang_vel_z: Weight for angular velocity z tracking
+        weight_leg_joint_pos: Weight for leg joint position tracking
+        weight_neck_joint_pos: Weight for neck joint position tracking
+        weight_leg_joint_vel: Weight for leg joint velocity tracking
+        weight_neck_joint_vel: Weight for neck joint velocity tracking
+        weight_contact: Weight for foot contact matching
 
     Returns:
         Reward tensor of shape (num_envs,)
@@ -113,9 +127,26 @@ def imitation_reward(
     joints_pos = asset.data.joint_pos[:, asset_cfg.joint_ids]
     joints_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
 
-    # Use all 14 joints (including neck/head)
+    # Separate leg joints (indices 0-4, 9-13) from neck joints (indices 5-8)
+    leg_joint_indices = list(range(0, 5)) + list(range(9, 14))  # 10 leg joints
+    neck_joint_indices = list(range(5, 9))  # 4 neck joints
+
+    leg_joints_pos = joints_pos[:, leg_joint_indices]
+    neck_joints_pos = joints_pos[:, neck_joint_indices]
+    leg_joints_vel = joints_vel[:, leg_joint_indices]
+    neck_joints_vel = joints_vel[:, neck_joint_indices]
+
+    # Reference joint positions and velocities
     ref_joints_pos = ref_data["joints_pos"]
     ref_joints_vel = ref_data["joints_vel"]
+    ref_leg_joints_pos = ref_joints_pos[:, leg_joint_indices]
+    ref_neck_joints_pos = ref_joints_pos[:, neck_joint_indices]
+    ref_leg_joints_vel = ref_joints_vel[:, leg_joint_indices]
+    ref_neck_joints_vel = ref_joints_vel[:, neck_joint_indices]
+
+    # Torso (base) position and orientation
+    torso_pos_w = asset.data.root_link_pos_w  # (num_envs, 3) in world frame
+    torso_quat_w = asset.data.root_link_quat_w  # (num_envs, 4) quaternion in world frame
 
     # Base velocities (world frame)
     base_lin_vel = asset.data.root_link_vel_w[:, :3]  # Linear velocity (first 3 components)
@@ -127,12 +158,17 @@ def imitation_reward(
     else:
         contacts = torch.zeros((env.num_envs, 2), device=env.device)
 
-    # Compute reward components
-    # Joint position: negative squared error (all 14 joints)
-    joint_pos_rew = -torch.sum(torch.square(joints_pos - ref_joints_pos), dim=1) * weight_joint_pos
+    # Compute reward components (BD-X paper structure)
 
-    # Joint velocity: negative squared error (all 14 joints)
-    joint_vel_rew = -torch.sum(torch.square(joints_vel - ref_joints_vel), dim=1) * weight_joint_vel
+    # Torso position XY: exponential reward
+    # Note: For periodic motions, torso position in reference is relative to path frame
+    # For now, we compute this as zero since ref_data may not include absolute position
+    # TODO: Add torso position tracking if reference motions include it
+    torso_pos_xy_rew = torch.zeros(env.num_envs, device=env.device) * weight_torso_pos_xy
+
+    # Torso orientation: exponential reward
+    # TODO: Add quaternion difference computation if reference includes orientation
+    torso_orient_rew = torch.zeros(env.num_envs, device=env.device) * weight_torso_orient
 
     # Linear velocity XY: exponential reward
     lin_vel_xy_rew = torch.exp(-8.0 * torch.sum(torch.square(base_lin_vel[:, :2] - ref_data["base_linear_vel"][:, :2]), dim=1)) * weight_lin_vel_xy
@@ -146,6 +182,18 @@ def imitation_reward(
     # Angular velocity Z: exponential reward
     ang_vel_z_rew = torch.exp(-2.0 * torch.square(base_ang_vel[:, 2] - ref_data["base_angular_vel"][:, 2])) * weight_ang_vel_z
 
+    # Leg joint positions: negative squared error (10 leg joints)
+    leg_joint_pos_rew = -torch.sum(torch.square(leg_joints_pos - ref_leg_joints_pos), dim=1) * weight_leg_joint_pos
+
+    # Neck joint positions: negative squared error (4 neck joints)
+    neck_joint_pos_rew = -torch.sum(torch.square(neck_joints_pos - ref_neck_joints_pos), dim=1) * weight_neck_joint_pos
+
+    # Leg joint velocities: negative squared error (10 leg joints)
+    leg_joint_vel_rew = -torch.sum(torch.square(leg_joints_vel - ref_leg_joints_vel), dim=1) * weight_leg_joint_vel
+
+    # Neck joint velocities: negative squared error (4 neck joints)
+    neck_joint_vel_rew = -torch.sum(torch.square(neck_joints_vel - ref_neck_joints_vel), dim=1) * weight_neck_joint_vel
+
     # Contact reward: binary match
     ref_contacts = (ref_data["foot_contacts"] > 0.5).float()
     contacts_float = contacts.float()
@@ -153,12 +201,16 @@ def imitation_reward(
 
     # Total reward
     reward = (
-        joint_pos_rew
-        + joint_vel_rew
+        torso_pos_xy_rew
+        + torso_orient_rew
         + lin_vel_xy_rew
         + lin_vel_z_rew
         + ang_vel_xy_rew
         + ang_vel_z_rew
+        + leg_joint_pos_rew
+        + neck_joint_pos_rew
+        + leg_joint_vel_rew
+        + neck_joint_vel_rew
         + contact_rew
     )
 
@@ -245,6 +297,197 @@ def reference_motion_observation(
     ], dim=1)
 
     return ref_obs
+
+
+def joint_accelerations_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize joint accelerations using L2 squared norm.
+    Joint accelerations are computed using finite differences of joint velocities.
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,) - sum of squared joint accelerations
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get current joint velocities
+    joint_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
+
+    # Get previous joint velocities (stored in asset data)
+    # Note: This assumes the environment stores previous joint velocities
+    if not hasattr(asset.data, '_prev_joint_vel'):
+        # Initialize on first call
+        asset.data._prev_joint_vel = joint_vel.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Compute joint accelerations using finite differences
+    dt = env.step_dt
+    joint_acc = (joint_vel - asset.data._prev_joint_vel) / dt
+
+    # Store current velocities for next step
+    asset.data._prev_joint_vel = joint_vel.clone()
+
+    # Return L2 squared norm
+    return torch.sum(torch.square(joint_acc), dim=1)
+
+
+def leg_action_rate_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize the rate of change of leg actions (action_t - action_{t-1}).
+    Leg joints are indices 0-4 and 9-13 (10 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    # Get leg joint indices
+    leg_joint_indices = list(range(0, 5)) + list(range(9, 14))
+
+    # Get current and previous actions for leg joints only
+    # Actions are stored in env (assuming the action is available)
+    if not hasattr(env, 'action_manager'):
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Get the joint position action
+    actions = env.action_manager.action
+    if actions.shape[1] < 14:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    leg_actions = actions[:, leg_joint_indices]
+
+    if not hasattr(env, '_prev_leg_actions'):
+        env._prev_leg_actions = leg_actions.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    action_rate = leg_actions - env._prev_leg_actions
+    env._prev_leg_actions = leg_actions.clone()
+
+    return torch.sum(torch.square(action_rate), dim=1)
+
+
+def neck_action_rate_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize the rate of change of neck actions (action_t - action_{t-1}).
+    Neck joints are indices 5-8 (4 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    # Get neck joint indices
+    neck_joint_indices = list(range(5, 9))
+
+    # Get current and previous actions for neck joints only
+    if not hasattr(env, 'action_manager'):
+        return torch.zeros(env.num_envs, device=env.device)
+
+    actions = env.action_manager.action
+    if actions.shape[1] < 14:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    neck_actions = actions[:, neck_joint_indices]
+
+    if not hasattr(env, '_prev_neck_actions'):
+        env._prev_neck_actions = neck_actions.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    action_rate = neck_actions - env._prev_neck_actions
+    env._prev_neck_actions = neck_actions.clone()
+
+    return torch.sum(torch.square(action_rate), dim=1)
+
+
+def leg_action_acceleration_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize leg action accelerations (action_t - 2*action_{t-1} + action_{t-2}).
+    Leg joints are indices 0-4 and 9-13 (10 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    # Get leg joint indices
+    leg_joint_indices = list(range(0, 5)) + list(range(9, 14))
+
+    if not hasattr(env, 'action_manager'):
+        return torch.zeros(env.num_envs, device=env.device)
+
+    actions = env.action_manager.action
+    if actions.shape[1] < 14:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    leg_actions = actions[:, leg_joint_indices]
+
+    if not hasattr(env, '_prev_leg_actions_for_acc'):
+        env._prev_leg_actions_for_acc = leg_actions.clone()
+        env._prev_prev_leg_actions_for_acc = leg_actions.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    action_acc = leg_actions - 2 * env._prev_leg_actions_for_acc + env._prev_prev_leg_actions_for_acc
+
+    env._prev_prev_leg_actions_for_acc = env._prev_leg_actions_for_acc.clone()
+    env._prev_leg_actions_for_acc = leg_actions.clone()
+
+    return torch.sum(torch.square(action_acc), dim=1)
+
+
+def neck_action_acceleration_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize neck action accelerations (action_t - 2*action_{t-1} + action_{t-2}).
+    Neck joints are indices 5-8 (4 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    # Get neck joint indices
+    neck_joint_indices = list(range(5, 9))
+
+    if not hasattr(env, 'action_manager'):
+        return torch.zeros(env.num_envs, device=env.device)
+
+    actions = env.action_manager.action
+    if actions.shape[1] < 14:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    neck_actions = actions[:, neck_joint_indices]
+
+    if not hasattr(env, '_prev_neck_actions_for_acc'):
+        env._prev_neck_actions_for_acc = neck_actions.clone()
+        env._prev_prev_neck_actions_for_acc = neck_actions.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    action_acc = neck_actions - 2 * env._prev_neck_actions_for_acc + env._prev_prev_neck_actions_for_acc
+
+    env._prev_prev_neck_actions_for_acc = env._prev_neck_actions_for_acc.clone()
+    env._prev_neck_actions_for_acc = neck_actions.clone()
+
+    return torch.sum(torch.square(action_acc), dim=1)
 
 
 def is_alive(env: ManagerBasedRlEnv) -> torch.Tensor:
