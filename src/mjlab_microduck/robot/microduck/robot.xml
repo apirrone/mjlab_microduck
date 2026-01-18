@@ -39,7 +39,8 @@
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.035" frictionloss="0.021" armature="0.0017"/>
       <!-- Using kv=0.0 (no velocity feedback), overriding dampratio from parent classes -->
-      <position kp="0.32" kv="0.0" forcerange="-0.66 0.66"/>
+      <!-- ctrlrange set wide (-10, 10) to allow policy overshooting for compliant control -->
+      <position kp="0.32" kv="0.0" forcerange="-0.66 0.66" ctrlrange="-10.0 10.0"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->
@@ -316,20 +317,20 @@
     <material name="right_roll_to_pitch_material" rgba="0.235294 0.235294 0.235294 1"/>
   </asset>
   <actuator>
-    <position class="chosen_actuator" name="left_hip_yaw" joint="left_hip_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_hip_roll" joint="left_hip_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_hip_pitch" joint="left_hip_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_knee" joint="left_knee" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_ankle" joint="left_ankle" inheritrange="1"/>
-    <position class="chosen_actuator" name="neck_pitch" joint="neck_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_pitch" joint="head_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_yaw" joint="head_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_roll" joint="head_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_yaw" joint="right_hip_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_roll" joint="right_hip_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_pitch" joint="right_hip_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_knee" joint="right_knee" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_ankle" joint="right_ankle" inheritrange="1"/>
+    <position class="chosen_actuator" name="left_hip_yaw" joint="left_hip_yaw" />
+    <position class="chosen_actuator" name="left_hip_roll" joint="left_hip_roll" />
+    <position class="chosen_actuator" name="left_hip_pitch" joint="left_hip_pitch" />
+    <position class="chosen_actuator" name="left_knee" joint="left_knee" />
+    <position class="chosen_actuator" name="left_ankle" joint="left_ankle" />
+    <position class="chosen_actuator" name="neck_pitch" joint="neck_pitch" />
+    <position class="chosen_actuator" name="head_pitch" joint="head_pitch" />
+    <position class="chosen_actuator" name="head_yaw" joint="head_yaw" />
+    <position class="chosen_actuator" name="head_roll" joint="head_roll" />
+    <position class="chosen_actuator" name="right_hip_yaw" joint="right_hip_yaw" />
+    <position class="chosen_actuator" name="right_hip_roll" joint="right_hip_roll" />
+    <position class="chosen_actuator" name="right_hip_pitch" joint="right_hip_pitch" />
+    <position class="chosen_actuator" name="right_knee" joint="right_knee" />
+    <position class="chosen_actuator" name="right_ankle" joint="right_ankle" />
   </actuator>
   <equality/>
 </mujoco>
