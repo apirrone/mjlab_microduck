@@ -305,13 +305,13 @@ def make_microduck_velocity_env_cfg(
             # Add alive bonus
             cfg.rewards["alive"] = RewardTermCfg(
                 func=microduck_mdp.is_alive,
-                weight=20.0
+                weight=10.0
             )
 
             # Add imitation reward
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=1.0,
+                weight=2.0,
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
