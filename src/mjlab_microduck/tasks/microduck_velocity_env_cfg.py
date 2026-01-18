@@ -193,7 +193,7 @@ def make_microduck_velocity_env_cfg(
     #     r".*(?<!head_yaw)(?<!head_pitch)(?<!head_roll)$",
     # )
 
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.12)
 
     cfg.commands["twist"].viz.z_offset = 1.0
 
@@ -224,6 +224,8 @@ def make_microduck_velocity_env_cfg(
 
     # Disabling self-collision
     cfg.rewards["self_collisions"].weight = 0.0
+    # Disabling soft landing
+    cfg.rewards["soft_landing"].weight = 0.0
 
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
@@ -237,13 +239,16 @@ def make_microduck_velocity_env_cfg(
         cfg.observations["policy"].terms["base_ang_vel"]
     )
 
-    cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 1
-    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
-    cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
+    # Disable observation delays in play mode for cleaner testing
+    # (During training, delays help with sim2real transfer)
+    if not play:
+        cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 1
+        cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
+        cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
-    cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 1
-    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
-    cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 1
+        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
+        cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     cfg.commands["twist"].ranges.ang_vel_z = (-1.0, 1.0)
     cfg.commands["twist"].ranges.lin_vel_y = (-0.5, 0.5)
@@ -286,7 +291,7 @@ def make_microduck_velocity_env_cfg(
             # Set minimal reward weights
             cfg.rewards["track_linear_velocity"].weight = 2.5
             cfg.rewards["track_angular_velocity"].weight = 6.0
-            cfg.rewards["action_rate_l2"].weight = -0.5
+            cfg.rewards["action_rate_l2"].weight = -0.2
 
             # Add torque penalty (if not already present)
             if "joint_torques_l2" not in cfg.rewards:
