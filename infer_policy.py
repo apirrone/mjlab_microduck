@@ -326,6 +326,11 @@ def main():
     # Load MuJoCo model
     print(f"Loading MuJoCo model from: {MICRODUCK_XML}")
     model = mujoco.MjModel.from_xml_path(MICRODUCK_XML)
+
+    # Override timestep to match mjlab (0.005s instead of XML's 0.002s)
+    # mjlab velocity environments use timestep=0.005 for performance/stability
+    model.opt.timestep = 0.005
+
     data = mujoco.MjData(model)
 
     # Initialize policy
