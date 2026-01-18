@@ -278,22 +278,22 @@ def make_microduck_velocity_env_cfg(
         imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
 
         if not play:
-            # Simplified reward set for imitation learning (matching Open Duck Playground)
+            # BD-X paper reward structure
             # Disable most rewards and keep only essential ones
             rewards_to_disable = [
                 "upright", "body_ang_vel", "angular_momentum", "air_time", "foot_clearance", "foot_swing_height", "foot_slip",
-                "self_collisions", "feet_stumble", "feet_slide", "dof_acc"
+                "self_collisions", "feet_stumble", "feet_slide", "dof_acc", "action_rate_l2"
             ]
             for reward_name in rewards_to_disable:
                 if reward_name in cfg.rewards:
                     cfg.rewards[reward_name].weight = 0.0
 
-            # Set minimal reward weights
+            # Basic velocity tracking rewards (minimal weights)
             cfg.rewards["track_linear_velocity"].weight = 2.5
             cfg.rewards["track_angular_velocity"].weight = 6.0
-            cfg.rewards["action_rate_l2"].weight = -0.2
 
-            # Add torque penalty (if not already present)
+            # Regularization rewards (BD-X paper Table I)
+            # Joint torques: -||τ||², weight 1.0·10⁻³
             if "joint_torques_l2" not in cfg.rewards:
                 cfg.rewards["joint_torques_l2"] = RewardTermCfg(
                     func=mdp.joint_torques_l2,
@@ -302,26 +302,64 @@ def make_microduck_velocity_env_cfg(
             else:
                 cfg.rewards["joint_torques_l2"].weight = -1.0e-3
 
-            # Add alive bonus
-            cfg.rewards["alive"] = RewardTermCfg(
-                func=microduck_mdp.is_alive,
-                weight=10.0
+            # Joint accelerations: -||q̈||², weight 2.5·10⁻⁶
+            cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
+                func=microduck_mdp.joint_accelerations_l2,
+                weight=-2.5e-6
             )
 
-            # Add imitation reward
+            # Leg action rate: -||a_l - a_{t-1,l}||², weight 1.5
+            cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
+                func=microduck_mdp.leg_action_rate_l2,
+                weight=-1.5
+            )
+
+            # Neck action rate: -||a_n - a_{t-1,n}||², weight 5.0
+            cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
+                func=microduck_mdp.neck_action_rate_l2,
+                weight=-5.0
+            )
+
+            # Leg action acceleration: -||a_l - 2a_{t-1,l} + a_{t-2,l}||², weight 0.45
+            cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
+                func=microduck_mdp.leg_action_acceleration_l2,
+                weight=-0.45
+            )
+
+            # Neck action acceleration: -||a_n - 2a_{t-1,n} + a_{t-2,n}||², weight 5.0
+            cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
+                func=microduck_mdp.neck_action_acceleration_l2,
+                weight=-5.0
+            )
+
+            # Survival reward: 1.0, weight 20.0
+            cfg.rewards["alive"] = RewardTermCfg(
+                func=microduck_mdp.is_alive,
+                weight=20.0
+            )
+
+            # Imitation reward (BD-X paper Table I)
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=2.0,
+                weight=1.0,  # Individual weights are specified inside the function
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
-                    "weight_joint_pos": 15.0,
-                    "weight_joint_vel": 1e-3,
-                    "weight_lin_vel_xy": 1.0,
-                    "weight_lin_vel_z": 1.0,
-                    "weight_ang_vel_xy": 0.5,
-                    "weight_ang_vel_z": 0.5,
-                    "weight_contact": 1.0,
+                    # Torso tracking
+                    "weight_torso_pos_xy": 1.0,  # exp(-200.0 * ||p_xy - p̂_xy||²)
+                    "weight_torso_orient": 1.0,  # exp(-20.0 * ||θ ⊟ θ̂||²)
+                    # Velocity tracking
+                    "weight_lin_vel_xy": 1.0,  # exp(-8.0 * ||v_xy - v̂_xy||²)
+                    "weight_lin_vel_z": 1.0,   # exp(-8.0 * (v_z - v̂_z)²)
+                    "weight_ang_vel_xy": 0.5,  # exp(-2.0 * ||ω_xy - ω̂_xy||²)
+                    "weight_ang_vel_z": 0.5,   # exp(-2.0 * (ω_z - ω̂_z)²)
+                    # Joint tracking (separated leg vs neck)
+                    "weight_leg_joint_pos": 15.0,   # -||q_l - q̂_l||²
+                    "weight_neck_joint_pos": 100.0,  # -||q_n - q̂_n||²
+                    "weight_leg_joint_vel": 1.0e-3,  # -||q̇_l - q̇̂_l||²
+                    "weight_neck_joint_vel": 1.0,    # -||q̇_n - q̇̂_n||²
+                    # Contact tracking
+                    "weight_contact": 1.0,  # Σ_i∈{L,R} 1[c_i = ĉ_i]
                 }
             )
 
