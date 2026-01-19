@@ -219,9 +219,10 @@ def make_microduck_velocity_env_cfg(
     #   cfg.sim.nconmax = 256
     #   cfg.sim.njmax = 512
 
+    # Increased push range to train robustness and recovery behavior
     cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-0.8, 0.8),
-        "y": (-0.8, 0.8),
+        "x": (-1.5, 1.5),  # Was (-0.8, 0.8), increased for recovery training
+        "y": (-1.5, 1.5),  # Was (-0.8, 0.8), increased for recovery training
     }
 
     # Slightly increased L2 action rate penalty
@@ -321,44 +322,45 @@ def make_microduck_velocity_env_cfg(
             )
 
             # Leg action rate: -||a_l - a_{t-1,l}||², weight 1.5
-            # REDUCED by 10x initially to allow exploration
+            # INCREASED by 5x for smooth real robot behavior
             cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_rate_l2,
-                weight=-0.5  # Was -1.5
+                weight=-2.5  # Was -0.5, increased for smoothness
             )
 
             # Neck action rate: -||a_n - a_{t-1,n}||², weight 5.0
-            # REDUCED by 10x initially to allow exploration
+            # INCREASED by 5x for smooth real robot behavior
             cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_rate_l2,
-                weight=-1.0  # Was -5.0
+                weight=-5.0  # Was -1.0, increased for smoothness
             )
 
             # Leg action acceleration: -||a_l - 2a_{t-1,l} + a_{t-2,l}||², weight 0.45
-            # REDUCED by 10x initially to allow exploration
+            # INCREASED by 5x for smooth real robot behavior
             cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_acceleration_l2,
-                weight=-0.1  # Was -0.45
+                weight=-0.5  # Was -0.1, increased for smoothness
             )
 
             # Neck action acceleration: -||a_n - 2a_{t-1,n} + a_{t-2,n}||², weight 5.0
-            # REDUCED by 10x initially to allow exploration
+            # INCREASED by 5x for smooth real robot behavior
             cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_acceleration_l2,
-                weight=-1.0  # Was -5.0
+                weight=-5.0  # Was -1.0, increased for smoothness
             )
 
-            # Survival reward: 1.0, weight 0.5 (REDUCED to not dominate)
+            # Survival reward: 1.0, weight 20.0 (REBALANCED for robustness)
+            # Increased to encourage recovery from pushes and prioritize staying upright
             cfg.rewards["alive"] = RewardTermCfg(
                 func=microduck_mdp.is_alive,
-                weight=10.0  # Was 20.0 - reduced to prevent "stand still" local optimum
+                weight=20.0  # Increased to balance with imitation reward
             )
 
             # Imitation reward (BD-X paper Table I)
-            # INCREASED outer weight to make imitation dominant
+            # REDUCED weight to prioritize robustness over perfect tracking
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=1.0,  # Was 1.0 - increased to dominate over other rewards
+                weight=1.0,  # Keep low to allow recovery and reduce erratic behavior
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
@@ -372,7 +374,7 @@ def make_microduck_velocity_env_cfg(
                     "weight_ang_vel_z": 0.5,   # exp(-2.0 * (ω_z - ω̂_z)²)
                     # Joint tracking (separated leg vs neck)
                     "weight_leg_joint_pos": 15.0,   # -||q_l - q̂_l||²
-                    "weight_neck_joint_pos": 100.0,  # -||q_n - q̂_n||²
+                    "weight_neck_joint_pos": 30.0,  # -||q_n - q̂_n||² (reduced from 100.0 for robustness)
                     "weight_leg_joint_vel": 1.0e-3,  # -||q̇_l - q̇̂_l||²
                     "weight_neck_joint_vel": 1.0,    # -||q̇_n - q̇̂_n||²
                     # Contact tracking (INCREASED to encourage foot lifting during swing)
