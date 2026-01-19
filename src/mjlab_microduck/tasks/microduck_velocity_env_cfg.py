@@ -324,32 +324,28 @@ def make_microduck_velocity_env_cfg(
             # REDUCED by 10x initially to allow exploration
             cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_rate_l2,
-                # weight=-0.15  # Was -1.5
-                weight=-1.5  # Was -1.5
+                weight=-0.5  # Was -1.5
             )
 
             # Neck action rate: -||a_n - a_{t-1,n}||², weight 5.0
             # REDUCED by 10x initially to allow exploration
             cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_rate_l2,
-                # weight=-0.5  # Was -5.0
-                weight=-5.0  # Was -5.0
+                weight=-1.0  # Was -5.0
             )
 
             # Leg action acceleration: -||a_l - 2a_{t-1,l} + a_{t-2,l}||², weight 0.45
             # REDUCED by 10x initially to allow exploration
             cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.leg_action_acceleration_l2,
-                # weight=-0.045  # Was -0.45
-                weight=-0.45  # Was -0.45
+                weight=-0.1  # Was -0.45
             )
 
             # Neck action acceleration: -||a_n - 2a_{t-1,n} + a_{t-2,n}||², weight 5.0
             # REDUCED by 10x initially to allow exploration
             cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
                 func=microduck_mdp.neck_action_acceleration_l2,
-                # weight=-0.5  # Was -5.0
-                weight=-5.0  # Was -5.0
+                weight=-1.0  # Was -5.0
             )
 
             # Survival reward: 1.0, weight 0.5 (REDUCED to not dominate)
