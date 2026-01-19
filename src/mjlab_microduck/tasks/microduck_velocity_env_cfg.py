@@ -225,7 +225,7 @@ def make_microduck_velocity_env_cfg(
     }
 
     # Slightly increased L2 action rate penalty
-    cfg.rewards["action_rate_l2"].weight = -0.2
+    cfg.rewards["action_rate_l2"].weight = -0.5
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)
