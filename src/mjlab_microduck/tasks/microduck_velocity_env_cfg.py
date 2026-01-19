@@ -189,8 +189,14 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["air_time"].weight = 0.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
 
-    cfg.rewards["track_linear_velocity"].weight = 4.0  # Was 2.0
-    cfg.rewards["track_angular_velocity"].weight = 4.0  # Was 2.0
+    # Only set velocity tracking weights if NOT using imitation
+    # (imitation curriculum will control these weights)
+    if not use_imitation:
+        cfg.rewards["track_linear_velocity"].weight = 4.0  # Was 2.0
+        cfg.rewards["track_angular_velocity"].weight = 4.0  # Was 2.0
+    else:
+        cfg.rewards["track_linear_velocity"].weight = 0.0  # Controlled by curriculum
+        cfg.rewards["track_angular_velocity"].weight = 0.0  # Controlled by curriculum
 
     # Removing base lin velocity observation
     del cfg.observations["policy"].terms["base_lin_vel"]
@@ -212,59 +218,17 @@ def make_microduck_velocity_env_cfg(
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 
-    # Replace default curriculum with custom imitation learning curriculum
+    # Disable default curriculum (terrain levels, command velocity)
     del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
-
-    # Curriculum for imitation learning:
-    # Gradually reduce imitation weight and increase velocity tracking requirements
-    # Steps are in training iterations (not env steps)
-    cfg.curriculum["imitation_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "imitation",
-            "weight_stages": [
-                {"step": 0,     "weight": 1.0},   # 0-5k: Learn basic gait
-                {"step": 5000,  "weight": 0.8},   # 5-10k: Start reducing imitation dominance
-                {"step": 10000, "weight": 0.6},   # 10-15k: Further reduce
-                {"step": 15000, "weight": 0.5},   # 15-20k: Prioritize robustness
-            ],
-        },
-    )
-
-    cfg.curriculum["track_linear_velocity_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "track_linear_velocity",
-            "weight_stages": [
-                {"step": 0,     "weight": 0.0},   # 0-5k: Don't track velocity, focus on gait
-                {"step": 5000,  "weight": 1.0},   # 5-10k: Start velocity tracking
-                {"step": 10000, "weight": 2.0},   # 10-15k: Increase requirement
-                {"step": 15000, "weight": 4.0},   # 15-20k: Full velocity tracking
-            ],
-        },
-    )
-
-    cfg.curriculum["track_angular_velocity_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "track_angular_velocity",
-            "weight_stages": [
-                {"step": 0,     "weight": 0.0},   # 0-5k: Don't track velocity, focus on gait
-                {"step": 5000,  "weight": 1.0},   # 5-10k: Start velocity tracking
-                {"step": 10000, "weight": 2.0},   # 10-15k: Increase requirement
-                {"step": 15000, "weight": 4.0},   # 15-20k: Full velocity tracking
-            ],
-        },
-    )
 
     #   cfg.sim.nconmax = 256
     #   cfg.sim.njmax = 512
 
-    # Increased push range to train robustness and recovery behavior
+    # Push range for robustness and recovery behavior training
     cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-0.8, 0.8),  # Was (-0.8, 0.8), increased for recovery training
-        "y": (-0.8, 0.8),  # Was (-0.8, 0.8), increased for recovery training
+        "x": (-0.8, 0.8),
+        "y": (-0.8, 0.8),
     }
 
     # Slightly increased L2 action rate penalty
@@ -342,10 +306,10 @@ def make_microduck_velocity_env_cfg(
                 if reward_name in cfg.rewards:
                     cfg.rewards[reward_name].weight = 0.0
 
-            # DISABLE velocity tracking rewards - they conflict with imitation learning
-            # The imitation reward handles velocity tracking internally
-            cfg.rewards["track_linear_velocity"].weight = 4.0
-            cfg.rewards["track_angular_velocity"].weight = 4.0
+            # Velocity tracking rewards - controlled by curriculum
+            # Start at 0.0, curriculum will gradually increase them
+            cfg.rewards["track_linear_velocity"].weight = 0.0  # Curriculum controls this
+            cfg.rewards["track_angular_velocity"].weight = 0.0  # Curriculum controls this
 
             # Regularization rewards (BD-X paper Table I)
             # Joint torques: -||τ||², weight 1.0·10⁻³
@@ -399,10 +363,10 @@ def make_microduck_velocity_env_cfg(
             )
 
             # Imitation reward (BD-X paper Table I)
-            # REDUCED weight to prioritize robustness over perfect tracking
+            # Base weight matches curriculum start, will be controlled by curriculum
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=0.8,  # Was 1.0 # Keep low to allow recovery and reduce erratic behavior
+                weight=1.0,  # Curriculum will gradually reduce this to 0.5
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
@@ -422,6 +386,48 @@ def make_microduck_velocity_env_cfg(
                     # Contact tracking (INCREASED to encourage foot lifting during swing)
                     "weight_contact": 5.0,  # Was 10
                 }
+            )
+
+            # Curriculum for imitation learning (TRAINING ONLY)
+            # Gradually reduce imitation weight and increase velocity tracking requirements
+            # Steps are in training iterations (not env steps)
+            cfg.curriculum["imitation_weight"] = CurriculumTermCfg(
+                func=mdp.reward_weight,
+                params={
+                    "reward_name": "imitation",
+                    "weight_stages": [
+                        {"step": 0,     "weight": 1.0},   # 0-5k: Learn basic gait
+                        {"step": 5000,  "weight": 0.8},   # 5-10k: Start reducing imitation dominance
+                        {"step": 10000, "weight": 0.6},   # 10-15k: Further reduce
+                        {"step": 15000, "weight": 0.5},   # 15-20k: Prioritize robustness
+                    ],
+                },
+            )
+
+            cfg.curriculum["track_linear_velocity_weight"] = CurriculumTermCfg(
+                func=mdp.reward_weight,
+                params={
+                    "reward_name": "track_linear_velocity",
+                    "weight_stages": [
+                        {"step": 0,     "weight": 0.0},   # 0-5k: Don't track velocity, focus on gait
+                        {"step": 5000,  "weight": 1.0},   # 5-10k: Start velocity tracking
+                        {"step": 10000, "weight": 2.0},   # 10-15k: Increase requirement
+                        {"step": 15000, "weight": 4.0},   # 15-20k: Full velocity tracking
+                    ],
+                },
+            )
+
+            cfg.curriculum["track_angular_velocity_weight"] = CurriculumTermCfg(
+                func=mdp.reward_weight,
+                params={
+                    "reward_name": "track_angular_velocity",
+                    "weight_stages": [
+                        {"step": 0,     "weight": 0.0},   # 0-5k: Don't track velocity, focus on gait
+                        {"step": 5000,  "weight": 1.0},   # 5-10k: Start velocity tracking
+                        {"step": 10000, "weight": 2.0},   # 10-15k: Increase requirement
+                        {"step": 15000, "weight": 4.0},   # 15-20k: Full velocity tracking
+                    ],
+                },
             )
 
         # Add reset event to reset imitation phase
