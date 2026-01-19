@@ -221,8 +221,8 @@ def make_microduck_velocity_env_cfg(
 
     # Increased push range to train robustness and recovery behavior
     cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-1.5, 1.5),  # Was (-0.8, 0.8), increased for recovery training
-        "y": (-1.5, 1.5),  # Was (-0.8, 0.8), increased for recovery training
+        "x": (-0.8, 0.8),  # Was (-0.8, 0.8), increased for recovery training
+        "y": (-0.8, 0.8),  # Was (-0.8, 0.8), increased for recovery training
     }
 
     # Slightly increased L2 action rate penalty
@@ -266,12 +266,12 @@ def make_microduck_velocity_env_cfg(
     cfg.commands["twist"].ranges.lin_vel_y = (-0.5, 0.5)
     cfg.commands["twist"].ranges.lin_vel_x = (-0.5, 0.5)
 
-    if play:
+    # if play:
         #Disabling push
-        cfg.events["push_robot"].params["velocity_range"] = {
-            "x": (0.0, 0.0),
-            "y": (0.0, 0.0),
-        }
+        # cfg.events["push_robot"].params["velocity_range"] = {
+            # "x": (0.0, 0.0),
+            # "y": (0.0, 0.0),
+        # }
 
         # Custom command
         # cfg.commands["twist"].ranges.ang_vel_z = (0.0, 0.0)
