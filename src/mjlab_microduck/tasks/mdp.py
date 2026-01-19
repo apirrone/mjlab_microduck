@@ -271,10 +271,15 @@ def imitation_reward(
         print("\n" + "="*70)
         print("CONTACT REWARD DEBUG (first environment, first call)")
         print("="*70)
-        print(f"Reference contacts (left, right): {ref_contacts[0].cpu().numpy()}")
-        print(f"Robot contacts (left, right): {contacts_float[0].cpu().numpy()}")
+        print(f"Reference contacts [LEFT, RIGHT]: {ref_contacts[0].cpu().numpy()}")
+        print(f"Robot contacts    [LEFT, RIGHT]: {contacts_float[0].cpu().numpy()}")
         print(f"Contact sensor shape: {contacts_float.shape}")
         print(f"Has swing phase in reference? {torch.any(ref_contacts == 0.0).item()}")
+        print(f"Left foot ever in swing? {torch.any(ref_contacts[:, 0] == 0.0).item()}")
+        print(f"Right foot ever in swing? {torch.any(ref_contacts[:, 1] == 0.0).item()}")
+        print("\nNOTE: Sensor pattern matches bodies in this order:")
+        print("  Index 0 = LEFT foot  (foot_tpu_bottom)")
+        print("  Index 1 = RIGHT foot (foot)")
         print("="*70 + "\n")
         imitation_reward._contact_debug_printed = True
 

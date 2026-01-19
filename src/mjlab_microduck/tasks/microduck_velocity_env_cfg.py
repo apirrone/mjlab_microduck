@@ -97,11 +97,15 @@ def make_microduck_velocity_env_cfg(
 
     site_names = ["left_foot", "right_foot"]
 
+    # CRITICAL: Body names in robot.xml are:
+    # - Left foot: "foot_tpu_bottom" (child of left_roll_to_pitch)
+    # - Right foot: "foot" (child of right_roll_to_pitch)
+    # Pattern must match in LEFT, RIGHT order to match reference motion
     feet_ground_cfg = ContactSensorCfg(
         name="feet_ground_contact",
         primary=ContactMatch(
             mode="subtree",
-            pattern=r"^(foot|foot_2)$",
+            pattern=r"^(foot_tpu_bottom|foot)$",  # LEFT foot first, RIGHT foot second
             entity="robot",
         ),
         secondary=ContactMatch(mode="body", pattern="terrain"),
