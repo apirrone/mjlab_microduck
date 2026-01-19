@@ -302,8 +302,8 @@ def make_microduck_velocity_env_cfg(
 
             # DISABLE velocity tracking rewards - they conflict with imitation learning
             # The imitation reward handles velocity tracking internally
-            cfg.rewards["track_linear_velocity"].weight = 0.0
-            cfg.rewards["track_angular_velocity"].weight = 0.0
+            cfg.rewards["track_linear_velocity"].weight = 4.0
+            cfg.rewards["track_angular_velocity"].weight = 4.0
 
             # Regularization rewards (BD-X paper Table I)
             # Joint torques: -||τ||², weight 1.0·10⁻³
@@ -360,7 +360,7 @@ def make_microduck_velocity_env_cfg(
             # REDUCED weight to prioritize robustness over perfect tracking
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=0.3,  # Was 1.0 # Keep low to allow recovery and reduce erratic behavior
+                weight=0.5,  # Was 1.0 # Keep low to allow recovery and reduce erratic behavior
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
