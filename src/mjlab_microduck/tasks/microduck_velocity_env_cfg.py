@@ -360,7 +360,7 @@ def make_microduck_velocity_env_cfg(
             # REDUCED weight to prioritize robustness over perfect tracking
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=0.7,  # Was 1.0 # Keep low to allow recovery and reduce erratic behavior
+                weight=0.8,  # Was 1.0 # Keep low to allow recovery and reduce erratic behavior
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
