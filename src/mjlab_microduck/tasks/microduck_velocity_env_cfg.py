@@ -150,9 +150,9 @@ def make_microduck_velocity_env_cfg(
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_clearance"].params["target_height"] = 0.03
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # 1cm clearance for 23cm tall robot
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_swing_height"].params["target_height"] = 0.03
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # 1cm swing height for 23cm tall robot
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
 
     cfg.observations["critic"].terms["foot_height"].params[
@@ -186,7 +186,7 @@ def make_microduck_velocity_env_cfg(
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["air_time"].weight = 0.0
+    cfg.rewards["air_time"].weight = 0.5  # Encourage proper gait with foot swing
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
 
     # Only set velocity tracking weights if NOT using imitation
@@ -242,8 +242,8 @@ def make_microduck_velocity_env_cfg(
 
     # Disabling self-collision
     cfg.rewards["self_collisions"].weight = 0.0
-    # Disabling soft landing
-    cfg.rewards["soft_landing"].weight = 0.0
+    # Enable soft landing for better push recovery
+    cfg.rewards["soft_landing"].weight = 0.5
 
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
