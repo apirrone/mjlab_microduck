@@ -366,7 +366,7 @@ def make_microduck_velocity_env_cfg(
             # Base weight matches curriculum start, will be controlled by curriculum
             cfg.rewards["imitation"] = RewardTermCfg(
                 func=microduck_mdp.imitation_reward,
-                weight=0.3, 
+                weight=1.0, 
                 params={
                     "imitation_state": imitation_state,
                     "command_threshold": 0.01,
