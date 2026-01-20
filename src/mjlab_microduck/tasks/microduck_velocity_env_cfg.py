@@ -155,6 +155,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # 1cm swing height for 23cm tall robot
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
 
+    # CRITICAL: Strong penalty for foot sliding to prevent "split and slide" behavior
+    cfg.rewards["foot_slip"].weight = -2.0  # Increased from default -0.1
+    cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
+
     cfg.observations["critic"].terms["foot_height"].params[
         "asset_cfg"
     ].site_names = site_names
@@ -186,8 +190,13 @@ def make_microduck_velocity_env_cfg(
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["air_time"].weight = 0.5  # Encourage proper gait with foot swing
+
+    # STRONGLY encourage proper gait with foot lifting (not sliding!)
+    # Limit air time to prevent jumping - small robot should take quick steps
+    cfg.rewards["air_time"].weight = 3.0  # Increased from 0.5 to force foot lifting
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
+    cfg.rewards["air_time"].params["threshold_min"] = 0.02  # Minimum air time for valid step
+    cfg.rewards["air_time"].params["threshold_max"] = 0.15  # Maximum air time - prevents jumping!
 
     # Only set velocity tracking weights if NOT using imitation
     # (imitation curriculum will control these weights)
@@ -231,8 +240,18 @@ def make_microduck_velocity_env_cfg(
         "y": (-0.8, 0.8),
     }
 
-    # Slightly increased L2 action rate penalty
+    # Reduce action rate penalty to allow dynamic movement (was -0.5, too restrictive)
     cfg.rewards["action_rate_l2"].weight = -0.5
+
+    # Add specific neck penalties to keep head stable
+    cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_action_rate_l2,
+        weight=-2.0  # Stronger penalty for neck action changes
+    )
+    cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_joint_vel_l2,
+        weight=-0.5  # Penalty for neck joint velocities
+    )
 
     # Penalizing torque
     #   cfg.rewards["torque_l2"] = RewardTermCfg(func=mdp.joint_torques_l2, weight=-1e-4)

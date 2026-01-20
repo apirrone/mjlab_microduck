@@ -638,3 +638,30 @@ def com_height_target(
     reward = in_range.float() - (penalty_below + penalty_above)
 
     return reward
+
+
+def neck_joint_vel_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize neck joint velocities to keep head stable.
+    Neck joints are indices 5-8 (4 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get neck joint indices (neck_pitch, head_pitch, head_yaw, head_roll)
+    neck_joint_indices = list(range(5, 9))
+
+    # Get joint velocities for neck joints
+    joint_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
+    neck_joint_vel = joint_vel[:, neck_joint_indices]
+
+    # Return L2 squared norm of neck joint velocities
+    return torch.sum(torch.square(neck_joint_vel), dim=1)
