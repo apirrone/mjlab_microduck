@@ -245,6 +245,16 @@ def make_microduck_velocity_env_cfg(
     # Enable soft landing for better push recovery
     cfg.rewards["soft_landing"].weight = 0.5
 
+    # CoM height target: keep center of mass between 0.1 and 0.15 meters
+    cfg.rewards["com_height_target"] = RewardTermCfg(
+        func=microduck_mdp.com_height_target,
+        weight=1.0,
+        params={
+            "target_height_min": 0.1,
+            "target_height_max": 0.15,
+        }
+    )
+
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.1

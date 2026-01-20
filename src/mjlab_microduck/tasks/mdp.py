@@ -598,3 +598,43 @@ def is_alive(env: ManagerBasedRlEnv) -> torch.Tensor:
         Reward tensor of shape (num_envs,) - ones for all envs
     """
     return torch.ones(env.num_envs, device=env.device)
+
+
+def com_height_target(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    target_height_min: float = 0.1,
+    target_height_max: float = 0.15,
+) -> torch.Tensor:
+    """
+    Reward for keeping the center of mass within a target height range.
+    Returns positive reward when in range, negative penalty when outside.
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+        target_height_min: Minimum target height for CoM (meters)
+        target_height_max: Maximum target height for CoM (meters)
+
+    Returns:
+        Reward tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get center of mass height (z position of root link)
+    com_height = asset.data.root_link_pos_w[:, 2]
+
+    # Reward when in range, penalty when outside
+    # Use smooth penalty that increases quadratically with distance from range
+    below_min = com_height < target_height_min
+    above_max = com_height > target_height_max
+    in_range = ~(below_min | above_max)
+
+    # Compute penalties for being outside range
+    penalty_below = torch.square(com_height - target_height_min) * below_min.float()
+    penalty_above = torch.square(com_height - target_height_max) * above_max.float()
+
+    # Reward: +1 when in range, -squared_distance when outside
+    reward = in_range.float() - (penalty_below + penalty_above)
+
+    return reward
