@@ -240,8 +240,7 @@ def make_microduck_velocity_env_cfg(
         "y": (-0.8, 0.8),
     }
 
-    # Reduce action rate penalty to allow dynamic movement (was -0.5, too restrictive)
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = -1.0
 
     # Add specific neck penalties to keep head stable
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
