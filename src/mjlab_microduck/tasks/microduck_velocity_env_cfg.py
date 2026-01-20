@@ -240,7 +240,7 @@ def make_microduck_velocity_env_cfg(
         "y": (-0.8, 0.8),
     }
 
-    cfg.rewards["action_rate_l2"].weight = -0.75 # 0.5 worked but was too fast
+    cfg.rewards["action_rate_l2"].weight = -0.75  # 0.5 worked but was too fast
 
     # Add specific neck penalties to keep head stable
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
