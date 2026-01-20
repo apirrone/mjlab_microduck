@@ -392,44 +392,44 @@ def make_microduck_velocity_env_cfg(
             # Gradually reduce imitation weight and increase velocity tracking requirements
             # Steps are in environment steps (training_iterations * steps_per_iteration)
             # Using multiplier of 24 * 2048 = 49152 steps per training iteration
-            cfg.curriculum["imitation_weight"] = CurriculumTermCfg(
-                func=mdp.reward_weight,
-                params={
-                    "reward_name": "imitation",
-                    "weight_stages": [
-                        {"step": 0,                "weight": 1.0},   # 0-5k iterations: Learn basic gait
-                        {"step": 5000 * 49152,     "weight": 0.8},   # 5-10k: Start reducing imitation dominance
-                        {"step": 10000 * 49152,    "weight": 0.6},   # 10-15k: Further reduce
-                        {"step": 15000 * 49152,    "weight": 0.5},   # 15-20k: Prioritize robustness
-                    ],
-                },
-            )
-
-            cfg.curriculum["track_linear_velocity_weight"] = CurriculumTermCfg(
-                func=mdp.reward_weight,
-                params={
-                    "reward_name": "track_linear_velocity",
-                    "weight_stages": [
-                        {"step": 0,                "weight": 0.0},   # 0-5k iterations: Don't track velocity, focus on gait
-                        {"step": 5000 * 49152,     "weight": 1.0},   # 5-10k: Start velocity tracking
-                        {"step": 10000 * 49152,    "weight": 2.0},   # 10-15k: Increase requirement
-                        {"step": 15000 * 49152,    "weight": 4.0},   # 15-20k: Full velocity tracking
-                    ],
-                },
-            )
-
-            cfg.curriculum["track_angular_velocity_weight"] = CurriculumTermCfg(
-                func=mdp.reward_weight,
-                params={
-                    "reward_name": "track_angular_velocity",
-                    "weight_stages": [
-                        {"step": 0,                "weight": 0.0},   # 0-5k iterations: Don't track velocity, focus on gait
-                        {"step": 5000 * 49152,     "weight": 1.0},   # 5-10k: Start velocity tracking
-                        {"step": 10000 * 49152,    "weight": 2.0},   # 10-15k: Increase requirement
-                        {"step": 15000 * 49152,    "weight": 4.0},   # 15-20k: Full velocity tracking
-                    ],
-                },
-            )
+            # cfg.curriculum["imitation_weight"] = CurriculumTermCfg(
+                # func=mdp.reward_weight,
+                # params={
+                    # "reward_name": "imitation",
+                    # "weight_stages": [
+                        # {"step": 0,                "weight": 1.0},   # 0-5k iterations: Learn basic gait
+                        # {"step": 5000 * 49152,     "weight": 0.8},   # 5-10k: Start reducing imitation dominance
+                        # {"step": 10000 * 49152,    "weight": 0.6},   # 10-15k: Further reduce
+                        # {"step": 15000 * 49152,    "weight": 0.5},   # 15-20k: Prioritize robustness
+                    # ],
+                # },
+            # )
+# 
+            # cfg.curriculum["track_linear_velocity_weight"] = CurriculumTermCfg(
+                # func=mdp.reward_weight,
+                # params={
+                    # "reward_name": "track_linear_velocity",
+                    # "weight_stages": [
+                        # {"step": 0,                "weight": 0.0},   # 0-5k iterations: Don't track velocity, focus on gait
+                        # {"step": 5000 * 49152,     "weight": 1.0},   # 5-10k: Start velocity tracking
+                        # {"step": 10000 * 49152,    "weight": 2.0},   # 10-15k: Increase requirement
+                        # {"step": 15000 * 49152,    "weight": 4.0},   # 15-20k: Full velocity tracking
+                    # ],
+                # },
+            # )
+# 
+            # cfg.curriculum["track_angular_velocity_weight"] = CurriculumTermCfg(
+                # func=mdp.reward_weight,
+                # params={
+                    # "reward_name": "track_angular_velocity",
+                    # "weight_stages": [
+                        # {"step": 0,                "weight": 0.0},   # 0-5k iterations: Don't track velocity, focus on gait
+                        # {"step": 5000 * 49152,     "weight": 1.0},   # 5-10k: Start velocity tracking
+                        # {"step": 10000 * 49152,    "weight": 2.0},   # 10-15k: Increase requirement
+                        # {"step": 15000 * 49152,    "weight": 4.0},   # 15-20k: Full velocity tracking
+                    # ],
+                # },
+            # )
 
         # Add reset event to reset imitation phase
         cfg.events["reset_imitation_phase"] = EventTermCfg(
