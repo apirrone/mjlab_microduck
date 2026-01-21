@@ -192,10 +192,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # STRONGLY encourage proper gait with foot lifting (not sliding!)
-    # Limit air time to prevent jumping - small robot should take quick steps
+    # Enforce slower stepping with higher minimum air time threshold
     cfg.rewards["air_time"].weight = 3.0  # Increased from 0.5 to force foot lifting
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.02  # Minimum air time for valid step
+    cfg.rewards["air_time"].params["threshold_min"] = 0.1  # Increased from 0.02 to enforce slower steps
     cfg.rewards["air_time"].params["threshold_max"] = 0.15  # Maximum air time - prevents jumping!
 
     # Only set velocity tracking weights if NOT using imitation
@@ -270,17 +270,6 @@ def make_microduck_velocity_env_cfg(
         params={
             "target_height_min": 0.07,
             "target_height_max": 0.13,
-        }
-    )
-
-    # Foot air time reward: encourage proper swing phases with sufficient air time
-    cfg.rewards["foot_air_time_reward"] = RewardTermCfg(
-        func=microduck_mdp.foot_air_time_reward,
-        weight=2.0,
-        params={
-            "sensor_name": "feet_ground_contact",
-            "min_air_time": 0.1,  # Minimum 0.1s air time per step
-            "command_threshold": 0.01,
         }
     )
 
