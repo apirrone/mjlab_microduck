@@ -107,7 +107,7 @@ def make_microduck_velocity_env_cfg(
     for reward_name in ["foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -2.0
+    cfg.rewards["foot_slip"].weight = -3.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
