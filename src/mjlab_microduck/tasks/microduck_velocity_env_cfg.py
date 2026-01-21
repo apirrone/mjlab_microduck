@@ -114,7 +114,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["soft_landing"].weight = 0.5
 
     # Air time reward - enforce slower stepping
-    cfg.rewards["air_time"].weight = 4.0
+    cfg.rewards["air_time"].weight = 6.0  # was 4.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.1
     cfg.rewards["air_time"].params["threshold_max"] = 0.15
@@ -198,7 +198,7 @@ def make_microduck_velocity_env_cfg(
             "reward_name": "action_rate_l2",
             "weight_stages": [
                 {"step": 0, "weight": -0.5},
-                {"step": 256, "weight": -1.0}, # It actually worked pretty well this way
+                {"step": 2000, "weight": -1.0}, # It actually worked pretty well this way
                 # {"step": 512 * 24, "weight": -0.7},
                 # {"step": 768 * 24, "weight": -0.8},
                 # {"step": 1024 * 24, "weight": -0.9},
