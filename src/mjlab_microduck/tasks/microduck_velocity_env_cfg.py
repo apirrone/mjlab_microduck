@@ -124,7 +124,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 4.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = -1.0
 
     # Neck stability
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
