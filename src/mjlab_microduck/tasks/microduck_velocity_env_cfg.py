@@ -273,10 +273,10 @@ def make_microduck_velocity_env_cfg(
         }
     )
 
-    # Contact frequency penalty: discourage rapid stepping
+    # Contact frequency penalty: discourage rapid stepping (DISABLED for now)
     cfg.rewards["contact_frequency_penalty"] = RewardTermCfg(
         func=microduck_mdp.contact_frequency_penalty,
-        weight=-1.0,
+        weight=0.0,  # Disabled - using air_time reward only
         params={
             "sensor_name": "feet_ground_contact",
             "max_contact_changes_per_sec": 4.0,  # Max 4 contact changes/sec = 2 steps/sec = 1 Hz gait
