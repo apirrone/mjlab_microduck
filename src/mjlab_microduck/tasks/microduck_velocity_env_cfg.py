@@ -170,14 +170,13 @@ def make_microduck_velocity_env_cfg(
         cfg.observations["policy"].terms["base_ang_vel"]
     )
 
-    if not play:
-        cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 1
-        cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
-        cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
+    cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 1
+    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
+    cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
-        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 1
-        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
-        cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+    cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 1
+    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
+    cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
