@@ -420,20 +420,6 @@ def make_microduck_velocity_env_cfg(
             # Gradually reduce imitation weight and increase velocity tracking requirements
             # Steps are in environment steps (training_iterations * steps_per_iteration)
             # Using multiplier of 24 * 2048 = 49152 steps per training iteration
-            cfg.curriculum["action_rate_l2"] = CurriculumTermCfg(
-                func=mdp.action_rate_l2,
-                params={
-                    "reward_name": "action_rate_l2",
-                    "weight_stages": [
-                        {"step": 0,                "weight": -0.5},
-                        {"step": 2000 * 49152,     "weight": -0.6},
-                        {"step": 4000 * 49152,     "weight": -0.7},
-                        {"step": 6000 * 49152,     "weight": -0.8},
-                        {"step": 8000 * 49152,     "weight": -0.9},
-                        {"step": 10000 * 49152,    "weight": -1.0},
-                    ],
-                },
-            )
 
         # Add reset event to reset imitation phase
         cfg.events["reset_imitation_phase"] = EventTermCfg(
@@ -453,6 +439,24 @@ def make_microduck_velocity_env_cfg(
         cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
             func=microduck_mdp.reference_motion_observation,
             params={"imitation_state": imitation_state}
+        )
+
+    # Curriculum for action_rate_l2 (applies to all training modes, not just imitation)
+    # Gradually increase the penalty for action rate changes to encourage smoother movements
+    if not play:
+        cfg.curriculum["action_rate_l2"] = CurriculumTermCfg(
+            func=mdp.action_rate_l2,
+            params={
+                "reward_name": "action_rate_l2",
+                "weight_stages": [
+                    {"step": 0,                "weight": -0.5},
+                    {"step": 2000 * 49152,     "weight": -0.6},
+                    {"step": 4000 * 49152,     "weight": -0.7},
+                    {"step": 6000 * 49152,     "weight": -0.8},
+                    {"step": 8000 * 49152,     "weight": -0.9},
+                    {"step": 10000 * 49152,    "weight": -1.0},
+                ],
+            },
         )
 
     return cfg
