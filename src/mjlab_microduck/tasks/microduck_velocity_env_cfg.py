@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
-from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg
+from mjlab.managers.manager_term_config import CurriculumTermCfg, EventTermCfg, RewardTermCfg
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -124,7 +124,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 4.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -1.0
+    cfg.rewards["action_rate_l2"].weight = -0.5
 
     # Neck stability
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
@@ -190,6 +190,22 @@ def make_microduck_velocity_env_cfg(
     # Terrain
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
+
+    # Add action rate curriculum
+    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "action_rate_l2",
+            "weight_stages": [
+                {"step": 0, "weight": -0.5},
+                {"step": 256, "weight": -0.6},
+                {"step": 512, "weight": -0.7},
+                {"step": 768, "weight": -0.8},
+                {"step": 1024, "weight": -0.9},
+                {"step": 1280, "weight": -1.0},
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
