@@ -665,3 +665,141 @@ def neck_joint_vel_l2(
 
     # Return L2 squared norm of neck joint velocities
     return torch.sum(torch.square(neck_joint_vel), dim=1)
+
+
+def foot_air_time_reward(
+    env: ManagerBasedRlEnv,
+    sensor_name: str = "feet_ground_contact",
+    min_air_time: float = 0.1,
+    command_threshold: float = 0.01,
+) -> torch.Tensor:
+    """
+    Reward feet being in the air for a minimum duration per step.
+    This encourages proper swing phases with sufficient air time.
+
+    Args:
+        env: The environment
+        sensor_name: Name of the contact sensor
+        min_air_time: Minimum air time (seconds) to get reward
+        command_threshold: Minimum command magnitude to apply reward
+
+    Returns:
+        Reward tensor of shape (num_envs,)
+    """
+    if sensor_name not in env.scene.sensors:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Check if command is above threshold
+    if "twist" in env.command_manager._terms:
+        cmd = env.command_manager.get_command("twist")
+        cmd_vel = cmd[:, :3]
+        cmd_norm = torch.linalg.norm(cmd_vel, dim=1)
+        active_mask = cmd_norm > command_threshold
+    else:
+        active_mask = torch.ones(env.num_envs, device=env.device, dtype=torch.bool)
+
+    sensor = env.scene.sensors[sensor_name]
+
+    # Get contact state and air time
+    # contacts: (num_envs, 2) - binary contact for left and right foot
+    # air_time: (num_envs, 2) - time since last contact for each foot
+    contacts = sensor.data.found[:, :2]  # (num_envs, 2)
+    air_time = sensor.data.air_time[:, :2]  # (num_envs, 2) in seconds
+
+    # Initialize previous contact state if needed
+    if not hasattr(env, '_prev_foot_contacts'):
+        env._prev_foot_contacts = contacts.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Detect touchdown events (was in air, now in contact)
+    # prev_contacts == 0 (was in air) and contacts == 1 (now touching)
+    touchdown = (env._prev_foot_contacts == 0) & (contacts == 1)
+
+    # Reward if air time at touchdown exceeds minimum
+    # air_time at touchdown moment tells us how long the foot was in the air
+    sufficient_air_time = air_time >= min_air_time
+    reward_per_foot = touchdown & sufficient_air_time
+
+    # Sum across both feet
+    reward = torch.sum(reward_per_foot.float(), dim=1)
+
+    # Update previous contact state
+    env._prev_foot_contacts = contacts.clone()
+
+    # Apply command threshold mask
+    reward = reward * active_mask.float()
+
+    return reward
+
+
+def contact_frequency_penalty(
+    env: ManagerBasedRlEnv,
+    sensor_name: str = "feet_ground_contact",
+    max_contact_changes_per_sec: float = 4.0,
+    command_threshold: float = 0.01,
+) -> torch.Tensor:
+    """
+    Penalize high frequency of contact changes to encourage slower stepping.
+    Tracks the number of contact state changes per second and penalizes when above threshold.
+
+    Args:
+        env: The environment
+        sensor_name: Name of the contact sensor
+        max_contact_changes_per_sec: Maximum allowed contact changes per second
+        command_threshold: Minimum command magnitude to apply penalty
+
+    Returns:
+        Penalty tensor of shape (num_envs,) - negative when exceeding threshold
+    """
+    if sensor_name not in env.scene.sensors:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Check if command is above threshold
+    if "twist" in env.command_manager._terms:
+        cmd = env.command_manager.get_command("twist")
+        cmd_vel = cmd[:, :3]
+        cmd_norm = torch.linalg.norm(cmd_vel, dim=1)
+        active_mask = cmd_norm > command_threshold
+    else:
+        active_mask = torch.ones(env.num_envs, device=env.device, dtype=torch.bool)
+
+    sensor = env.scene.sensors[sensor_name]
+    contacts = sensor.data.found[:, :2]  # (num_envs, 2)
+
+    # Initialize tracking if needed
+    if not hasattr(env, '_contact_change_count'):
+        env._contact_change_count = torch.zeros(env.num_envs, device=env.device)
+        env._contact_change_timer = torch.zeros(env.num_envs, device=env.device)
+        env._prev_contacts_for_freq = contacts.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Detect any contact changes (either foot)
+    contact_changed = torch.any(contacts != env._prev_contacts_for_freq, dim=1)
+
+    # Increment change counter
+    env._contact_change_count += contact_changed.float()
+
+    # Update timer
+    env._contact_change_timer += env.step_dt
+
+    # Calculate current frequency (changes per second)
+    # Avoid division by zero
+    freq = env._contact_change_count / torch.clamp(env._contact_change_timer, min=0.01)
+
+    # Reset counter and timer every 1 second
+    reset_mask = env._contact_change_timer >= 1.0
+    env._contact_change_count[reset_mask] = 0.0
+    env._contact_change_timer[reset_mask] = 0.0
+
+    # Penalize when frequency exceeds maximum
+    # Use quadratic penalty for frequencies above threshold
+    excess_freq = torch.clamp(freq - max_contact_changes_per_sec, min=0.0)
+    penalty = -torch.square(excess_freq)
+
+    # Update previous contacts
+    env._prev_contacts_for_freq = contacts.clone()
+
+    # Apply command threshold mask
+    penalty = penalty * active_mask.float()
+
+    return penalty

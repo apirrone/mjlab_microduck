@@ -273,6 +273,28 @@ def make_microduck_velocity_env_cfg(
         }
     )
 
+    # Foot air time reward: encourage proper swing phases with sufficient air time
+    cfg.rewards["foot_air_time_reward"] = RewardTermCfg(
+        func=microduck_mdp.foot_air_time_reward,
+        weight=2.0,
+        params={
+            "sensor_name": "feet_ground_contact",
+            "min_air_time": 0.1,  # Minimum 0.1s air time per step
+            "command_threshold": 0.01,
+        }
+    )
+
+    # Contact frequency penalty: discourage rapid stepping
+    cfg.rewards["contact_frequency_penalty"] = RewardTermCfg(
+        func=microduck_mdp.contact_frequency_penalty,
+        weight=-1.0,
+        params={
+            "sensor_name": "feet_ground_contact",
+            "max_contact_changes_per_sec": 4.0,  # Max 4 contact changes/sec = 2 steps/sec = 1 Hz gait
+            "command_threshold": 0.01,
+        }
+    )
+
     # More standing env, disabling heading envs
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.1
@@ -441,23 +463,7 @@ def make_microduck_velocity_env_cfg(
             params={"imitation_state": imitation_state}
         )
 
-    # Curriculum for action_rate_l2 (applies to all training modes, not just imitation)
-    # Gradually increase the penalty for action rate changes to encourage smoother movements
-    if not play:
-        cfg.curriculum["action_rate_l2"] = CurriculumTermCfg(
-            func=mdp.reward_weight,
-            params={
-                "reward_name": "action_rate_l2",
-                "weight_stages": [
-                    {"step": 0,                "weight": -0.5},
-                    {"step": 2000 * 49152,     "weight": -0.6},
-                    {"step": 4000 * 49152,     "weight": -0.7},
-                    {"step": 6000 * 49152,     "weight": -0.8},
-                    {"step": 8000 * 49152,     "weight": -0.9},
-                    {"step": 10000 * 49152,    "weight": -1.0},
-                ],
-            },
-        )
+    # Curriculum for action_rate_l2 removed - using fixed weight instead
 
     return cfg
 
