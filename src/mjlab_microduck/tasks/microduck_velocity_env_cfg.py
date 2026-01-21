@@ -4,17 +4,18 @@ from copy import deepcopy
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
-from mjlab_microduck.robot.microduck_constants import MICRODUCK_ROBOT_CFG
+from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
     RslRlPpoAlgorithmCfg,
 )
-from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
-from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg
 from mjlab.sensor import ContactMatch, ContactSensorCfg
 from mjlab.tasks.velocity import mdp
+from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
+
+from mjlab_microduck.robot.microduck_constants import MICRODUCK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
@@ -101,7 +102,6 @@ def make_microduck_velocity_env_cfg(
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    # cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
     # Foot-specific configurations
     for reward_name in ["foot_slip"]:
@@ -110,16 +110,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["foot_slip"].weight = -2.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
-    # Self collision
-    cfg.rewards["self_collisions"] = RewardTermCfg(
-        func=mdp.self_collision_cost,
-        weight=0.0,  # Disabled
-        params={"sensor_name": self_collision_cfg.name},
-    )
-
     # Body dynamics rewards
-    # cfg.rewards["body_ang_vel"].weight = -0.05
-    # cfg.rewards["angular_momentum"].weight = -0.02
     cfg.rewards["soft_landing"].weight = 0.5
 
     # Air time reward - enforce slower stepping
