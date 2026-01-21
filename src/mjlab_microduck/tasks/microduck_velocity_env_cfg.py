@@ -116,7 +116,7 @@ def make_microduck_velocity_env_cfg(
     # Air time reward - enforce slower stepping
     cfg.rewards["air_time"].weight = 4.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.07
+    cfg.rewards["air_time"].params["threshold_min"] = 0.1
     cfg.rewards["air_time"].params["threshold_max"] = 0.15
 
     # Velocity tracking rewards
@@ -191,22 +191,21 @@ def make_microduck_velocity_env_cfg(
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 
-    # Add action rate curriculum
+    # Add action rate curriculum (every 256 learning iterations)
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
         func=mdp.reward_weight,
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
                 {"step": 0, "weight": -0.5},
-                {"step": 256, "weight": -0.6},
-                {"step": 512, "weight": -0.7},
-                {"step": 768, "weight": -0.8},
-                {"step": 1024, "weight": -0.9},
-                {"step": 1280, "weight": -1.0},
+                {"step": 256, "weight": -1.0}, # It actually worked pretty well this way
+                # {"step": 512 * 24, "weight": -0.7},
+                # {"step": 768 * 24, "weight": -0.8},
+                # {"step": 1024 * 24, "weight": -0.9},
+                # {"step": 1280 * 24, "weight": -1.0},
             ],
         },
     )
-
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
