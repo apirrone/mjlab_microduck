@@ -224,7 +224,7 @@ MicroduckRlCfg = RslRlOnPolicyRunnerCfg(
     ),
     wandb_project="mjlab_microduck",
     experiment_name="microduck_velocity",
-    save_interval=500,
+    save_interval=250,
     num_steps_per_env=24,
     max_iterations=50_000,
 )
