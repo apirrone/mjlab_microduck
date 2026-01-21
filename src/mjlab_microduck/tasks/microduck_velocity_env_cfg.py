@@ -150,8 +150,11 @@ def make_microduck_velocity_env_cfg(
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
+    # Disable clearance and swing height - they conflict with air_time reward requirements
+    cfg.rewards["foot_clearance"].weight = 0.0
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # 1cm clearance for 23cm tall robot
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].weight = 0.0
     cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # 1cm swing height for 23cm tall robot
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
 
