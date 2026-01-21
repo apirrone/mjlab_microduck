@@ -198,7 +198,7 @@ def make_microduck_velocity_env_cfg(
     # Enforce slower stepping with higher minimum air time threshold
     cfg.rewards["air_time"].weight = 4.0  # Increased from 0.5 to force foot lifting
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.04  # Increased from 0.02 to enforce slower steps
+    cfg.rewards["air_time"].params["threshold_min"] = 0.06  # Increased from 0.02 to enforce slower steps
     cfg.rewards["air_time"].params["threshold_max"] = 0.15  # Maximum air time - prevents jumping!
 
     # Only set velocity tracking weights if NOT using imitation
