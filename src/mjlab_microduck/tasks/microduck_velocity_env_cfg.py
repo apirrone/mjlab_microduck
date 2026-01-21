@@ -183,8 +183,8 @@ def make_microduck_velocity_env_cfg(
     command.rel_standing_envs = 0.1
     command.rel_heading_envs = 0.0
     command.ranges.ang_vel_z = (-1.0, 1.0)
-    command.ranges.lin_vel_y = (-0.5, 0.5)
     command.ranges.lin_vel_x = (-0.5, 0.5)
+    command.ranges.lin_vel_y = (-0.5, 0.5)
     command.viz.z_offset = 1.0
 
     # Terrain
