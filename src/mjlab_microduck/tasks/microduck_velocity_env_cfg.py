@@ -445,7 +445,7 @@ def make_microduck_velocity_env_cfg(
     # Gradually increase the penalty for action rate changes to encourage smoother movements
     if not play:
         cfg.curriculum["action_rate_l2"] = CurriculumTermCfg(
-            func=mdp.action_rate_l2,
+            func=mdp.reward_weight,
             params={
                 "reward_name": "action_rate_l2",
                 "weight_stages": [
