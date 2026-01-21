@@ -12,7 +12,7 @@ from mjlab.rl import (
     RslRlPpoAlgorithmCfg,
 )
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
-from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg, ObservationTermCfg, CurriculumTermCfg
+from mjlab.managers.manager_term_config import EventTermCfg, RewardTermCfg, ObservationTermCfg
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 
 from mjlab.sensor import ContactMatch, ContactSensorCfg

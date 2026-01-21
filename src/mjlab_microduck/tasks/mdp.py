@@ -97,6 +97,24 @@ def reset_action_history(
         joint_vel = asset.data.joint_vel[env_ids, :][:, asset_cfg.joint_ids]
         asset.data._prev_joint_vel[env_ids] = joint_vel
 
+    # Reset foot air time tracking
+    if hasattr(env, '_foot_air_time_tracker'):
+        env._foot_air_time_tracker[env_ids] = 0.0
+    if hasattr(env, '_prev_foot_contacts_air'):
+        if "feet_ground_contact" in env.scene.sensors:
+            contacts = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2]
+            env._prev_foot_contacts_air[env_ids] = contacts
+
+    # Reset contact frequency tracking
+    if hasattr(env, '_contact_change_count'):
+        env._contact_change_count[env_ids] = 0.0
+    if hasattr(env, '_contact_change_timer'):
+        env._contact_change_timer[env_ids] = 0.0
+    if hasattr(env, '_prev_contacts_for_freq'):
+        if "feet_ground_contact" in env.scene.sensors:
+            contacts = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2]
+            env._prev_contacts_for_freq[env_ids] = contacts
+
 
 def imitation_reward(
     env: ManagerBasedRlEnv,
@@ -699,32 +717,34 @@ def foot_air_time_reward(
         active_mask = torch.ones(env.num_envs, device=env.device, dtype=torch.bool)
 
     sensor = env.scene.sensors[sensor_name]
-
-    # Get contact state and air time
-    # contacts: (num_envs, 2) - binary contact for left and right foot
-    # air_time: (num_envs, 2) - time since last contact for each foot
     contacts = sensor.data.found[:, :2]  # (num_envs, 2)
-    air_time = sensor.data.air_time[:, :2]  # (num_envs, 2) in seconds
 
-    # Initialize previous contact state if needed
-    if not hasattr(env, '_prev_foot_contacts'):
-        env._prev_foot_contacts = contacts.clone()
+    # Initialize tracking if needed
+    if not hasattr(env, '_foot_air_time_tracker'):
+        env._foot_air_time_tracker = torch.zeros(env.num_envs, 2, device=env.device)
+        env._prev_foot_contacts_air = contacts.clone()
         return torch.zeros(env.num_envs, device=env.device)
 
     # Detect touchdown events (was in air, now in contact)
-    # prev_contacts == 0 (was in air) and contacts == 1 (now touching)
-    touchdown = (env._prev_foot_contacts == 0) & (contacts == 1)
+    touchdown = (env._prev_foot_contacts_air == 0) & (contacts == 1)
 
-    # Reward if air time at touchdown exceeds minimum
-    # air_time at touchdown moment tells us how long the foot was in the air
-    sufficient_air_time = air_time >= min_air_time
+    # Check if air time at touchdown was sufficient (before resetting)
+    sufficient_air_time = env._foot_air_time_tracker >= min_air_time
     reward_per_foot = touchdown & sufficient_air_time
 
     # Sum across both feet
     reward = torch.sum(reward_per_foot.float(), dim=1)
 
+    # Update air time: increment when in air, reset when in contact
+    in_air = (contacts == 0)
+    env._foot_air_time_tracker = torch.where(
+        in_air,
+        env._foot_air_time_tracker + env.step_dt,
+        torch.zeros_like(env._foot_air_time_tracker)
+    )
+
     # Update previous contact state
-    env._prev_foot_contacts = contacts.clone()
+    env._prev_foot_contacts_air = contacts.clone()
 
     # Apply command threshold mask
     reward = reward * active_mask.float()
