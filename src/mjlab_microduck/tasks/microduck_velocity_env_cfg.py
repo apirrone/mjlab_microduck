@@ -114,10 +114,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["soft_landing"].weight = 0.5
 
     # Air time reward - enforce slower stepping
-    cfg.rewards["air_time"].weight = 4.0  # was 8.0
+    cfg.rewards["air_time"].weight = 8.0  # was 8.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.2
-    cfg.rewards["air_time"].params["threshold_max"] = 0.4
+    cfg.rewards["air_time"].params["threshold_max"] = 0.3
 
     # Velocity tracking rewards
     cfg.rewards["track_linear_velocity"].weight = 4.0
