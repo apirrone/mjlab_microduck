@@ -116,8 +116,8 @@ def make_microduck_velocity_env_cfg(
     # Air time reward - enforce slower stepping
     cfg.rewards["air_time"].weight = 4.0  # was 8.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.1
-    cfg.rewards["air_time"].params["threshold_max"] = 0.15
+    cfg.rewards["air_time"].params["threshold_min"] = 0.2
+    cfg.rewards["air_time"].params["threshold_max"] = 0.4
 
     # Velocity tracking rewards
     cfg.rewards["track_linear_velocity"].weight = 4.0
@@ -165,7 +165,7 @@ def make_microduck_velocity_env_cfg(
         # Add imitation reward
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
-            weight=0.2,  # Conservative weight - just for guidance
+            weight=0.05,  # Conservative weight - just for guidance
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
@@ -254,8 +254,8 @@ def make_microduck_velocity_env_cfg(
             "reward_name": "action_rate_l2",
             "weight_stages": [
                 {"step": 0, "weight": -0.5},
-                {"step": 5000, "weight": -0.7},
-                {"step": 10000, "weight": -1.0},
+                {"step": 10000, "weight": -0.7},
+                {"step": 20000, "weight": -1.0},
             ],
         },
     )
