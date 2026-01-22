@@ -165,7 +165,7 @@ def make_microduck_velocity_env_cfg(
         # Add imitation reward
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
-            weight=0.5,  # Conservative weight - just for guidance
+            weight=0.2,  # Conservative weight - just for guidance
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
