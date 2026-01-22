@@ -149,6 +149,40 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
+    # Imitation learning setup (optional, lightweight guidance)
+    imitation_state = None
+    if use_imitation and reference_motion_path:
+        from mjlab_microduck.reference_motion import ReferenceMotionLoader
+        import os
+
+        if not os.path.exists(reference_motion_path):
+            raise FileNotFoundError(f"Reference motion file not found: {reference_motion_path}")
+
+        # Create reference motion loader and imitation state
+        ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
+        imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
+
+        # Add imitation reward
+        cfg.rewards["imitation"] = RewardTermCfg(
+            func=microduck_mdp.imitation_reward,
+            weight=0.5,  # Conservative weight - just for guidance
+            params={
+                "imitation_state": imitation_state,
+                "command_threshold": 0.01,
+                "weight_torso_pos_xy": 0.0,  # Disabled
+                "weight_torso_orient": 0.0,  # Disabled
+                "weight_lin_vel_xy": 0.5,    # Light guidance on velocities
+                "weight_lin_vel_z": 0.5,
+                "weight_ang_vel_xy": 0.3,
+                "weight_ang_vel_z": 0.3,
+                "weight_leg_joint_pos": 5.0,   # Reduced from 15.0 for gentle guidance
+                "weight_neck_joint_pos": 0.0,  # Let other rewards handle neck
+                "weight_leg_joint_vel": 0.0,   # Disabled
+                "weight_neck_joint_vel": 0.0,  # Disabled
+                "weight_contact": 0.5,         # Light contact timing guidance
+            },
+        )
+
     # Events
     cfg.events["reset_action_history"] = EventTermCfg(
         func=microduck_mdp.reset_action_history,
@@ -182,6 +216,23 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
     cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+
+    # Add imitation observations if using imitation
+    if use_imitation and reference_motion_path and imitation_state is not None:
+        from mjlab.managers.manager_term_config import ObservationTermCfg
+
+        # Add phase observation to policy (for both training and play)
+        cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(
+            func=microduck_mdp.imitation_phase_observation,
+            params={"imitation_state": imitation_state}
+        )
+
+        # Add reference motion to critic privileged observations
+        # Include in both training and play to keep model architecture consistent
+        cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
+            func=microduck_mdp.reference_motion_observation,
+            params={"imitation_state": imitation_state}
+        )
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
