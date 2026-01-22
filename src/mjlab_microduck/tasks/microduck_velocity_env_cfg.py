@@ -179,7 +179,7 @@ def make_microduck_velocity_env_cfg(
                 "weight_neck_joint_pos": 0.0,  # Let other rewards handle neck
                 "weight_leg_joint_vel": 0.0,   # Disabled
                 "weight_neck_joint_vel": 0.0,  # Disabled
-                "weight_contact": 0.5,         # Light contact timing guidance
+                "weight_contact": 3.0,         # Light contact timing guidance
             },
         )
 
