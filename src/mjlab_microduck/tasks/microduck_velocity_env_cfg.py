@@ -144,8 +144,8 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.com_height_target,
         weight=1.0,
         params={
-            "target_height_min": 0.10,
-            "target_height_max": 0.12,
+            "target_height_min": 0.09,
+            "target_height_max": 0.13,
         },
     )
 
@@ -165,7 +165,7 @@ def make_microduck_velocity_env_cfg(
         # Add imitation reward
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
-            weight=0.05,  # Conservative weight - just for guidance
+            weight=0.01,  # Conservative weight - just for guidance
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
@@ -187,6 +187,7 @@ def make_microduck_velocity_env_cfg(
     cfg.events["reset_action_history"] = EventTermCfg(
         func=microduck_mdp.reset_action_history,
         mode="reset",
+        params={"imitation_state": imitation_state} if imitation_state is not None else {},
     )
 
     cfg.events["foot_friction"].params[
