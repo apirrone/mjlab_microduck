@@ -703,45 +703,6 @@ def leg_joint_vel_l2(
     # Return L2 squared norm of leg joint velocities
     return torch.sum(torch.square(leg_joint_vel), dim=1)
 
-
-def air_time_curriculum(
-    env: ManagerBasedRlEnv,
-    env_ids: torch.Tensor,
-    reward_name: str,
-    threshold_min_stages: list[dict],
-    threshold_max_stages: list[dict],
-) -> dict[str, torch.Tensor]:
-    """Update air_time reward thresholds based on training step stages.
-
-    Args:
-        env: The environment
-        env_ids: Environment IDs (unused but required by curriculum API)
-        reward_name: Name of the reward term to modify
-        threshold_min_stages: List of dicts with 'step' and 'value' keys for min threshold
-        threshold_max_stages: List of dicts with 'step' and 'value' keys for max threshold
-
-    Returns:
-        Dict with current threshold values
-    """
-    del env_ids  # Unused
-    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
-
-    # Update threshold_min
-    for stage in threshold_min_stages:
-        if env.common_step_counter > stage["step"]:
-            reward_term_cfg.params["threshold_min"] = stage["value"]
-
-    # Update threshold_max
-    for stage in threshold_max_stages:
-        if env.common_step_counter > stage["step"]:
-            reward_term_cfg.params["threshold_max"] = stage["value"]
-
-    return {
-        "threshold_min": torch.tensor([reward_term_cfg.params["threshold_min"]]),
-        "threshold_max": torch.tensor([reward_term_cfg.params["threshold_max"]]),
-    }
-
-
 def contact_frequency_penalty(
     env: ManagerBasedRlEnv,
     sensor_name: str = "feet_ground_contact",

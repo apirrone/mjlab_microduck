@@ -111,7 +111,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
-    cfg.rewards["soft_landing"].weight = 3.0  # Increased to discourage dynamic impacts
+    cfg.rewards["soft_landing"].weight = 0.5
 
     # Air time reward - enforce slower stepping
     cfg.rewards["air_time"].weight = 8.0  # was 4.0
@@ -183,13 +183,13 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
-    # Commands - reduced ranges for slower, more stable gaits
+    # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.1
     command.rel_heading_envs = 0.0
-    command.ranges.ang_vel_z = (-0.8, 0.8)  # Reduced from (-1.0, 1.0)
-    command.ranges.lin_vel_x = (-0.3, 0.3)  # Reduced from (-0.5, 0.5)
-    command.ranges.lin_vel_y = (-0.3, 0.3)  # Reduced from (-0.5, 0.5)
+    command.ranges.ang_vel_z = (-1.0, 1.0)
+    command.ranges.lin_vel_x = (-0.5, 0.5)
+    command.ranges.lin_vel_y = (-0.5, 0.5)
     command.viz.z_offset = 1.0
 
     # Terrain
@@ -205,24 +205,6 @@ def make_microduck_velocity_env_cfg(
                 {"step": 0, "weight": -0.5},
                 {"step": 5000, "weight": -0.7},
                 {"step": 10000, "weight": -1.0},
-            ],
-        },
-    )
-
-    # Add air time curriculum - gradually increase thresholds for slower stepping
-    cfg.curriculum["air_time_thresholds"] = CurriculumTermCfg(
-        func=microduck_mdp.air_time_curriculum,
-        params={
-            "reward_name": "air_time",
-            "threshold_min_stages": [
-                {"step": 0, "value": 0.1},
-                {"step": 20000, "value": 0.12},
-                {"step": 40000, "value": 0.15},
-            ],
-            "threshold_max_stages": [
-                {"step": 0, "value": 0.15},
-                {"step": 20000, "value": 0.20},
-                {"step": 40000, "value": 0.25},
             ],
         },
     )
