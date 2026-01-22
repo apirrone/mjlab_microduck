@@ -677,6 +677,71 @@ def neck_joint_vel_l2(
     return torch.sum(torch.square(neck_joint_vel), dim=1)
 
 
+def leg_joint_vel_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize leg joint velocities to encourage smoother, less dynamic motion.
+    Leg joints are indices 0-4 and 9-13 (10 joints total).
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get leg joint indices (left hip-ankle: 0-4, right hip-ankle: 9-13)
+    leg_joint_indices = list(range(0, 5)) + list(range(9, 14))
+
+    # Get joint velocities for leg joints
+    joint_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]
+    leg_joint_vel = joint_vel[:, leg_joint_indices]
+
+    # Return L2 squared norm of leg joint velocities
+    return torch.sum(torch.square(leg_joint_vel), dim=1)
+
+
+def air_time_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    reward_name: str,
+    threshold_min_stages: list[dict],
+    threshold_max_stages: list[dict],
+) -> dict[str, torch.Tensor]:
+    """Update air_time reward thresholds based on training step stages.
+
+    Args:
+        env: The environment
+        env_ids: Environment IDs (unused but required by curriculum API)
+        reward_name: Name of the reward term to modify
+        threshold_min_stages: List of dicts with 'step' and 'value' keys for min threshold
+        threshold_max_stages: List of dicts with 'step' and 'value' keys for max threshold
+
+    Returns:
+        Dict with current threshold values
+    """
+    del env_ids  # Unused
+    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
+
+    # Update threshold_min
+    for stage in threshold_min_stages:
+        if env.common_step_counter > stage["step"]:
+            reward_term_cfg.params["threshold_min"] = stage["value"]
+
+    # Update threshold_max
+    for stage in threshold_max_stages:
+        if env.common_step_counter > stage["step"]:
+            reward_term_cfg.params["threshold_max"] = stage["value"]
+
+    return {
+        "threshold_min": torch.tensor([reward_term_cfg.params["threshold_min"]]),
+        "threshold_max": torch.tensor([reward_term_cfg.params["threshold_max"]]),
+    }
+
+
 def contact_frequency_penalty(
     env: ManagerBasedRlEnv,
     sensor_name: str = "feet_ground_contact",
