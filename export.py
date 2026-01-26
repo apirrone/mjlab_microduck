@@ -28,9 +28,10 @@ class ExportConfig:
     wandb_run_path: str | None = None
     checkpoint_file: str | None = None
     motion_file: str | None = None
+    mimic: tyro.conf.UseCounterAction[bool] = False  # Override auto-detection: force motion tracking policy export
     num_envs: int | None = None
     device: str | None = None
-    video: bool = False
+    video: tyro.conf.UseCounterAction[bool] = False
     video_length: int = 200
     video_height: int | None = None
     video_width: int | None = None
@@ -184,26 +185,51 @@ def run_export(task_id: str, cfg: ExportConfig):
         runner.load(str(resume_path), map_location=device)
         policy = runner.get_inference_policy(device=device)
 
-    from mjlab.tasks.velocity.rl.exporter import (
-        export_velocity_policy_as_onnx,
-        attach_onnx_metadata,
-    )
-
     onnx_path = os.path.abspath(cfg.onnx_file)
     path = os.path.dirname(onnx_path)
 
-    export_velocity_policy_as_onnx(
-        runner.alg.policy,
-        path=path,
-        filename=onnx_path,
-    )
-    attach_onnx_metadata(
-        runner.env.unwrapped,
-        cfg.checkpoint_file,  # type: ignore
-        path=path,
-        filename=onnx_path,
-    )
-    print(f"Written {onnx_path}")
+    # Determine export type: --mimic flag overrides auto-detection
+    use_motion_exporter = cfg.mimic or is_tracking_task
+
+    # Use appropriate exporter based on task type
+    if use_motion_exporter:
+        from mjlab.tasks.tracking.rl.exporter import (
+            export_motion_policy_as_onnx,
+            attach_onnx_metadata,
+        )
+
+        export_motion_policy_as_onnx(
+            runner.env.unwrapped,  # Motion exporter needs env as first argument
+            runner.alg.policy,
+            path=path,
+            filename=onnx_path,
+        )
+        attach_onnx_metadata(
+            runner.env.unwrapped,
+            cfg.checkpoint_file,  # type: ignore
+            path=path,
+            filename=onnx_path,
+        )
+        mode_str = "(forced)" if cfg.mimic and not is_tracking_task else ""
+        print(f"Written {onnx_path} (motion tracking policy) {mode_str}".strip())
+    else:
+        from mjlab.tasks.velocity.rl.exporter import (
+            export_velocity_policy_as_onnx,
+            attach_onnx_metadata,
+        )
+
+        export_velocity_policy_as_onnx(
+            runner.alg.policy,
+            path=path,
+            filename=onnx_path,
+        )
+        attach_onnx_metadata(
+            runner.env.unwrapped,
+            cfg.checkpoint_file,  # type: ignore
+            path=path,
+            filename=onnx_path,
+        )
+        print(f"Written {onnx_path} (velocity policy)")
 
     env.close()
 

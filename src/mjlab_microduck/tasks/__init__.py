@@ -48,3 +48,29 @@ else:
     print(f"Warning: Reference motion file not found at {_reference_motion_path}")
     print("Imitation learning task 'Mjlab-Velocity-Flat-MicroDuck-Imitation' not registered.")
     print("To enable, set MICRODUCK_REFERENCE_MOTION_PATH environment variable or place file at default location.")
+
+# BeyondMimic tracking task
+# Motion files are downloaded from wandb artifacts, so no local file is needed
+try:
+    from mjlab.tasks.tracking.rl import MotionTrackingOnPolicyRunner
+    from .microduck_beyondmimic_env_cfg import (
+        make_microduck_beyondmimic_env_cfg,
+        MicroduckBeyondMimicRlCfg,
+    )
+
+    # Register with empty motion_file - it will be downloaded from wandb artifact
+    register_mjlab_task(
+        task_id="Mjlab-BeyondMimic-MicroDuck",
+        env_cfg=make_microduck_beyondmimic_env_cfg(
+            motion_file="",  # Will be set by train script from wandb artifact
+        ),
+        play_env_cfg=make_microduck_beyondmimic_env_cfg(
+            play=True,
+            motion_file="",  # Will be set by train script from wandb artifact
+        ),
+        rl_cfg=MicroduckBeyondMimicRlCfg,
+        runner_cls=MotionTrackingOnPolicyRunner,
+    )
+except ImportError as e:
+    print(f"Warning: Could not register BeyondMimic task: {e}")
+    print("This is expected if mjlab doesn't have tracking task support.")
