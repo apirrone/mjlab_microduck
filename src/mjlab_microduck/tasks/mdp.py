@@ -682,22 +682,22 @@ def joint_torques_l2(
     env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
 ) -> torch.Tensor:
     """
-    Penalize joint torques to encourage energy-efficient motion.
+    Penalize actuator forces (torques) to encourage energy-efficient motion.
 
     Args:
         env: The environment
         asset_cfg: Asset configuration
 
     Returns:
-        Penalty tensor of shape (num_envs,) - sum of squared joint torques
+        Penalty tensor of shape (num_envs,) - sum of squared actuator forces
     """
     asset: Entity = env.scene[asset_cfg.name]
 
-    # Get applied joint torques
-    joint_torques = asset.data.applied_torque[:, asset_cfg.joint_ids]
+    # Get actuator forces (scalar actuation in actuation space)
+    actuator_forces = asset.data.actuator_force
 
     # Return L2 squared norm
-    return torch.sum(torch.square(joint_torques), dim=1)
+    return torch.sum(torch.square(actuator_forces), dim=1)
 
 
 def contact_frequency_penalty(
