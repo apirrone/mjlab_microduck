@@ -19,3 +19,6 @@ agents
 *.pch
 nohup.out
 *.onnx
+beyondmimic_motions/
+artifacts/
+*.npz
