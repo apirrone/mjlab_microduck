@@ -4,7 +4,11 @@ from copy import deepcopy
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
-from mjlab.managers.manager_term_config import CurriculumTermCfg, EventTermCfg, RewardTermCfg
+from mjlab.managers.manager_term_config import (
+    CurriculumTermCfg,
+    EventTermCfg,
+    RewardTermCfg,
+)
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -98,45 +102,46 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.5  # was 1.0
+    cfg.rewards["pose"].weight = 1.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
+    cfg.rewards["upright"].weight = 1.0
 
     # Foot-specific configurations
     for reward_name in ["foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -5.0
+    cfg.rewards["foot_slip"].weight = -1.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
-    cfg.rewards["soft_landing"].weight = 0.5
+    cfg.rewards["soft_landing"].weight = 1.0
 
-    # Air time reward - enforce slower stepping
-    cfg.rewards["air_time"].weight = 8.0  # was 8.0
+    # Air time reward
+    cfg.rewards["air_time"].weight = 1.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.2
-    cfg.rewards["air_time"].params["threshold_max"] = 0.3
+    cfg.rewards["air_time"].params["threshold_min"] = 0.05
+    cfg.rewards["air_time"].params["threshold_max"] = 0.15
 
     # Velocity tracking rewards
-    cfg.rewards["track_linear_velocity"].weight = 8.0
-    cfg.rewards["track_angular_velocity"].weight = 4.0
+    cfg.rewards["track_linear_velocity"].weight = 1.0
+    cfg.rewards["track_angular_velocity"].weight = 1.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = -0.1
 
     # Leg joint velocity penalty (encourage slower, smoother motion)
-    cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
-        func=microduck_mdp.leg_joint_vel_l2, weight=-0.02
-    )
+    # cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
+    #     func=microduck_mdp.leg_joint_vel_l2, weight=-0.02
+    # )
 
     # Neck stability
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-2.0
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
     )
     cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_joint_vel_l2, weight=-0.5
+        func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     )
 
     # CoM height target
@@ -156,7 +161,9 @@ def make_microduck_velocity_env_cfg(
         import os
 
         if not os.path.exists(reference_motion_path):
-            raise FileNotFoundError(f"Reference motion file not found: {reference_motion_path}")
+            raise FileNotFoundError(
+                f"Reference motion file not found: {reference_motion_path}"
+            )
 
         # Create reference motion loader and imitation state
         ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
@@ -165,21 +172,21 @@ def make_microduck_velocity_env_cfg(
         # Add imitation reward
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
-            weight=0.01,  # Conservative weight - just for guidance
+            weight=1.0,  # Conservative weight - just for guidance
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
                 "weight_torso_pos_xy": 0.0,  # Disabled
                 "weight_torso_orient": 0.0,  # Disabled
-                "weight_lin_vel_xy": 0.5,    # Light guidance on velocities
+                "weight_lin_vel_xy": 0.5,  # Light guidance on velocities
                 "weight_lin_vel_z": 0.5,
                 "weight_ang_vel_xy": 0.3,
                 "weight_ang_vel_z": 0.3,
-                "weight_leg_joint_pos": 5.0,   # Reduced from 15.0 for gentle guidance
+                "weight_leg_joint_pos": 5.0,  # Reduced from 15.0 for gentle guidance
                 "weight_neck_joint_pos": 0.0,  # Let other rewards handle neck
-                "weight_leg_joint_vel": 0.0,   # Disabled
+                "weight_leg_joint_vel": 0.0,  # Disabled
                 "weight_neck_joint_vel": 0.0,  # Disabled
-                "weight_contact": 3.0,         # Light contact timing guidance
+                "weight_contact": 3.0,  # Light contact timing guidance
             },
         )
 
@@ -187,7 +194,9 @@ def make_microduck_velocity_env_cfg(
     cfg.events["reset_action_history"] = EventTermCfg(
         func=microduck_mdp.reset_action_history,
         mode="reset",
-        params={"imitation_state": imitation_state} if imitation_state is not None else {},
+        params={"imitation_state": imitation_state}
+        if imitation_state is not None
+        else {},
     )
 
     cfg.events["foot_friction"].params[
@@ -225,14 +234,14 @@ def make_microduck_velocity_env_cfg(
         # Add phase observation to policy (for both training and play)
         cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(
             func=microduck_mdp.imitation_phase_observation,
-            params={"imitation_state": imitation_state}
+            params={"imitation_state": imitation_state},
         )
 
         # Add reference motion to critic privileged observations
         # Include in both training and play to keep model architecture consistent
         cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
             func=microduck_mdp.reference_motion_observation,
-            params={"imitation_state": imitation_state}
+            params={"imitation_state": imitation_state},
         )
 
     # Commands
@@ -248,18 +257,18 @@ def make_microduck_velocity_env_cfg(
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 
-    # Add action rate curriculum
-    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "action_rate_l2",
-            "weight_stages": [
-                {"step": 0, "weight": -0.5},
-                {"step": 10000, "weight": -0.7},
-                {"step": 20000, "weight": -1.0},
-            ],
-        },
-    )
+    # # Add action rate curriculum
+    # cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+    #     func=mdp.reward_weight,
+    #     params={
+    #         "reward_name": "action_rate_l2",
+    #         "weight_stages": [
+    #             {"step": 0, "weight": -0.5},
+    #             {"step": 10000, "weight": -0.7},
+    #             {"step": 20000, "weight": -1.0},
+    #         ],
+    #     },
+    # )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
