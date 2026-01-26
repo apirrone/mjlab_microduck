@@ -102,17 +102,17 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 2.0
+    cfg.rewards["pose"].weight = 0.0 # was 2.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0
+    cfg.rewards["upright"].weight = 0.0  # was 1.0
 
     # Foot-specific configurations
     for reward_name in ["foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -1.0
+    cfg.rewards["foot_slip"].weight = -0.0 # was -1.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
