@@ -158,6 +158,33 @@ def make_microduck_velocity_env_cfg(
         # },
     # )
 
+    # === SURVIVAL REWARD (applies to all tasks) ===
+    # Critical baseline reward for staying alive
+    cfg.rewards["survival"] = RewardTermCfg(
+        func=microduck_mdp.is_alive, weight=20.0
+    )
+
+    # === REGULARIZATION REWARDS (applies to all tasks) ===
+    # Joint torques penalty
+    cfg.rewards["joint_torques_l2"] = RewardTermCfg(
+        func=microduck_mdp.joint_torques_l2, weight=-1e-3
+    )
+
+    # Joint accelerations penalty
+    cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
+        func=microduck_mdp.joint_accelerations_l2, weight=-2.5e-6
+    )
+
+    # Leg action acceleration penalty
+    cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
+        func=microduck_mdp.leg_action_acceleration_l2, weight=-0.45
+    )
+
+    # Neck action acceleration penalty
+    cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
+    )
+
     # Imitation learning setup (optional, lightweight guidance)
     imitation_state = None
     if use_imitation and reference_motion_path:

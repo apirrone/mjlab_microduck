@@ -163,12 +163,6 @@ def imitation_reward(
 
     asset: Entity = env.scene[asset_cfg.name]
 
-    # Reset phases for environments that just terminated
-    if hasattr(env, '_reset_buf'):
-        reset_env_ids = env._reset_buf.nonzero(as_tuple=False).squeeze(-1)
-        if len(reset_env_ids) > 0:
-            imitation_state.reset_phases(reset_env_ids)
-
     # Get commanded velocity from the environment
     # Assuming velocity command exists with name "twist"
     if "twist" not in env.command_manager._terms:
@@ -277,40 +271,15 @@ def imitation_reward(
     # Neck joint velocities: negative squared error (4 neck joints)
     neck_joint_vel_rew = -torch.sum(torch.square(neck_joints_vel - ref_neck_joints_vel), dim=1) * weight_neck_joint_vel
 
-    # Contact reward: binary match with exponential penalty for mismatches
-    # This encourages lifting feet during swing phase
+    # Contact reward: Σ_{i∈{L,R}} 1[c_i = ĉ_i] (simple binary match per foot)
     ref_contacts = (ref_data["foot_contacts"] > 0.5).float()
     contacts_float = contacts.float()
-
-    # Debug: Print contact info once to verify reference motion has swing phases
-    if not hasattr(imitation_reward, "_contact_debug_printed"):
-        print("\n" + "="*70)
-        print("CONTACT REWARD DEBUG (first environment, first call)")
-        print("="*70)
-        print(f"Reference contacts [LEFT, RIGHT]: {ref_contacts[0].cpu().numpy()}")
-        print(f"Robot contacts    [LEFT, RIGHT]: {contacts_float[0].cpu().numpy()}")
-        print(f"Contact sensor shape: {contacts_float.shape}")
-        print(f"Has swing phase in reference? {torch.any(ref_contacts == 0.0).item()}")
-        print(f"Left foot ever in swing? {torch.any(ref_contacts[:, 0] == 0.0).item()}")
-        print(f"Right foot ever in swing? {torch.any(ref_contacts[:, 1] == 0.0).item()}")
-        print("\nNOTE: Sensor pattern matches bodies in this order:")
-        print("  Index 0 = LEFT foot  (foot_tpu_bottom)")
-        print("  Index 1 = RIGHT foot (foot)")
-        print("="*70 + "\n")
-        imitation_reward._contact_debug_printed = True
 
     # Compute per-foot contact matching (0 if mismatch, 1 if match)
     contact_matches = (contacts_float == ref_contacts).float()  # (num_envs, 2)
 
-    # Original linear reward (keep for when contacts match)
-    contact_rew_linear = torch.sum(contact_matches, dim=1) * weight_contact
-
-    # Add exponential penalty for wrong contacts (especially for keeping foot down during swing)
-    # When ref says "lift foot" (ref=0) but robot keeps it down (contact=1), add large penalty
-    wrong_contact_penalty = torch.sum((ref_contacts == 0.0) & (contacts_float == 1.0), dim=1)
-
-    # Combined reward: linear bonus for matches, exponential penalty for wrong contacts during swing
-    contact_rew = contact_rew_linear - 5.0 * wrong_contact_penalty
+    # Sum matches across both feet (max value is 2.0)
+    contact_rew = torch.sum(contact_matches, dim=1) * weight_contact
 
     # Total reward
     reward = (
@@ -708,6 +677,28 @@ def leg_joint_vel_l2(
 
     # Return L2 squared norm of leg joint velocities
     return torch.sum(torch.square(leg_joint_vel), dim=1)
+
+def joint_torques_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """
+    Penalize joint torques to encourage energy-efficient motion.
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+
+    Returns:
+        Penalty tensor of shape (num_envs,) - sum of squared joint torques
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get applied joint torques
+    joint_torques = asset.data.applied_torque[:, asset_cfg.joint_ids]
+
+    # Return L2 squared norm
+    return torch.sum(torch.square(joint_torques), dim=1)
+
 
 def contact_frequency_penalty(
     env: ManagerBasedRlEnv,
