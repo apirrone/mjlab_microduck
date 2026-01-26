@@ -225,7 +225,7 @@ def make_microduck_velocity_env_cfg(
                 "weight_neck_joint_pos": 100.0,
                 "weight_leg_joint_vel": 1e-3,
                 "weight_neck_joint_vel": 1.0,
-                "weight_contact": 1.0,
+                "weight_contact": 5.0,
             },
         )
 

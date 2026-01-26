@@ -204,6 +204,7 @@ class ReferenceMotionPlayer:
         """
         Compute imitation reward components to verify perfect playback.
         Uses same weights as training (from microduck_velocity_env_cfg.py).
+        Matches the paper's reward structure exactly.
         """
         # Get actual state after applying reference motion
         actual_joints_pos = self.data.qpos[7:7 + self.n_joints]
@@ -218,9 +219,26 @@ class ReferenceMotionPlayer:
         ref_base_ang_vel = ref['base_angular_vel']
         ref_foot_contacts = ref['foot_contacts']
 
-        # Weights from training config
-        weight_joint_pos = 15.0
-        weight_joint_vel = 1e-3
+        # Separate leg joints (indices 0-4, 9-13) from neck joints (indices 5-8)
+        leg_joint_indices = list(range(0, 5)) + list(range(9, 14))  # 10 leg joints
+        neck_joint_indices = list(range(5, 9))  # 4 neck joints
+
+        actual_leg_joints_pos = actual_joints_pos[leg_joint_indices]
+        actual_neck_joints_pos = actual_joints_pos[neck_joint_indices]
+        actual_leg_joints_vel = actual_joints_vel[leg_joint_indices]
+        actual_neck_joints_vel = actual_joints_vel[neck_joint_indices]
+
+        ref_leg_joints_pos = ref_joints_pos[leg_joint_indices]
+        ref_neck_joints_pos = ref_joints_pos[neck_joint_indices]
+        ref_leg_joints_vel = ref_joints_vel[leg_joint_indices]
+        ref_neck_joints_vel = ref_joints_vel[neck_joint_indices]
+
+        # Weights from training config (microduck_velocity_env_cfg.py)
+        # These match the paper's table exactly
+        weight_leg_joint_pos = 15.0
+        weight_neck_joint_pos = 100.0
+        weight_leg_joint_vel = 1e-3
+        weight_neck_joint_vel = 1.0
         weight_lin_vel_xy = 1.0
         weight_lin_vel_z = 1.0
         weight_ang_vel_xy = 0.5
@@ -228,12 +246,18 @@ class ReferenceMotionPlayer:
         weight_contact = 1.0
 
         # Compute errors
-        joint_pos_error = np.sum(np.square(actual_joints_pos - ref_joints_pos))
-        joint_vel_error = np.sum(np.square(actual_joints_vel - ref_joints_vel))
+        leg_joint_pos_error = np.sum(np.square(actual_leg_joints_pos - ref_leg_joints_pos))
+        neck_joint_pos_error = np.sum(np.square(actual_neck_joints_pos - ref_neck_joints_pos))
+        leg_joint_vel_error = np.sum(np.square(actual_leg_joints_vel - ref_leg_joints_vel))
+        neck_joint_vel_error = np.sum(np.square(actual_neck_joints_vel - ref_neck_joints_vel))
 
-        # Joint rewards (negative squared error)
-        joint_pos_rew = -joint_pos_error * weight_joint_pos
-        joint_vel_rew = -joint_vel_error * weight_joint_vel
+        # Joint position rewards: -||q - q̂||^2 (negative squared error)
+        leg_joint_pos_rew = -leg_joint_pos_error * weight_leg_joint_pos
+        neck_joint_pos_rew = -neck_joint_pos_error * weight_neck_joint_pos
+
+        # Joint velocity rewards: -||q̇ - q̂̇||^2 (negative squared error)
+        leg_joint_vel_rew = -leg_joint_vel_error * weight_leg_joint_vel
+        neck_joint_vel_rew = -neck_joint_vel_error * weight_neck_joint_vel
 
         # Velocity rewards (exponential)
         lin_vel_xy_error = np.sum(np.square(actual_base_lin_vel[:2] - ref_base_lin_vel[:2]))
@@ -250,14 +274,17 @@ class ReferenceMotionPlayer:
         # For perfect replay in hang mode, this would be 0 anyway
         contact_rew = 0.0
 
-        total_rew = (joint_pos_rew + joint_vel_rew +
+        total_rew = (leg_joint_pos_rew + neck_joint_pos_rew +
+                     leg_joint_vel_rew + neck_joint_vel_rew +
                      lin_vel_xy_rew + lin_vel_z_rew +
                      ang_vel_xy_rew + ang_vel_z_rew + contact_rew)
 
         return {
             'total': total_rew,
-            'joint_pos': joint_pos_rew,
-            'joint_vel': joint_vel_rew,
+            'leg_joint_pos': leg_joint_pos_rew,
+            'neck_joint_pos': neck_joint_pos_rew,
+            'leg_joint_vel': leg_joint_vel_rew,
+            'neck_joint_vel': neck_joint_vel_rew,
             'lin_vel_xy': lin_vel_xy_rew,
             'lin_vel_z': lin_vel_z_rew,
             'ang_vel_xy': ang_vel_xy_rew,
@@ -265,8 +292,10 @@ class ReferenceMotionPlayer:
             'contact': contact_rew,
             # Also return raw errors for debugging
             'errors': {
-                'joint_pos': joint_pos_error,
-                'joint_vel': joint_vel_error,
+                'leg_joint_pos': leg_joint_pos_error,
+                'neck_joint_pos': neck_joint_pos_error,
+                'leg_joint_vel': leg_joint_vel_error,
+                'neck_joint_vel': neck_joint_vel_error,
                 'lin_vel_xy': lin_vel_xy_error,
                 'lin_vel_z': lin_vel_z_error,
                 'ang_vel_xy': ang_vel_xy_error,
@@ -455,18 +484,21 @@ def main():
                     # Compute imitation reward
                     reward_info = player.compute_imitation_reward(ref)
                     reward_status = (f"\n  Reward: {reward_info['total']:8.3f} | "
-                                     f"Joint Pos: {reward_info['joint_pos']:8.3f} | "
-                                     f"Joint Vel: {reward_info['joint_vel']:8.3f} | "
-                                     f"Lin XY: {reward_info['lin_vel_xy']:6.3f} | "
-                                     f"Lin Z: {reward_info['lin_vel_z']:6.3f} | "
-                                     f"Ang XY: {reward_info['ang_vel_xy']:6.3f} | "
-                                     f"Ang Z: {reward_info['ang_vel_z']:6.3f}")
+                                     f"Leg Pos: {reward_info['leg_joint_pos']:7.2f} | "
+                                     f"Neck Pos: {reward_info['neck_joint_pos']:7.2f} | "
+                                     f"Leg Vel: {reward_info['leg_joint_vel']:6.3f} | "
+                                     f"Neck Vel: {reward_info['neck_joint_vel']:6.3f}")
+                    reward_status2 = (f"\n         "
+                                      f"Lin XY: {reward_info['lin_vel_xy']:6.3f} | "
+                                      f"Lin Z: {reward_info['lin_vel_z']:6.3f} | "
+                                      f"Ang XY: {reward_info['ang_vel_xy']:6.3f} | "
+                                      f"Ang Z: {reward_info['ang_vel_z']:6.3f}")
                     # Also show raw errors for debugging
-                    error_status = (f"\n  Errors: Joint Pos: {reward_info['errors']['joint_pos']:8.6f} | "
-                                    f"Joint Vel: {reward_info['errors']['joint_vel']:8.6f} | "
-                                    f"Lin XY: {reward_info['errors']['lin_vel_xy']:8.6f} | "
-                                    f"Lin Z: {reward_info['errors']['lin_vel_z']:8.6f}")
-                    status += reward_status + error_status
+                    error_status = (f"\n  Errors: Leg Pos: {reward_info['errors']['leg_joint_pos']:8.6f} | "
+                                    f"Neck Pos: {reward_info['errors']['neck_joint_pos']:8.6f} | "
+                                    f"Leg Vel: {reward_info['errors']['leg_joint_vel']:8.6f} | "
+                                    f"Neck Vel: {reward_info['errors']['neck_joint_vel']:8.6f}")
+                    status += reward_status + reward_status2 + error_status
 
                 print(status)
                 motion_changed[0] = False
