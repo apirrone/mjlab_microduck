@@ -129,7 +129,11 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 1.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = 0.0 # was -0.5
+
+    cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
+        func=microduck_mdp.leg_action_rate_l2, weight=-1.5
+    )
 
     # Leg joint velocity penalty (encourage slower, smoother motion)
     # cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
@@ -138,21 +142,21 @@ def make_microduck_velocity_env_cfg(
 
     # Neck stability
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
+        func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
     )
-    cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
-    )
+    # cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
+        # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
+    # )
 
     # CoM height target
-    cfg.rewards["com_height_target"] = RewardTermCfg(
-        func=microduck_mdp.com_height_target,
-        weight=1.0,
-        params={
-            "target_height_min": 0.09,
-            "target_height_max": 0.13,
-        },
-    )
+    # cfg.rewards["com_height_target"] = RewardTermCfg(
+        # func=microduck_mdp.com_height_target,
+        # weight=1.0,
+        # params={
+            # "target_height_min": 0.09,
+            # "target_height_max": 0.13,
+        # },
+    # )
 
     # Imitation learning setup (optional, lightweight guidance)
     imitation_state = None
@@ -176,17 +180,17 @@ def make_microduck_velocity_env_cfg(
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
-                "weight_torso_pos_xy": 0.0,  # Disabled
-                "weight_torso_orient": 0.0,  # Disabled
-                "weight_lin_vel_xy": 0.5,  # Light guidance on velocities
-                "weight_lin_vel_z": 0.5,
-                "weight_ang_vel_xy": 0.3,
-                "weight_ang_vel_z": 0.3,
-                "weight_leg_joint_pos": 5.0,  # Reduced from 15.0 for gentle guidance
-                "weight_neck_joint_pos": 0.0,  # Let other rewards handle neck
-                "weight_leg_joint_vel": 0.0,  # Disabled
-                "weight_neck_joint_vel": 0.0,  # Disabled
-                "weight_contact": 3.0,  # Light contact timing guidance
+                "weight_torso_pos_xy": 1.0,
+                "weight_torso_orient": 1.0,
+                "weight_lin_vel_xy": 1.0,
+                "weight_lin_vel_z": 1.0,
+                "weight_ang_vel_xy": 0.5,
+                "weight_ang_vel_z": 0.5,
+                "weight_leg_joint_pos": 15.0,  # Reduced from 15.0 for gentle guidance
+                "weight_neck_joint_pos": 100.0,  # Let other rewards handle neck
+                "weight_leg_joint_vel": 1e-3,  # Disabled
+                "weight_neck_joint_vel": 1.0,  # Disabled
+                "weight_contact": 1.0,  # Light contact timing guidance
             },
         )
 
