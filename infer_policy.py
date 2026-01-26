@@ -446,6 +446,8 @@ def main():
                     obs = policy.get_observations()
                     pos = data.qpos[qpos_adr:qpos_adr + 3]
                     quat = data.qpos[qpos_adr + 3:qpos_adr + 7]
+                    com = data.subtree_com[policy.trunk_base_id]
+                    com_height = com[2]
 
                     print(f"\n{'='*70}")
                     print(f"Step {control_step_count} DEBUG:")
@@ -454,6 +456,7 @@ def main():
                         print(f"Imitation phase: {policy.imitation_phase:.4f} (period: {policy.gait_period:.3f}s)")
                     print(f"Base state:")
                     print(f"  Position: [{pos[0]:7.4f}, {pos[1]:7.4f}, {pos[2]:7.4f}]")
+                    print(f"  CoM height: {com_height:7.4f}")
                     print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
                     print(f"\nObservation (shape {obs.shape}, total {obs.size}):")
                     print(f"  Ang vel [0:3]:        {obs[0:3]}")

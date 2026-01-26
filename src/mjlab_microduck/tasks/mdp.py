@@ -34,7 +34,8 @@ class ImitationRewardState:
 def reset_action_history(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
-    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    imitation_state: Optional[ImitationRewardState] = None,
 ):
     """
     Reset cached action history for environments that are being reset.
@@ -46,6 +47,7 @@ def reset_action_history(
         env: The environment
         env_ids: Indices of environments being reset
         asset_cfg: Asset configuration
+        imitation_state: Optional imitation state to reset phase tracking
     """
     if len(env_ids) == 0:
         return
@@ -106,6 +108,10 @@ def reset_action_history(
         if "feet_ground_contact" in env.scene.sensors:
             contacts = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2]
             env._prev_contacts_for_freq[env_ids] = contacts
+
+    # Reset imitation phase tracking
+    if imitation_state is not None and imitation_state.phase is not None:
+        imitation_state.reset_phases(env_ids)
 
 
 def imitation_reward(
