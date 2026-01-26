@@ -107,7 +107,7 @@ def make_microduck_velocity_env_cfg(
     for reward_name in ["foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -3.0
+    cfg.rewards["foot_slip"].weight = -5.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
@@ -116,8 +116,8 @@ def make_microduck_velocity_env_cfg(
     # Air time reward - enforce slower stepping
     cfg.rewards["air_time"].weight = 8.0  # was 4.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.1
-    cfg.rewards["air_time"].params["threshold_max"] = 0.15
+    cfg.rewards["air_time"].params["threshold_min"] = 0.15
+    cfg.rewards["air_time"].params["threshold_max"] = 0.2
 
     # Velocity tracking rewards
     cfg.rewards["track_linear_velocity"].weight = 4.0
@@ -144,8 +144,8 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.com_height_target,
         weight=1.0,
         params={
-            "target_height_min": 0.07,
-            "target_height_max": 0.13,
+            "target_height_min": 0.09,
+            "target_height_max": 0.12,
         },
     )
 
