@@ -200,15 +200,16 @@ def make_microduck_velocity_env_cfg(
         ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
         imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
 
-        # Disable command tracking rewards (imitation uses reference motion velocities instead)
-        cfg.rewards["track_linear_velocity"].weight = 0.0
-        cfg.rewards["track_angular_velocity"].weight = 0.0
+        # Keep velocity tracking rewards active (helps with command following)
+        # Reduced weight to not compete too much with imitation
+        cfg.rewards["track_linear_velocity"].weight = 2.0
+        cfg.rewards["track_angular_velocity"].weight = 1.0
 
         # Disable rewards not in the paper's imitation table
         cfg.rewards["air_time"].weight = 0.0
         cfg.rewards["soft_landing"].weight = 0.0
 
-        # Add imitation reward (matches paper exactly)
+        # Add imitation reward (rebalanced for better command following)
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
             weight=1.0,
@@ -217,14 +218,16 @@ def make_microduck_velocity_env_cfg(
                 "command_threshold": 0.01,
                 "weight_torso_pos_xy": 1.0,
                 "weight_torso_orient": 1.0,
-                "weight_lin_vel_xy": 1.0,
-                "weight_lin_vel_z": 1.0,
-                "weight_ang_vel_xy": 0.5,
-                "weight_ang_vel_z": 0.5,
-                "weight_leg_joint_pos": 15.0,
-                "weight_neck_joint_pos": 100.0,
+                # Increase velocity tracking weights (more important than joint matching!)
+                "weight_lin_vel_xy": 5.0,  # was 1.0
+                "weight_lin_vel_z": 2.0,   # was 1.0
+                "weight_ang_vel_xy": 2.0,  # was 0.5
+                "weight_ang_vel_z": 2.0,   # was 0.5
+                # Reduce joint position weights (guidance only, not goal)
+                "weight_leg_joint_pos": 2.0,   # was 15.0
+                "weight_neck_joint_pos": 5.0,  # was 100.0 (!)
                 "weight_leg_joint_vel": 1e-3,
-                "weight_neck_joint_vel": 1.0,
+                "weight_neck_joint_vel": 0.5,  # was 1.0
                 "weight_contact": 5.0,
             },
         )
@@ -283,13 +286,15 @@ def make_microduck_velocity_env_cfg(
             params={"imitation_state": imitation_state},
         )
 
-    # Commands
+    # Commands - matched to reference motion coverage!
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.1
+    command.rel_standing_envs = 0.02  # was 0.1 - reduce to give more motion training
     command.rel_heading_envs = 0.0
-    command.ranges.ang_vel_z = (-1.0, 1.0)
-    command.ranges.lin_vel_x = (-0.5, 0.5)
-    command.ranges.lin_vel_y = (-0.5, 0.5)
+    # IMPORTANT: These ranges MUST match your reference motion coverage
+    # Current reference motions: lin_x [-0.03, 0.04], lin_y [-0.02, 0.02], ang_z [-0.5, 0.5]
+    command.ranges.lin_vel_x = (-0.03, 0.04)  # was (-0.5, 0.5) - WAY too large!
+    command.ranges.lin_vel_y = (-0.02, 0.02)  # was (-0.5, 0.5) - WAY too large!
+    command.ranges.ang_vel_z = (-0.5, 0.5)    # was (-1.0, 1.0) - slightly too large
     command.viz.z_offset = 1.0
 
     # Terrain

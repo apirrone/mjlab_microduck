@@ -26,9 +26,14 @@ class ImitationRewardState:
         self.current_motion_idx = torch.zeros(num_envs, dtype=torch.int32, device=device)
 
     def reset_phases(self, env_ids: torch.Tensor):
-        """Reset phases for specific environments (e.g., after episode termination)"""
+        """Reset phases for specific environments (e.g., after episode termination)
+
+        Randomizes phase instead of always starting at 0.0 to improve push recovery.
+        This forces the robot to learn to start walking from any point in the gait cycle.
+        """
         if self.phase is not None and len(env_ids) > 0:
-            self.phase[env_ids] = 0.0
+            # Randomize phase in [0, 1) for better generalization and push recovery
+            self.phase[env_ids] = torch.rand(len(env_ids), device=self.phase.device)
 
 
 def reset_action_history(
