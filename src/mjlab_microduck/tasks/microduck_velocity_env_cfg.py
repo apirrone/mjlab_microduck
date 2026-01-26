@@ -129,7 +129,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 1.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.1
+    cfg.rewards["action_rate_l2"].weight = -0.5
 
     # Leg joint velocity penalty (encourage slower, smoother motion)
     # cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
