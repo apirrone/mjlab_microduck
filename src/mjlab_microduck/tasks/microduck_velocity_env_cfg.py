@@ -124,7 +124,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["air_time"].params["threshold_min"] = 0.05
     cfg.rewards["air_time"].params["threshold_max"] = 0.15
 
-    # Velocity tracking rewards
+    # Velocity tracking rewards (will be disabled when using imitation)
     cfg.rewards["track_linear_velocity"].weight = 1.0
     cfg.rewards["track_angular_velocity"].weight = 1.0
 
@@ -200,10 +200,18 @@ def make_microduck_velocity_env_cfg(
         ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
         imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
 
-        # Add imitation reward
+        # Disable command tracking rewards (imitation uses reference motion velocities instead)
+        cfg.rewards["track_linear_velocity"].weight = 0.0
+        cfg.rewards["track_angular_velocity"].weight = 0.0
+
+        # Disable rewards not in the paper's imitation table
+        cfg.rewards["air_time"].weight = 0.0
+        cfg.rewards["soft_landing"].weight = 0.0
+
+        # Add imitation reward (matches paper exactly)
         cfg.rewards["imitation"] = RewardTermCfg(
             func=microduck_mdp.imitation_reward,
-            weight=1.0,  # Conservative weight - just for guidance
+            weight=1.0,
             params={
                 "imitation_state": imitation_state,
                 "command_threshold": 0.01,
@@ -213,11 +221,11 @@ def make_microduck_velocity_env_cfg(
                 "weight_lin_vel_z": 1.0,
                 "weight_ang_vel_xy": 0.5,
                 "weight_ang_vel_z": 0.5,
-                "weight_leg_joint_pos": 15.0,  # Reduced from 15.0 for gentle guidance
-                "weight_neck_joint_pos": 100.0,  # Let other rewards handle neck
-                "weight_leg_joint_vel": 1e-3,  # Disabled
-                "weight_neck_joint_vel": 1.0,  # Disabled
-                "weight_contact": 1.0,  # Light contact timing guidance
+                "weight_leg_joint_pos": 15.0,
+                "weight_neck_joint_pos": 100.0,
+                "weight_leg_joint_vel": 1e-3,
+                "weight_neck_joint_vel": 1.0,
+                "weight_contact": 1.0,
             },
         )
 
