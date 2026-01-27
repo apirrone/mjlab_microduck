@@ -75,10 +75,10 @@ def make_microduck_velocity_env_cfg(
     cfg = make_velocity_env_cfg()
 
     for to_remove in [
-        "foot_clearance",
-        "foot_swing_height",
-        "angular_momentum",
-        "body_ang_vel",
+        # "foot_clearance",
+        # "foot_swing_height",
+        # "angular_momentum",
+        # "body_ang_vel",
     ]:
         del cfg.rewards[to_remove]
 
@@ -102,34 +102,44 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 2.0 # was 2.0
+    cfg.rewards["pose"].weight = 1.0 # was 2.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 0.0  # was 1.0
+    cfg.rewards["upright"].weight = 1.0  # was 1.0
 
     # Foot-specific configurations
     for reward_name in ["foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -1.0 # was -1.0
+    cfg.rewards["foot_slip"].weight = -0.1 # was -1.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
-    cfg.rewards["soft_landing"].weight = 0.0
+    cfg.rewards["soft_landing"].weight = -1e-05
 
     # Air time reward
-    cfg.rewards["air_time"].weight = 3.0
+    cfg.rewards["air_time"].weight = 0.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.07
     cfg.rewards["air_time"].params["threshold_max"] = 0.15
 
+    cfg.rewards["body_ang_vel"].weight = -0.05
+    cfg.rewards["angular_momentum"].weight = -0.02
+
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 6.0
-    cfg.rewards["track_angular_velocity"].weight = 4.0
+    cfg.rewards["track_linear_velocity"].weight = 2.0
+    cfg.rewards["track_angular_velocity"].weight = 2.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5 # was -0.5
+    cfg.rewards["action_rate_l2"].weight = -0.4 # was -0.5
+    
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
+    
+    
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
         # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
@@ -149,20 +159,20 @@ def make_microduck_velocity_env_cfg(
     # )
 
     # CoM height target
-    cfg.rewards["com_height_target"] = RewardTermCfg(
-        func=microduck_mdp.com_height_target,
-        weight=1.0,
-        params={
-            "target_height_min": 0.09,
-            "target_height_max": 0.13,
-        },
-    )
+    # cfg.rewards["com_height_target"] = RewardTermCfg(
+    #     func=microduck_mdp.com_height_target,
+    #     weight=1.0,
+    #     params={
+    #         "target_height_min": 0.09,
+    #         "target_height_max": 0.13,
+    #     },
+    # )
 
     # === SURVIVAL REWARD (applies to all tasks) ===
     # Critical baseline reward for staying alive
-    cfg.rewards["survival"] = RewardTermCfg(
-        func=microduck_mdp.is_alive, weight=2.0
-    )
+    # cfg.rewards["survival"] = RewardTermCfg(
+    #     func=microduck_mdp.is_alive, weight=2.0
+    # )
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
