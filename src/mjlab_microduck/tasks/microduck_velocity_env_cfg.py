@@ -102,11 +102,11 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.0 # was 2.0
+    cfg.rewards["pose"].weight = 0.5 # was 2.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0  # was 1.0
+    cfg.rewards["upright"].weight = 0.0  # was 1.0
 
     # Foot-specific configurations
     for reward_name in ["foot_slip"]:
@@ -116,7 +116,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
-    cfg.rewards["soft_landing"].weight = 1.0
+    cfg.rewards["soft_landing"].weight = 0.0
 
     # Air time reward
     cfg.rewards["air_time"].weight = 1.0
@@ -129,11 +129,11 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 1.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = 0.0 # was -0.5
+    cfg.rewards["action_rate_l2"].weight = -0.5 # was -0.5
 
-    cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.leg_action_rate_l2, weight=-0.5
-    )
+    # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
+        # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
+    # )
 
     # Leg joint velocity penalty (encourage slower, smoother motion)
     # cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
@@ -141,9 +141,9 @@ def make_microduck_velocity_env_cfg(
     # )
 
     # Neck stability
-    cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
-    )
+    # cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
+        # func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
+    # )
     # cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
         # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
@@ -166,24 +166,24 @@ def make_microduck_velocity_env_cfg(
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
-    cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-        func=microduck_mdp.joint_torques_l2, weight=-1e-3
-    )
+    # cfg.rewards["joint_torques_l2"] = RewardTermCfg(
+        # func=microduck_mdp.joint_torques_l2, weight=-1e-3
+    # )
 
     # Joint accelerations penalty
-    cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
-        func=microduck_mdp.joint_accelerations_l2, weight=-2.5e-6
-    )
+    # cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
+        # func=microduck_mdp.joint_accelerations_l2, weight=-2.5e-6
+    # )
 
     # Leg action acceleration penalty
-    cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
-        func=microduck_mdp.leg_action_acceleration_l2, weight=-0.45
-    )
+    # cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
+        # func=microduck_mdp.leg_action_acceleration_l2, weight=-0.45
+    # )
 
     # Neck action acceleration penalty
-    cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
-    )
+    # cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
+        # func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
+    # )
 
     # Imitation learning setup (optional, lightweight guidance)
     imitation_state = None
