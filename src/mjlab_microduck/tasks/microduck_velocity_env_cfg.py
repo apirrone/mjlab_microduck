@@ -218,16 +218,14 @@ def make_microduck_velocity_env_cfg(
                 "command_threshold": 0.01,
                 "weight_torso_pos_xy": 1.0,
                 "weight_torso_orient": 1.0,
-                # Increase velocity tracking weights (more important than joint matching!)
-                "weight_lin_vel_xy": 5.0,  # was 1.0
-                "weight_lin_vel_z": 2.0,   # was 1.0
-                "weight_ang_vel_xy": 2.0,  # was 0.5
-                "weight_ang_vel_z": 2.0,   # was 0.5
-                # Reduce joint position weights (guidance only, not goal)
-                "weight_leg_joint_pos": 2.0,   # was 15.0
-                "weight_neck_joint_pos": 5.0,  # was 100.0 (!)
+                "weight_lin_vel_xy": 1.0,
+                "weight_lin_vel_z": 1.0,
+                "weight_ang_vel_xy": 0.5,
+                "weight_ang_vel_z": 0.5,
+                "weight_leg_joint_pos": 10.0,
+                "weight_neck_joint_pos": 30.0,
                 "weight_leg_joint_vel": 1e-3,
-                "weight_neck_joint_vel": 0.5,  # was 1.0
+                "weight_neck_joint_vel": 0.5,
                 "weight_contact": 5.0,
             },
         )
