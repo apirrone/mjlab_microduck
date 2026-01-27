@@ -160,9 +160,9 @@ def make_microduck_velocity_env_cfg(
 
     # === SURVIVAL REWARD (applies to all tasks) ===
     # Critical baseline reward for staying alive
-    # cfg.rewards["survival"] = RewardTermCfg(
-        # func=microduck_mdp.is_alive, weight=20.0
-    # )
+    cfg.rewards["survival"] = RewardTermCfg(
+        func=microduck_mdp.is_alive, weight=2.0
+    )
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
