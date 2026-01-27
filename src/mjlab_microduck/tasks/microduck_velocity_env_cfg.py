@@ -306,11 +306,9 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.25  # was 0.1 - reduce to give more motion training
     command.rel_heading_envs = 0.0
-    # IMPORTANT: These ranges MUST match your reference motion coverage
-    # Current reference motions: lin_x [-0.03, 0.04], lin_y [-0.02, 0.02], ang_z [-0.5, 0.5]
-    command.ranges.lin_vel_x = (-0.03, 0.04)  # was (-0.5, 0.5) - WAY too large!
-    command.ranges.lin_vel_y = (-0.02, 0.02)  # was (-0.5, 0.5) - WAY too large!
-    command.ranges.ang_vel_z = (-0.5, 0.5)  # was (-1.0, 1.0) - slightly too large
+    command.ranges.lin_vel_x = (-0.4, 0.4)
+    command.ranges.lin_vel_y = (-0.4, 0.4)
+    command.ranges.ang_vel_z = (-1.0, 1.0)
     command.viz.z_offset = 1.0
 
     # Terrain
