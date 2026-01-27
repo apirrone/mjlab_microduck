@@ -254,11 +254,11 @@ def make_microduck_velocity_env_cfg(
     cfg.events["foot_friction"].params[
         "asset_cfg"
     ].geom_names = foot_frictions_geom_names
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.12)
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
 
     cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-0.8, 0.8),
-        "y": (-0.8, 0.8),
+        "x": (-0.3, 0.3),
+        "y": (-0.3, 0.3),
     }
 
     # Observations
@@ -304,7 +304,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands - matched to reference motion coverage!
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.02  # was 0.1 - reduce to give more motion training
+    command.rel_standing_envs = 0.25  # was 0.1 - reduce to give more motion training
     command.rel_heading_envs = 0.0
     # IMPORTANT: These ranges MUST match your reference motion coverage
     # Current reference motions: lin_x [-0.03, 0.04], lin_y [-0.02, 0.02], ang_z [-0.5, 0.5]
