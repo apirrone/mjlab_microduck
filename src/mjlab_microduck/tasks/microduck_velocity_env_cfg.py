@@ -279,6 +279,12 @@ def make_microduck_velocity_env_cfg(
             params={"imitation_state": imitation_state},
         )
 
+        # Add phase observation to critic as well
+        cfg.observations["critic"].terms["imitation_phase"] = ObservationTermCfg(
+            func=microduck_mdp.imitation_phase_observation,
+            params={"imitation_state": imitation_state},
+        )
+
         # Add reference motion to critic privileged observations
         # Include in both training and play to keep model architecture consistent
         cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
