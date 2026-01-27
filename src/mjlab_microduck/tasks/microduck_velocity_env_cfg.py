@@ -74,13 +74,13 @@ def make_microduck_velocity_env_cfg(
     # Base configuration
     cfg = make_velocity_env_cfg()
 
-    for to_remove in [
-        # "foot_clearance",
-        # "foot_swing_height",
-        # "angular_momentum",
-        # "body_ang_vel",
-    ]:
-        del cfg.rewards[to_remove]
+    # for to_remove in [
+    #     # "foot_clearance",
+    #     # "foot_swing_height",
+    #     # "angular_momentum",
+    #     # "body_ang_vel",
+    # ]:
+    #     del cfg.rewards[to_remove]
 
     cfg.observations["critic"].terms["foot_height"].params[
         "asset_cfg"
@@ -102,17 +102,20 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.0 # was 2.0
+    cfg.rewards["pose"].weight = 1.0  # was 2.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0  # was 1.0
+    cfg.rewards["upright"].weight = 1.0  # was 1.0
 
     # Foot-specific configurations
-    for reward_name in ["foot_slip"]:
+    for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-    cfg.rewards["foot_slip"].weight = -0.1 # was -1.0
+    # Body-specific configurations
+    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
+
+    cfg.rewards["foot_slip"].weight = -0.1  # was -1.0
     cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
@@ -132,30 +135,29 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 2.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.4 # was -0.5
-    
+    cfg.rewards["action_rate_l2"].weight = -0.4  # was -0.5
+
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
     cfg.rewards["foot_clearance"].params["target_height"] = 0.02
-    
-    
+
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
     cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
-        # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
+    # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
     # )
 
     # Leg joint velocity penalty (encourage slower, smoother motion)
     # cfg.rewards["leg_joint_vel_l2"] = RewardTermCfg(
-        # func=microduck_mdp.leg_joint_vel_l2, weight=-0.02
+    # func=microduck_mdp.leg_joint_vel_l2, weight=-0.02
     # )
 
     # Neck stability
     # cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        # func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
+    # func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
     # )
     # cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
-        # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
+    # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
 
     # CoM height target
@@ -177,22 +179,22 @@ def make_microduck_velocity_env_cfg(
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
     # cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-        # func=microduck_mdp.joint_torques_l2, weight=-1e-3
+    # func=microduck_mdp.joint_torques_l2, weight=-1e-3
     # )
 
     # Joint accelerations penalty
     # cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
-        # func=microduck_mdp.joint_accelerations_l2, weight=-2.5e-6
+    # func=microduck_mdp.joint_accelerations_l2, weight=-2.5e-6
     # )
 
     # Leg action acceleration penalty
     # cfg.rewards["leg_action_acceleration_l2"] = RewardTermCfg(
-        # func=microduck_mdp.leg_action_acceleration_l2, weight=-0.45
+    # func=microduck_mdp.leg_action_acceleration_l2, weight=-0.45
     # )
 
     # Neck action acceleration penalty
     # cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
-        # func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
+    # func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
     # )
 
     # Imitation learning setup (optional, lightweight guidance)
@@ -308,7 +310,7 @@ def make_microduck_velocity_env_cfg(
     # Current reference motions: lin_x [-0.03, 0.04], lin_y [-0.02, 0.02], ang_z [-0.5, 0.5]
     command.ranges.lin_vel_x = (-0.03, 0.04)  # was (-0.5, 0.5) - WAY too large!
     command.ranges.lin_vel_y = (-0.02, 0.02)  # was (-0.5, 0.5) - WAY too large!
-    command.ranges.ang_vel_z = (-0.5, 0.5)    # was (-1.0, 1.0) - slightly too large
+    command.ranges.ang_vel_z = (-0.5, 0.5)  # was (-1.0, 1.0) - slightly too large
     command.viz.z_offset = 1.0
 
     # Terrain
