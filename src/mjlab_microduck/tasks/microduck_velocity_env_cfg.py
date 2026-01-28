@@ -122,7 +122,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["soft_landing"].weight = -1e-05
 
     # Air time reward
-    cfg.rewards["air_time"].weight = 2.0  # Increased to encourage walking
+    cfg.rewards["air_time"].weight = 0.0  # Increased to encourage walking
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.025  # Reduced for small robot gait
     cfg.rewards["air_time"].params["threshold_max"] = 0.15  # Reduced for small robot gait
