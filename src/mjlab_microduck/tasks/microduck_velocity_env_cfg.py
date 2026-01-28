@@ -122,10 +122,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["soft_landing"].weight = -1e-05
 
     # Air time reward
-    cfg.rewards["air_time"].weight = 0.0
+    cfg.rewards["air_time"].weight = 1.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.07
-    cfg.rewards["air_time"].params["threshold_max"] = 0.15
+    cfg.rewards["air_time"].params["threshold_min"] = 0.05
+    cfg.rewards["air_time"].params["threshold_max"] = 0.3
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
@@ -138,10 +138,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["action_rate_l2"].weight = -0.4  # was -0.5
 
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.03
 
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.03
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
     # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
