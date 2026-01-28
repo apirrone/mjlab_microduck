@@ -135,7 +135,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 2.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5
+    cfg.rewards["action_rate_l2"].weight = -0.4 # -0.5 doesn't work somehow, stiff left leg
 
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
