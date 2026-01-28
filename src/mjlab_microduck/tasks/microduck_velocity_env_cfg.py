@@ -2,6 +2,10 @@
 
 from copy import deepcopy
 
+# Domain randomization toggles
+ENABLE_COM_RANDOMIZATION = True
+ENABLE_KP_RANDOMIZATION = True
+
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import (
@@ -263,31 +267,33 @@ def make_microduck_velocity_env_cfg(
     }
 
     # Domain randomization - sampled once per episode at reset
-    # Randomize CoM position (±0.5cm on xyz)
-    cfg.events["randomize_com"] = EventTermCfg(
-        func=mdp.randomize_field,
-        mode="reset",
-        domain_randomization=True,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
-            "operation": "add",
-            "field": "body_ipos",  # Body inertial position (CoM)
-            "ranges": (-0.005, 0.005),  # ±0.5cm
-        },
-    )
+    if ENABLE_COM_RANDOMIZATION:
+        # Randomize CoM position (±0.5cm on xyz)
+        cfg.events["randomize_com"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "operation": "add",
+                "field": "body_ipos",  # Body inertial position (CoM)
+                "ranges": (-0.005, 0.005),  # ±0.5cm
+            },
+        )
 
-    # Randomize motor kp gains (±5%)
-    # Uses custom function that handles DelayedActuator
-    cfg.events["randomize_motor_kp"] = EventTermCfg(
-        func=microduck_mdp.randomize_delayed_actuator_gains,
-        mode="reset",
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "operation": "scale",
-            "kp_range": (0.95, 1.05),  # ±5%
-            "kd_range": (1.0, 1.0),  # Keep kd unchanged
-        },
-    )
+    if ENABLE_KP_RANDOMIZATION:
+        # Randomize motor kp gains (±5%)
+        # Uses custom function that handles DelayedActuator
+        cfg.events["randomize_motor_kp"] = EventTermCfg(
+            func=microduck_mdp.randomize_delayed_actuator_gains,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "operation": "scale",
+                "kp_range": (0.95, 1.05),  # ±5%
+                "kd_range": (1.0, 1.0),  # Keep kd unchanged
+            },
+        )
 
     # Note: Full IMU orientation randomization requires custom observation functions
     # to apply the rotation offset to projected_gravity and base_ang_vel readings.
