@@ -9,6 +9,7 @@ from mjlab.managers.manager_term_config import (
     EventTermCfg,
     RewardTermCfg,
 )
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -262,19 +263,16 @@ def make_microduck_velocity_env_cfg(
     }
 
     # Domain randomization - sampled once per episode at reset
-    from mjlab.managers.scene_entity_config import SceneEntityCfg
-
     # Randomize CoM position (±0.5cm on xyz)
     cfg.events["randomize_com"] = EventTermCfg(
         func=mdp.randomize_field,
         mode="reset",
         domain_randomization=True,
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="trunk_base"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            "operation": "add",
             "field": "body_ipos",  # Body inertial position (CoM)
             "ranges": (-0.005, 0.005),  # ±0.5cm
-            "operation": "add",
-            "distribution": "uniform",
         },
     )
 
@@ -285,10 +283,9 @@ def make_microduck_velocity_env_cfg(
         domain_randomization=True,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
+            "operation": "scale",
             "kp_range": (0.95, 1.05),  # ±5%
             "kd_range": (1.0, 1.0),  # Keep kd unchanged
-            "operation": "scale",
-            "distribution": "uniform",
         },
     )
 
