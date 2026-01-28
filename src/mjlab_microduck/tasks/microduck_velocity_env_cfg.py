@@ -356,10 +356,14 @@ def make_microduck_velocity_env_cfg(
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
+                # 250 iterations × 24 steps/iter = 6000 steps
                 {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.6},  # 250 iterations × 24 steps/iter = 6000 steps
-                {"step": 500 * 24, "weight": -0.8},  # 500 iterations × 24 steps/iter = 12000 steps
-                {"step": 750 * 24, "weight": -1.0},  # 750 iterations × 24 steps/iter = 18000 steps
+                {"step": 250 * 24, "weight": -0.6},
+                {"step": 500 * 24, "weight": -0.8},
+                {"step": 750 * 24, "weight": -1.0},
+                {"step": 1000 * 24, "weight": -1.2},
+                {"step": 1250 * 24, "weight": -1.4},
+                {"step": 1500 * 24, "weight": -1.6},
             ],
         },
     )
