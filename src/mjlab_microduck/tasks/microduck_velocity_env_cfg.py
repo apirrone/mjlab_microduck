@@ -135,7 +135,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 2.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.5  # was -0.4
+    cfg.rewards["action_rate_l2"].weight = -0.4
 
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
@@ -272,11 +272,11 @@ def make_microduck_velocity_env_cfg(
     )
 
     cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 0
-    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
+    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 1
     cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
     cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
+    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 1
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     # Add imitation observations if using imitation
