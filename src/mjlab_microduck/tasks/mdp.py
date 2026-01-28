@@ -838,9 +838,9 @@ def randomize_delayed_actuator_gains(
 
         # Reset to original values first (to prevent accumulation)
         original = env._original_actuator_gains[ctrl_key]
-        env.sim.model.actuator_gainprm[env_ids, ctrl_ids, 0] = original['gainprm'].unsqueeze(0).expand(len(env_ids), -1)
-        env.sim.model.actuator_biasprm[env_ids, ctrl_ids, 1] = original['biasprm1'].unsqueeze(0).expand(len(env_ids), -1)
-        env.sim.model.actuator_biasprm[env_ids, ctrl_ids, 2] = original['biasprm2'].unsqueeze(0).expand(len(env_ids), -1)
+        env.sim.model.actuator_gainprm[env_ids[:, None], ctrl_ids, 0] = original['gainprm'].unsqueeze(0).expand(len(env_ids), -1)
+        env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 1] = original['biasprm1'].unsqueeze(0).expand(len(env_ids), -1)
+        env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 2] = original['biasprm2'].unsqueeze(0).expand(len(env_ids), -1)
 
         # Sample random gains for each env and each control
         kp_samples = torch.rand(len(env_ids), len(ctrl_ids), device=env.device) * (kp_range[1] - kp_range[0]) + kp_range[0]
