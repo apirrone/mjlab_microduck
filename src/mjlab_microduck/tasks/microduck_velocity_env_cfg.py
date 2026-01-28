@@ -277,10 +277,10 @@ def make_microduck_velocity_env_cfg(
     )
 
     # Randomize motor kp gains (±5%)
+    # Uses custom function that handles DelayedActuator
     cfg.events["randomize_motor_kp"] = EventTermCfg(
-        func=mdp.randomize_pd_gains,
+        func=microduck_mdp.randomize_delayed_actuator_gains,
         mode="reset",
-        domain_randomization=True,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "operation": "scale",
