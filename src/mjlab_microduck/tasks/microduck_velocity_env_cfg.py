@@ -4,6 +4,7 @@ from copy import deepcopy
 
 # Domain randomization toggles
 ENABLE_COM_RANDOMIZATION = True
+ENABLE_KP_RANDOMIZATION = True
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -277,6 +278,21 @@ def make_microduck_velocity_env_cfg(
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
                 "ranges": (-0.001, 0.001),  # ±0.1cm
+            },
+        )
+
+    if ENABLE_KP_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize motor kp gains (±2%)
+        # Uses custom function that handles DelayedActuator
+        cfg.events["randomize_motor_kp"] = EventTermCfg(
+            func=microduck_mdp.randomize_delayed_actuator_gains,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "operation": "scale",
+                "kp_range": (0.98, 1.02),  # ±2%
+                "kd_range": (1.0, 1.0),  # Keep kd unchanged
             },
         )
 

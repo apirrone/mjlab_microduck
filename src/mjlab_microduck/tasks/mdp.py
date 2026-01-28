@@ -776,3 +776,63 @@ def contact_frequency_penalty(
     penalty = penalty * active_mask.float()
 
     return penalty
+
+
+# ==============================================================================
+# Domain Randomization Events
+# ==============================================================================
+
+
+def randomize_delayed_actuator_gains(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    kp_range: tuple[float, float],
+    kd_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    operation: str = "scale",
+):
+    """Randomize PD gains for DelayedActuator (which wraps XmlPositionActuator).
+
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize (None = all envs)
+        kp_range: (min, max) for kp randomization
+        kd_range: (min, max) for kd randomization
+        asset_cfg: Asset configuration
+        operation: "scale" or "abs"
+    """
+    from mjlab.actuator.delayed_actuator import DelayedActuator
+    from mjlab.actuator import XmlPositionActuator
+
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Apply to actuators
+    for actuator in asset.actuators:
+        # Handle DelayedActuator wrapping XmlPositionActuator
+        if isinstance(actuator, DelayedActuator):
+            base_actuator = actuator._base_actuator
+        else:
+            base_actuator = actuator
+
+        # Get control IDs
+        ctrl_ids = base_actuator.ctrl_ids
+
+        # Sample random gains for each env and each control
+        kp_samples = torch.rand(len(env_ids), len(ctrl_ids), device=env.device) * (kp_range[1] - kp_range[0]) + kp_range[0]
+        kd_samples = torch.rand(len(env_ids), len(ctrl_ids), device=env.device) * (kd_range[1] - kd_range[0]) + kd_range[0]
+
+        # For XmlPositionActuator, modify MuJoCo model parameters directly
+        if isinstance(base_actuator, XmlPositionActuator):
+            if operation == "scale":
+                env.sim.model.actuator_gainprm[env_ids[:, None], ctrl_ids, 0] *= kp_samples
+                env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 1] *= kp_samples
+                env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 2] *= kd_samples
+            elif operation == "abs":
+                env.sim.model.actuator_gainprm[env_ids[:, None], ctrl_ids, 0] = kp_samples
+                env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 1] = -kp_samples
+                env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 2] = -kd_samples
