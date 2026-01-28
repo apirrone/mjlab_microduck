@@ -350,18 +350,18 @@ def make_microduck_velocity_env_cfg(
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 
-    # # Add action rate curriculum
-    # cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-    #     func=mdp.reward_weight,
-    #     params={
-    #         "reward_name": "action_rate_l2",
-    #         "weight_stages": [
-    #             {"step": 0, "weight": -0.5},
-    #             {"step": 10000, "weight": -0.7},
-    #             {"step": 20000, "weight": -1.0},
-    #         ],
-    #     },
-    # )
+    # Add action rate curriculum
+    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "action_rate_l2",
+            "weight_stages": [
+                {"step": 0, "weight": -0.4},
+                {"step": 250 * 24, "weight": -0.5},  # 250 iterations × 24 steps/iter = 6000 steps
+                {"step": 500 * 24, "weight": -0.6},  # 500 iterations × 24 steps/iter = 12000 steps
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
