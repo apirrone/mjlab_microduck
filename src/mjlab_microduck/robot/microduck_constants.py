@@ -40,7 +40,7 @@ FULL_COLLISION = CollisionCfg(
 )
 
 actuators = DelayedActuatorCfg(
-    delay_min_lag=1,
+    delay_min_lag=0,
     delay_max_lag=2,
     base_cfg=XmlPositionActuatorCfg(joint_names_expr=(r".*",)),
 )
