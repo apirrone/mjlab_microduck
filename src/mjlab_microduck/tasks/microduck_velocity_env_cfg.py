@@ -283,7 +283,7 @@ def make_microduck_velocity_env_cfg(
 
     if ENABLE_KP_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize motor kp gains (±2%)
+        # Randomize motor kp gains (±5%)
         # Uses custom function that handles DelayedActuator
         cfg.events["randomize_motor_kp"] = EventTermCfg(
             func=microduck_mdp.randomize_delayed_actuator_gains,
@@ -291,7 +291,7 @@ def make_microduck_velocity_env_cfg(
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
                 "operation": "scale",
-                "kp_range": (0.98, 1.02),  # ±2%
+                "kp_range": (0.95, 1.05),  # ±5%
                 "kd_range": (1.0, 1.0),  # Keep kd unchanged
             },
         )
