@@ -261,6 +261,43 @@ def make_microduck_velocity_env_cfg(
         "y": (-0.3, 0.3),
     }
 
+    # Domain randomization - sampled once per episode at reset
+    from mjlab.managers.scene_entity_config import SceneEntityCfg
+
+    # Randomize CoM position (±0.5cm on xyz)
+    cfg.events["randomize_com"] = EventTermCfg(
+        func=mdp.randomize_field,
+        mode="reset",
+        domain_randomization=True,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="trunk_base"),
+            "field": "body_ipos",  # Body inertial position (CoM)
+            "ranges": (-0.005, 0.005),  # ±0.5cm
+            "operation": "add",
+            "distribution": "uniform",
+        },
+    )
+
+    # Randomize motor kp gains (±5%)
+    cfg.events["randomize_motor_kp"] = EventTermCfg(
+        func=mdp.randomize_pd_gains,
+        mode="reset",
+        domain_randomization=True,
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "kp_range": (0.95, 1.05),  # ±5%
+            "kd_range": (1.0, 1.0),  # Keep kd unchanged
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    # Note: Full IMU orientation randomization requires custom observation functions
+    # to apply the rotation offset to projected_gravity and base_ang_vel readings.
+    # For similar robustness, you can add observation noise to these terms directly:
+    #   cfg.observations["policy"].terms["projected_gravity"].noise = NoiseCfg(...)
+    #   cfg.observations["policy"].terms["base_ang_vel"].noise = NoiseCfg(...)
+
     # Observations
     del cfg.observations["policy"].terms["base_lin_vel"]
 
