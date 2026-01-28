@@ -161,14 +161,14 @@ def make_microduck_velocity_env_cfg(
     # )
 
     # CoM height target
-    # cfg.rewards["com_height_target"] = RewardTermCfg(
-    #     func=microduck_mdp.com_height_target,
-    #     weight=1.0,
-    #     params={
-    #         "target_height_min": 0.09,
-    #         "target_height_max": 0.13,
-    #     },
-    # )
+    cfg.rewards["com_height_target"] = RewardTermCfg(
+        func=microduck_mdp.com_height_target,
+        weight=1.0,
+        params={
+            "target_height_min": 0.09,
+            "target_height_max": 0.13,
+        },
+    )
 
     # === SURVIVAL REWARD (applies to all tasks) ===
     # Critical baseline reward for staying alive
