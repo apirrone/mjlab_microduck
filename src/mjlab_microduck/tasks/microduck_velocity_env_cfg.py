@@ -3,8 +3,8 @@
 from copy import deepcopy
 
 # Domain randomization toggles
-ENABLE_COM_RANDOMIZATION = True
-ENABLE_KP_RANDOMIZATION = True
+ENABLE_COM_RANDOMIZATION = False  # Disabled by default - set to True to enable
+ENABLE_KP_RANDOMIZATION = False   # Disabled by default - set to True to enable
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -13,7 +13,6 @@ from mjlab.managers.manager_term_config import (
     EventTermCfg,
     RewardTermCfg,
 )
-from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -268,6 +267,7 @@ def make_microduck_velocity_env_cfg(
 
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize CoM position (±0.5cm on xyz)
         cfg.events["randomize_com"] = EventTermCfg(
             func=mdp.randomize_field,
@@ -282,6 +282,7 @@ def make_microduck_velocity_env_cfg(
         )
 
     if ENABLE_KP_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize motor kp gains (±5%)
         # Uses custom function that handles DelayedActuator
         cfg.events["randomize_motor_kp"] = EventTermCfg(
