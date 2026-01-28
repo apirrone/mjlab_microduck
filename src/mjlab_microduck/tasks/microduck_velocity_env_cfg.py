@@ -34,7 +34,7 @@ def make_microduck_velocity_env_cfg(
         r".*hip_roll.*": 0.2,
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
-        r".*ankle.*": 0.15,
+        r".*ankle.*": 0.25, # was 0.15
         # Head
         r".*neck.*": 0.1,
         r".*head.*": 0.1,

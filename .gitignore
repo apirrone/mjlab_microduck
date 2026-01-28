@@ -22,3 +22,5 @@ nohup.out
 beyondmimic_motions/
 artifacts/
 *.npz
+
+src/mjlab_microduck/robot/microduck.bak/*
