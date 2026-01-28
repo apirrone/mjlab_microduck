@@ -4,7 +4,7 @@ from copy import deepcopy
 
 # Domain randomization toggles
 ENABLE_COM_RANDOMIZATION = True
-ENABLE_KP_RANDOMIZATION = True
+ENABLE_KP_RANDOMIZATION = False
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
