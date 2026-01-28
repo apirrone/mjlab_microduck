@@ -267,7 +267,7 @@ def make_microduck_velocity_env_cfg(
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize CoM position (±0.5cm on xyz)
+        # Randomize CoM position (±0.1cm on xyz)
         cfg.events["randomize_com"] = EventTermCfg(
             func=mdp.randomize_field,
             mode="reset",
@@ -276,7 +276,7 @@ def make_microduck_velocity_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
-                "ranges": (-0.005, 0.005),  # ±0.5cm
+                "ranges": (-0.001, 0.001),  # ±0.1cm
             },
         )
 
