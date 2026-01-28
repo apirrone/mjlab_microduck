@@ -811,6 +811,10 @@ def randomize_delayed_actuator_gains(
 
     asset: Entity = env.scene[asset_cfg.name]
 
+    # Store original gains on first call
+    if not hasattr(env, '_original_actuator_gains'):
+        env._original_actuator_gains = {}
+
     # Apply to actuators
     for actuator in asset.actuators:
         # Handle DelayedActuator wrapping XmlPositionActuator
@@ -822,6 +826,22 @@ def randomize_delayed_actuator_gains(
         # Get control IDs
         ctrl_ids = base_actuator.ctrl_ids
 
+        # Store original values on first call (use tuple of ctrl_ids as key)
+        ctrl_key = tuple(ctrl_ids.tolist())
+        if ctrl_key not in env._original_actuator_gains:
+            # Store a copy of the original values for env 0 (they're the same for all envs initially)
+            env._original_actuator_gains[ctrl_key] = {
+                'gainprm': env.sim.model.actuator_gainprm[0, ctrl_ids, 0].clone(),
+                'biasprm1': env.sim.model.actuator_biasprm[0, ctrl_ids, 1].clone(),
+                'biasprm2': env.sim.model.actuator_biasprm[0, ctrl_ids, 2].clone(),
+            }
+
+        # Reset to original values first (to prevent accumulation)
+        original = env._original_actuator_gains[ctrl_key]
+        env.sim.model.actuator_gainprm[env_ids, ctrl_ids, 0] = original['gainprm'].unsqueeze(0).expand(len(env_ids), -1)
+        env.sim.model.actuator_biasprm[env_ids, ctrl_ids, 1] = original['biasprm1'].unsqueeze(0).expand(len(env_ids), -1)
+        env.sim.model.actuator_biasprm[env_ids, ctrl_ids, 2] = original['biasprm2'].unsqueeze(0).expand(len(env_ids), -1)
+
         # Sample random gains for each env and each control
         kp_samples = torch.rand(len(env_ids), len(ctrl_ids), device=env.device) * (kp_range[1] - kp_range[0]) + kp_range[0]
         kd_samples = torch.rand(len(env_ids), len(ctrl_ids), device=env.device) * (kd_range[1] - kd_range[0]) + kd_range[0]
@@ -829,6 +849,7 @@ def randomize_delayed_actuator_gains(
         # For XmlPositionActuator, modify MuJoCo model parameters directly
         if isinstance(base_actuator, XmlPositionActuator):
             if operation == "scale":
+                # Scale the ORIGINAL (now-reset) values
                 env.sim.model.actuator_gainprm[env_ids[:, None], ctrl_ids, 0] *= kp_samples
                 env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 1] *= kp_samples
                 env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 2] *= kd_samples
