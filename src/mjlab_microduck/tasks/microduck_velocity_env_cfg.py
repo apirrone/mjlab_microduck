@@ -2,6 +2,9 @@
 
 from copy import deepcopy
 
+# Domain randomization toggles
+ENABLE_COM_RANDOMIZATION = True
+
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import (
@@ -260,6 +263,22 @@ def make_microduck_velocity_env_cfg(
         "x": (-0.3, 0.3),
         "y": (-0.3, 0.3),
     }
+
+    # Domain randomization - sampled once per episode at reset
+    if ENABLE_COM_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize CoM position (±0.5cm on xyz)
+        cfg.events["randomize_com"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "operation": "add",
+                "field": "body_ipos",  # Body inertial position (CoM)
+                "ranges": (-0.005, 0.005),  # ±0.5cm
+            },
+        )
 
     # Observations
     del cfg.observations["policy"].terms["base_lin_vel"]
