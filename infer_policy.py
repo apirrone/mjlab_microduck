@@ -35,26 +35,42 @@ DEFAULT_POSE = np.array([
 
 class PolicyInference:
     def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None,
-                 delay_min_lag=0, delay_max_lag=0):
+                 delay_min_lag=0, delay_max_lag=0, standing_onnx_path=None, switch_threshold=0.05):
         self.model = model
         self.data = data
         self.action_scale = action_scale
         self.use_imitation = use_imitation
         self.delay_min_lag = delay_min_lag
         self.delay_max_lag = delay_max_lag
+        self.switch_threshold = switch_threshold
 
-        # Load ONNX model
-        print(f"Loading ONNX model from: {onnx_path}")
-        self.ort_session = ort.InferenceSession(onnx_path)
+        # Load walking policy (primary ONNX model)
+        print(f"Loading walking policy from: {onnx_path}")
+        self.walking_session = ort.InferenceSession(onnx_path)
+        self.ort_session = self.walking_session  # Default to walking
 
-        # Get input/output names
-        self.input_name = self.ort_session.get_inputs()[0].name
-        self.output_name = self.ort_session.get_outputs()[0].name
+        # Get input/output names from walking policy
+        self.input_name = self.walking_session.get_inputs()[0].name
+        self.output_name = self.walking_session.get_outputs()[0].name
 
-        input_shape = self.ort_session.get_inputs()[0].shape
-        output_shape = self.ort_session.get_outputs()[0].shape
-        print(f"Policy input: {self.input_name}, shape: {input_shape}")
-        print(f"Policy output: {self.output_name}, shape: {output_shape}")
+        input_shape = self.walking_session.get_inputs()[0].shape
+        output_shape = self.walking_session.get_outputs()[0].shape
+        print(f"Walking policy input: {self.input_name}, shape: {input_shape}")
+        print(f"Walking policy output: {self.output_name}, shape: {output_shape}")
+
+        # Load standing policy if provided
+        self.standing_session = None
+        if standing_onnx_path:
+            print(f"\nLoading standing policy from: {standing_onnx_path}")
+            self.standing_session = ort.InferenceSession(standing_onnx_path)
+            standing_input_shape = self.standing_session.get_inputs()[0].shape
+            standing_output_shape = self.standing_session.get_outputs()[0].shape
+            print(f"Standing policy input: {self.standing_session.get_inputs()[0].name}, shape: {standing_input_shape}")
+            print(f"Standing policy output: {self.standing_session.get_outputs()[0].name}, shape: {standing_output_shape}")
+            print(f"Policy switching threshold: {switch_threshold} (command magnitude)")
+
+        # Track which policy is active
+        self.current_policy = "walking"
 
         # Get sensor IDs and body IDs
         self.imu_ang_vel_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, "imu_ang_vel")
@@ -234,9 +250,27 @@ class PolicyInference:
         return np.concatenate(obs).astype(np.float32)
 
     def set_command(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
-        """Set velocity command."""
+        """Set velocity command and switch policy if needed."""
         self.command = np.array([lin_vel_x, lin_vel_y, ang_vel_z], dtype=np.float32)
-        print(f"Command: lin_vel_x={lin_vel_x:.2f}, lin_vel_y={lin_vel_y:.2f}, ang_vel_z={ang_vel_z:.2f}")
+
+        # Calculate command magnitude
+        command_magnitude = np.sqrt(lin_vel_x**2 + lin_vel_y**2 + ang_vel_z**2)
+
+        # Switch policy based on command magnitude if standing policy is available
+        previous_policy = self.current_policy
+        if self.standing_session is not None:
+            if command_magnitude <= self.switch_threshold:
+                self.current_policy = "standing"
+                self.ort_session = self.standing_session
+            else:
+                self.current_policy = "walking"
+                self.ort_session = self.walking_session
+
+            # Print when policy switches
+            if previous_policy != self.current_policy:
+                print(f"Switched to {self.current_policy} policy (magnitude: {command_magnitude:.3f})")
+
+        print(f"Command: lin_vel_x={lin_vel_x:.2f}, lin_vel_y={lin_vel_y:.2f}, ang_vel_z={ang_vel_z:.2f} [{self.current_policy}]")
 
     def infer(self):
         """Run policy inference and return action."""
@@ -246,7 +280,7 @@ class PolicyInference:
         # Add batch dimension
         obs_batch = obs.reshape(1, -1)
 
-        # Run inference
+        # Run inference with active policy
         action = self.ort_session.run([self.output_name], {self.input_name: obs_batch})[0]
 
         # Remove batch dimension
@@ -292,7 +326,8 @@ class PolicyInference:
 
 def main():
     parser = argparse.ArgumentParser(description="Run ONNX policy in MuJoCo")
-    parser.add_argument("onnx_path", type=str, help="Path to ONNX policy file")
+    parser.add_argument("onnx_path", type=str, help="Path to ONNX policy file (walking policy)")
+    parser.add_argument("-s", "--standing", type=str, default=None, help="Path to standing policy ONNX file (optional)")
     parser.add_argument("--lin-vel-x", type=float, default=0.0, help="Linear velocity X command (m/s)")
     parser.add_argument("--lin-vel-y", type=float, default=0.0, help="Linear velocity Y command (m/s)")
     parser.add_argument("--ang-vel-z", type=float, default=0.0, help="Angular velocity Z command (rad/s)")
@@ -302,6 +337,7 @@ def main():
     parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
+    parser.add_argument("--switch-threshold", type=float, default=0.05, help="Command magnitude threshold for switching between standing and walking policy (default: 0.05)")
     args = parser.parse_args()
 
     # Parse delay arguments
@@ -341,7 +377,9 @@ def main():
         use_imitation=args.imitation,
         reference_motion_path=args.reference_motion,
         delay_min_lag=delay_min_lag,
-        delay_max_lag=delay_max_lag
+        delay_max_lag=delay_max_lag,
+        standing_onnx_path=args.standing,
+        switch_threshold=args.switch_threshold
     )
     policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
@@ -388,6 +426,10 @@ def main():
     print(f"Observation size: {test_obs.size} (expected: {expected_obs_size})")
     if policy.use_imitation:
         print(f"Imitation mode: ENABLED (gait period: {policy.gait_period:.3f}s)")
+    if policy.standing_session is not None:
+        print(f"Dual-policy mode: ENABLED")
+        print(f"  Standing/Walking switch threshold: {policy.switch_threshold} (command magnitude)")
+        print(f"  Initial policy: {policy.current_policy}")
     print("Close viewer window to exit")
     print()
 
