@@ -22,6 +22,7 @@ from mjlab.sensor import ContactMatch, ContactSensorCfg
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.robot.microduck_constants import MICRODUCK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
@@ -313,6 +314,12 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
     cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+
+    # Observation noise configuration (edit these values as needed)
+    cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.2, n_max=0.2)
+    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.1, n_max=0.1)  # was 0.05
+    cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.05, n_max=0.05)  # was 0.01
+    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-2.0, n_max=2.0)  # was 1.5
 
     # Add imitation observations if using imitation
     if use_imitation and reference_motion_path and imitation_state is not None:
