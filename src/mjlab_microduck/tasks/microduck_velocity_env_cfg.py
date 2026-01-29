@@ -170,7 +170,7 @@ def make_microduck_velocity_env_cfg(
         weight=1.2,
         params={
             "target_height_min": 0.09,
-            "target_height_max": 0.12,
+            "target_height_max": 0.11,
         },
     )
 
@@ -268,7 +268,7 @@ def make_microduck_velocity_env_cfg(
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize CoM position (±0.1cm on xyz)
+        # Randomize CoM position (±0.2cm on xyz)
         cfg.events["randomize_com"] = EventTermCfg(
             func=mdp.randomize_field,
             mode="reset",
@@ -277,13 +277,13 @@ def make_microduck_velocity_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
-                "ranges": (-0.001, 0.001),  # ±0.1cm
+                "ranges": (-0.002, 0.002),  # ±0.2cm
             },
         )
 
     if ENABLE_KP_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize motor kp gains (±5%)
+        # Randomize motor kp gains (±10%)
         # Uses custom function that handles DelayedActuator
         cfg.events["randomize_motor_kp"] = EventTermCfg(
             func=microduck_mdp.randomize_delayed_actuator_gains,
@@ -291,7 +291,7 @@ def make_microduck_velocity_env_cfg(
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
                 "operation": "scale",
-                "kp_range": (0.95, 1.05),  # ±5%
+                "kp_range": (0.9, 1.1),  # ±10%
                 "kd_range": (1.0, 1.0),  # Keep kd unchanged
             },
         )
@@ -307,11 +307,11 @@ def make_microduck_velocity_env_cfg(
     )
 
     cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 0
-    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 2
+    cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3
     cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
     cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 2
+    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     # Add imitation observations if using imitation
@@ -364,6 +364,7 @@ def make_microduck_velocity_env_cfg(
                 {"step": 1000 * 24, "weight": -1.2},
                 {"step": 1250 * 24, "weight": -1.4},
                 {"step": 1500 * 24, "weight": -1.6},
+                {"step": 1750 * 24, "weight": -1.8},
             ],
         },
     )
