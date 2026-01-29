@@ -107,7 +107,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.2  # was 1.0
+    cfg.rewards["pose"].weight = 1.4  # was 1.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -278,7 +278,7 @@ def make_microduck_velocity_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
-                "ranges": (-0.003, 0.003),  # ±0.4cm
+                "ranges": (-0.002, 0.002),  # ±0.4cm
             },
         )
 
