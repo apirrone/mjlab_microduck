@@ -157,9 +157,9 @@ def make_microduck_velocity_env_cfg(
     # )
 
     # Neck stability
-    # cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-    # func=microduck_mdp.neck_action_rate_l2, weight=-5.0 # was -0.1
-    # )
+    cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
+    )
     # cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
     # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
