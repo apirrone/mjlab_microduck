@@ -169,8 +169,8 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.com_height_target,
         weight=1.2,
         params={
-            "target_height_min": 0.09,
-            "target_height_max": 0.11,
+            "target_height_min": 0.07,
+            "target_height_max": 0.10,
         },
     )
 
