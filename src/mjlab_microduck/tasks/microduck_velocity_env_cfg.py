@@ -183,9 +183,9 @@ def make_microduck_velocity_env_cfg(
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
-    # cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-    # func=microduck_mdp.joint_torques_l2, weight=-1e-3
-    # )
+    cfg.rewards["joint_torques_l2"] = RewardTermCfg(
+        func=microduck_mdp.joint_torques_l2, weight=-1e-3
+    )
 
     # Joint accelerations penalty
     # cfg.rewards["joint_accelerations_l2"] = RewardTermCfg(
