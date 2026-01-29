@@ -277,7 +277,7 @@ def make_microduck_velocity_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
-                "ranges": (-0.004, 0.004),  # ±0.4cm
+                "ranges": (-0.003, 0.003),  # ±0.4cm
             },
         )
 
