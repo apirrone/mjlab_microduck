@@ -369,23 +369,23 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    # Add standing envs curriculum - gradually increase fraction of standing envs
-    cfg.curriculum["standing_envs"] = CurriculumTermCfg(
-        func=microduck_mdp.standing_envs_curriculum,
-        params={
-            "command_name": "twist",
-            "standing_stages": [
-                # Start with very few standing envs, gradually increase
-                # 250 iterations × 24 steps/iter = 6000 steps
-                {"step": 0, "rel_standing_envs": 0.02},
-                {"step": 250 * 24, "rel_standing_envs": 0.05},
-                {"step": 500 * 24, "rel_standing_envs": 0.1},
-                {"step": 750 * 24, "rel_standing_envs": 0.15},
-                {"step": 1000 * 24, "rel_standing_envs": 0.2},
-                {"step": 1250 * 24, "rel_standing_envs": 0.25},
-            ],
-        },
-    )
+    # # Add standing envs curriculum - gradually increase fraction of standing envs
+    # cfg.curriculum["standing_envs"] = CurriculumTermCfg(
+        # func=microduck_mdp.standing_envs_curriculum,
+        # params={
+            # "command_name": "twist",
+            # "standing_stages": [
+                # # Start with very few standing envs, gradually increase
+                # # 250 iterations × 24 steps/iter = 6000 steps
+                # {"step": 0, "rel_standing_envs": 0.02},
+                # {"step": 250 * 24, "rel_standing_envs": 0.05},
+                # {"step": 500 * 24, "rel_standing_envs": 0.1},
+                # {"step": 750 * 24, "rel_standing_envs": 0.15},
+                # {"step": 1000 * 24, "rel_standing_envs": 0.2},
+                # {"step": 1250 * 24, "rel_standing_envs": 0.25},
+            # ],
+        # },
+    # )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
