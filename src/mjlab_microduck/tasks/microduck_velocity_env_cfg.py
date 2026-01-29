@@ -170,7 +170,7 @@ def make_microduck_velocity_env_cfg(
         weight=1.0,
         params={
             "target_height_min": 0.08,
-            "target_height_max": 0.12,
+            "target_height_max": 0.11,
         },
     )
 
