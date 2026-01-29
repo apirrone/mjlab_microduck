@@ -401,6 +401,54 @@ def main():
     # Data collection for CSV
     csv_data = [] if args.save_csv else None
 
+    # Setup keyboard listener using pynput
+    try:
+        from pynput import keyboard as pynput_keyboard
+
+        def on_press(key):
+            try:
+                # Handle special keys (arrows and space)
+                if key == pynput_keyboard.Key.up:
+                    policy.set_command(0.5, 0.0, 0.0)
+                elif key == pynput_keyboard.Key.down:
+                    policy.set_command(-0.5, 0.0, 0.0)
+                elif key == pynput_keyboard.Key.right:
+                    policy.set_command(0.0, 0.5, 0.0)
+                elif key == pynput_keyboard.Key.left:
+                    policy.set_command(0.0, -0.5, 0.0)
+                elif key == pynput_keyboard.Key.space:
+                    policy.set_command(0.0, 0.0, 0.0)
+                # Handle character keys
+                elif hasattr(key, 'char'):
+                    if key.char == 'a' or key.char == 'A':
+                        policy.set_command(0.0, 0.0, 1.0)
+                    elif key.char == 'e' or key.char == 'E':
+                        policy.set_command(0.0, 0.0, -1.0)
+            except Exception as e:
+                print(f"Key press error: {e}")
+
+        listener = pynput_keyboard.Listener(on_press=on_press)
+        listener.start()
+
+        print("\nKeyboard controls enabled:")
+        print("  UP arrow:    lin_vel_x = +0.5")
+        print("  DOWN arrow:  lin_vel_x = -0.5")
+        print("  RIGHT arrow: lin_vel_y = +0.5")
+        print("  LEFT arrow:  lin_vel_y = -0.5")
+        print("  A key:       ang_vel_z = -1.0")
+        print("  E key:       ang_vel_z = +1.0")
+        print("  SPACE:       Stop (all velocities = 0.0)")
+        print("\nNote: Keyboard listener captures keys system-wide")
+
+    except ImportError:
+        print("\nKeyboard control unavailable:")
+        print("  pynput not found. Install with: pip install pynput")
+        print("  Or use command-line arguments: --lin-vel-x 0.5 --ang-vel-z 0.5")
+    except Exception as e:
+        print(f"\nCould not enable keyboard controls: {e}")
+        import traceback
+        traceback.print_exc()
+
     with mujoco.viewer.launch_passive(model, data) as viewer:
         viewer.sync()
         start_time = time.time()
