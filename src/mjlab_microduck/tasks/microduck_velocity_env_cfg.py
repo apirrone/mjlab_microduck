@@ -15,7 +15,7 @@ ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
 # Conservative ranges proven to be stable - can increase gradually if needed
 COM_RANDOMIZATION_RANGE = 0.003  # ±3mm
 MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% applied to BOTH mass and inertia together.
-KP_RANDOMIZATION_RANGE = (0.80, 1.2)  # ±20%. Was 15%
+KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
@@ -395,10 +395,10 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
 
     # Observation noise configuration (edit these values as needed)
-    cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.2, n_max=0.2)
-    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.1, n_max=0.1)  # was 0.05
-    cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.05, n_max=0.05)  # was 0.01
-    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-2.0, n_max=2.0)  # was 1.5
+    cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4) # was 0.2
+    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.15, n_max=0.15)  # was 0.1
+    cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)  # was 0.05
+    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # was 2.0
 
     # Add imitation observations if using imitation
     if use_imitation and reference_motion_path and imitation_state is not None:
