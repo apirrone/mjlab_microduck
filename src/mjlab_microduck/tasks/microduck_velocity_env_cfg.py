@@ -348,7 +348,7 @@ def make_microduck_velocity_env_cfg(
         cfg.events["randomize_mass_inertia"] = EventTermCfg(
             func=microduck_mdp.randomize_mass_and_inertia,
             mode="reset",
-            domain_randomization=True,
+            # Note: domain_randomization flag removed - custom function doesn't use standard interface
             params={
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "scale_range": MASS_INERTIA_RANDOMIZATION_RANGE,
