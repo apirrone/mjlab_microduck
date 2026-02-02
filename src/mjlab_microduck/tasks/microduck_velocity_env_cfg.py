@@ -13,8 +13,8 @@ ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
-COM_RANDOMIZATION_RANGE = 0.005  # ±5mm, was 3mm
-MASS_INERTIA_RANDOMIZATION_RANGE = (0.90, 1.1)  # ±10% applied to BOTH mass and inertia together. Was 5%
+COM_RANDOMIZATION_RANGE = 0.003  # ±3mm
+MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% applied to BOTH mass and inertia together.
 KP_RANDOMIZATION_RANGE = (0.80, 1.2)  # ±20%. Was 15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
