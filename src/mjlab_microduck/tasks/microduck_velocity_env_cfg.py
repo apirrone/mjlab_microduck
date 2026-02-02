@@ -3,13 +3,14 @@
 from copy import deepcopy
 
 # Domain randomization toggles
+# Enable ONE AT A TIME to identify which causes instability
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
-ENABLE_KD_RANDOMIZATION = True  # Now enabled - motor damping variation
-ENABLE_MASS_RANDOMIZATION = True  # Now enabled - important for sim2real
-ENABLE_INERTIA_RANDOMIZATION = True  # Now enabled - important for sim2real
-ENABLE_JOINT_FRICTION_RANDOMIZATION = True  # Now enabled - joint wear/temperature
-ENABLE_JOINT_DAMPING_RANDOMIZATION = True  # Now enabled - lubrication variation
+ENABLE_KD_RANDOMIZATION = True  # Test me first
+ENABLE_MASS_RANDOMIZATION = False  # Test me second
+ENABLE_INERTIA_RANDOMIZATION = False  # Test me third
+ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Test me fourth
+ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Test me fifth
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
 
 # Domain randomization ranges (adjust as needed)
