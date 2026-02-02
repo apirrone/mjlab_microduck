@@ -5,6 +5,23 @@ from copy import deepcopy
 # Domain randomization toggles
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
+ENABLE_KD_RANDOMIZATION = True
+ENABLE_MASS_RANDOMIZATION = True
+ENABLE_INERTIA_RANDOMIZATION = True
+ENABLE_JOINT_FRICTION_RANDOMIZATION = True
+ENABLE_JOINT_DAMPING_RANDOMIZATION = True
+ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+
+# Domain randomization ranges (adjust as needed)
+COM_RANDOMIZATION_RANGE = 0.005  # ±5mm (was 0.002 = ±2mm)
+MASS_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10%
+INERTIA_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
+KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
+KD_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±20%
+JOINT_FRICTION_RANDOMIZATION_RANGE = (0.8, 1.3)  # -20% to +30%
+JOINT_DAMPING_RANDOMIZATION_RANGE = (0.8, 1.3)  # -20% to +30%
+EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
+EXTERNAL_FORCE_MAGNITUDE = (0.5, 1.5)  # Force magnitude range in Newtons
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -261,15 +278,32 @@ def make_microduck_velocity_env_cfg(
     ].geom_names = foot_frictions_geom_names
     cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
 
-    cfg.events["push_robot"].params["velocity_range"] = {
-        "x": (-0.3, 0.3),
-        "y": (-0.3, 0.3),
-    }
+    # External force disturbances during episode
+    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Replace push_robot with apply_external_force_torque for better physical realism
+        cfg.events["push_robot"] = EventTermCfg(
+            func=mdp.apply_external_force_torque,
+            mode="interval",
+            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            params={
+                "force_range": EXTERNAL_FORCE_MAGNITUDE,
+                "torque_range": (0.0, 0.0),  # Only linear forces, no torques
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            },
+        )
+    else:
+        # Keep original velocity-based push but with very long interval
+        cfg.events["push_robot"].params["velocity_range"] = {
+            "x": (-0.3, 0.3),
+            "y": (-0.3, 0.3),
+        }
+        cfg.events["push_robot"].interval_range_s = (1e6, 1e6)
 
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize CoM position (±0.2cm on xyz)
+        # Randomize CoM position
         cfg.events["randomize_com"] = EventTermCfg(
             func=mdp.randomize_field,
             mode="reset",
@@ -278,22 +312,84 @@ def make_microduck_velocity_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "operation": "add",
                 "field": "body_ipos",  # Body inertial position (CoM)
-                "ranges": (-0.002, 0.002),  # ±0.2cm
+                "ranges": (-COM_RANDOMIZATION_RANGE, COM_RANDOMIZATION_RANGE),
             },
         )
 
-    if ENABLE_KP_RANDOMIZATION:
+    if ENABLE_KP_RANDOMIZATION or ENABLE_KD_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize motor kp gains (±10%)
+        # Randomize motor PD gains
         # Uses custom function that handles DelayedActuator
-        cfg.events["randomize_motor_kp"] = EventTermCfg(
+        kp_range = KP_RANDOMIZATION_RANGE if ENABLE_KP_RANDOMIZATION else (1.0, 1.0)
+        kd_range = KD_RANDOMIZATION_RANGE if ENABLE_KD_RANDOMIZATION else (1.0, 1.0)
+        cfg.events["randomize_motor_gains"] = EventTermCfg(
             func=microduck_mdp.randomize_delayed_actuator_gains,
             mode="reset",
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
                 "operation": "scale",
-                "kp_range": (0.85, 1.15),  # ±10%
-                "kd_range": (1.0, 1.0),  # Keep kd unchanged
+                "kp_range": kp_range,
+                "kd_range": kd_range,
+            },
+        )
+
+    if ENABLE_MASS_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize body masses (affects dynamics, manufacturing tolerances)
+        cfg.events["randomize_mass"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "operation": "scale",
+                "field": "body_mass",
+                "ranges": MASS_RANDOMIZATION_RANGE,
+            },
+        )
+
+    if ENABLE_INERTIA_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize body inertias (affects rotational dynamics)
+        cfg.events["randomize_inertia"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "operation": "scale",
+                "field": "body_inertia",
+                "ranges": INERTIA_RANDOMIZATION_RANGE,
+            },
+        )
+
+    if ENABLE_JOINT_FRICTION_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize joint friction losses (wear, temperature effects)
+        cfg.events["randomize_joint_friction"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
+                "operation": "scale",
+                "field": "dof_frictionloss",
+                "ranges": JOINT_FRICTION_RANDOMIZATION_RANGE,
+            },
+        )
+
+    if ENABLE_JOINT_DAMPING_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize joint damping (lubrication, temperature effects)
+        cfg.events["randomize_joint_damping"] = EventTermCfg(
+            func=mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
+                "operation": "scale",
+                "field": "dof_damping",
+                "ranges": JOINT_DAMPING_RANDOMIZATION_RANGE,
             },
         )
 
