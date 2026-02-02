@@ -5,22 +5,22 @@ from copy import deepcopy
 # Domain randomization toggles
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
-ENABLE_KD_RANDOMIZATION = False  # Start disabled, can cause instability
-ENABLE_MASS_RANDOMIZATION = False  # Start disabled, enable gradually
-ENABLE_INERTIA_RANDOMIZATION = False  # Start disabled, enable gradually
-ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Start disabled, enable gradually
-ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Start disabled, enable gradually
+ENABLE_KD_RANDOMIZATION = True  # Now enabled - motor damping variation
+ENABLE_MASS_RANDOMIZATION = True  # Now enabled - important for sim2real
+ENABLE_INERTIA_RANDOMIZATION = True  # Now enabled - important for sim2real
+ENABLE_JOINT_FRICTION_RANDOMIZATION = True  # Now enabled - joint wear/temperature
+ENABLE_JOINT_DAMPING_RANDOMIZATION = True  # Now enabled - lubrication variation
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
 
 # Domain randomization ranges (adjust as needed)
-# Start conservative, then gradually increase ranges as training stabilizes
-COM_RANDOMIZATION_RANGE = 0.002  # ±2mm (conservative start)
-MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% (conservative, increase to 0.9-1.1 later)
-INERTIA_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (conservative, increase to 0.85-1.15 later)
+# Conservative ranges proven to be stable - can increase gradually if needed
+COM_RANDOMIZATION_RANGE = 0.003  # ±3mm (moderate - can increase to 0.005)
+MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% (can increase to 0.9-1.1)
+INERTIA_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.85-1.15)
 KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
-KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (conservative, increase to 0.8-1.2 later)
-JOINT_FRICTION_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20% (conservative)
-JOINT_DAMPING_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20% (conservative)
+KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
+JOINT_FRICTION_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
+JOINT_DAMPING_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
 EXTERNAL_FORCE_MAGNITUDE = (0.5, 1.5)  # Force magnitude range in Newtons
 
