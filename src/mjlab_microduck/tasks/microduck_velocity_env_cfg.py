@@ -7,7 +7,7 @@ from copy import deepcopy
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
 ENABLE_KD_RANDOMIZATION = True  # Test me first
-ENABLE_MASS_RANDOMIZATION = False  # Test me second
+ENABLE_MASS_RANDOMIZATION = True  # Test me second
 ENABLE_INERTIA_RANDOMIZATION = False  # Test me third
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Test me fourth
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Test me fifth
