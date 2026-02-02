@@ -3,27 +3,32 @@
 from copy import deepcopy
 
 # Domain randomization toggles
-# Enable ONE AT A TIME to identify which causes instability
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
-ENABLE_KD_RANDOMIZATION = True  # Test me first
-ENABLE_MASS_RANDOMIZATION = True  # Test me second
-ENABLE_INERTIA_RANDOMIZATION = False  # Test me third
-ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Test me fourth
-ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Test me fifth
+ENABLE_KD_RANDOMIZATION = True
+ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Mass+Inertia together (physically consistent)
+ENABLE_JOINT_FRICTION_RANDOMIZATION = True
+ENABLE_JOINT_DAMPING_RANDOMIZATION = True
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+
+# Deprecated - use ENABLE_MASS_INERTIA_RANDOMIZATION instead
+ENABLE_MASS_RANDOMIZATION = False  # Don't use alone - causes instability
+ENABLE_INERTIA_RANDOMIZATION = False  # Don't use alone - use combined version
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
 COM_RANDOMIZATION_RANGE = 0.003  # ±3mm (moderate - can increase to 0.005)
-MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% (can increase to 0.9-1.1)
-INERTIA_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.85-1.15)
+MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% applied to BOTH mass and inertia together
 KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
 EXTERNAL_FORCE_MAGNITUDE = (0.5, 1.5)  # Force magnitude range in Newtons
+
+# Deprecated ranges (kept for compatibility)
+MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # Don't use alone
+INERTIA_RANDOMIZATION_RANGE = (0.9, 1.1)  # Don't use alone
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -336,9 +341,23 @@ def make_microduck_velocity_env_cfg(
             },
         )
 
+    if ENABLE_MASS_INERTIA_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        # Randomize mass and inertia together (physically consistent)
+        # Using the same scale for both prevents invalid inertia tensors
+        cfg.events["randomize_mass_inertia"] = EventTermCfg(
+            func=microduck_mdp.randomize_mass_and_inertia,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "scale_range": MASS_INERTIA_RANDOMIZATION_RANGE,
+            },
+        )
+
+    # Legacy separate randomizations (deprecated - use combined version above)
     if ENABLE_MASS_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize body masses (affects dynamics, manufacturing tolerances)
         cfg.events["randomize_mass"] = EventTermCfg(
             func=mdp.randomize_field,
             mode="reset",
@@ -353,7 +372,6 @@ def make_microduck_velocity_env_cfg(
 
     if ENABLE_INERTIA_RANDOMIZATION:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Randomize body inertias (affects rotational dynamics)
         cfg.events["randomize_inertia"] = EventTermCfg(
             func=mdp.randomize_field,
             mode="reset",

@@ -859,6 +859,58 @@ def randomize_delayed_actuator_gains(
                 env.sim.model.actuator_biasprm[env_ids[:, None], ctrl_ids, 2] = -kd_samples
 
 
+def randomize_mass_and_inertia(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    scale_range: tuple[float, float],
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize body mass and inertia together with the same scaling factor.
+
+    This maintains physical consistency - mass and inertia must scale together
+    to avoid creating invalid inertia tensors that cause simulation instability.
+
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize
+        scale_range: (min, max) scaling factor applied to both mass and inertia
+        asset_cfg: Asset configuration specifying which bodies to randomize
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get body indices
+    body_ids = asset_cfg.body_ids
+    if isinstance(body_ids, slice):
+        body_ids = list(range(asset.num_bodies))[body_ids]
+    body_indices = asset.indexing.body_ids[body_ids]
+
+    # Sample ONE random scale per environment (applied to both mass and inertia)
+    num_envs = len(env_ids)
+    num_bodies = len(body_indices)
+    scales = torch.rand(num_envs, num_bodies, device=env.device) * (scale_range[1] - scale_range[0]) + scale_range[0]
+
+    # Store original values on first call
+    if not hasattr(env, '_original_mass_inertia'):
+        env._original_mass_inertia = {
+            'mass': env.sim.model.body_mass[0, body_indices].clone(),
+            'inertia': env.sim.model.body_inertia[0, body_indices].clone(),
+        }
+
+    # Reset to original first (to prevent accumulation)
+    original = env._original_mass_inertia
+    env.sim.model.body_mass[env_ids[:, None], body_indices] = original['mass'].unsqueeze(0).expand(num_envs, -1)
+    env.sim.model.body_inertia[env_ids[:, None], body_indices] = original['inertia'].unsqueeze(0).expand(num_envs, -1, -1)
+
+    # Apply same scale to both mass and inertia
+    env.sim.model.body_mass[env_ids[:, None], body_indices] *= scales
+    env.sim.model.body_inertia[env_ids[:, None], body_indices] *= scales.unsqueeze(-1)  # Scale all 3 inertia components
+
+
 def standing_envs_curriculum(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
