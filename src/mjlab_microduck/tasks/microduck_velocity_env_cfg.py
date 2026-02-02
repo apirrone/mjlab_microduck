@@ -5,21 +5,22 @@ from copy import deepcopy
 # Domain randomization toggles
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
-ENABLE_KD_RANDOMIZATION = True
-ENABLE_MASS_RANDOMIZATION = True
-ENABLE_INERTIA_RANDOMIZATION = True
-ENABLE_JOINT_FRICTION_RANDOMIZATION = True
-ENABLE_JOINT_DAMPING_RANDOMIZATION = True
+ENABLE_KD_RANDOMIZATION = False  # Start disabled, can cause instability
+ENABLE_MASS_RANDOMIZATION = False  # Start disabled, enable gradually
+ENABLE_INERTIA_RANDOMIZATION = False  # Start disabled, enable gradually
+ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Start disabled, enable gradually
+ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Start disabled, enable gradually
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
 
 # Domain randomization ranges (adjust as needed)
-COM_RANDOMIZATION_RANGE = 0.005  # ±5mm (was 0.002 = ±2mm)
-MASS_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10%
-INERTIA_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
+# Start conservative, then gradually increase ranges as training stabilizes
+COM_RANDOMIZATION_RANGE = 0.002  # ±2mm (conservative start)
+MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% (conservative, increase to 0.9-1.1 later)
+INERTIA_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (conservative, increase to 0.85-1.15 later)
 KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
-KD_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±20%
-JOINT_FRICTION_RANDOMIZATION_RANGE = (0.8, 1.3)  # -20% to +30%
-JOINT_DAMPING_RANDOMIZATION_RANGE = (0.8, 1.3)  # -20% to +30%
+KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (conservative, increase to 0.8-1.2 later)
+JOINT_FRICTION_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20% (conservative)
+JOINT_DAMPING_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20% (conservative)
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
 EXTERNAL_FORCE_MAGNITUDE = (0.5, 1.5)  # Force magnitude range in Newtons
 
@@ -282,12 +283,13 @@ def make_microduck_velocity_env_cfg(
     if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Replace push_robot with apply_external_force_torque for better physical realism
+        # Forces need to be symmetric (positive and negative) for random directions
         cfg.events["push_robot"] = EventTermCfg(
             func=mdp.apply_external_force_torque,
             mode="interval",
             interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
             params={
-                "force_range": EXTERNAL_FORCE_MAGNITUDE,
+                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
                 "torque_range": (0.0, 0.0),  # Only linear forces, no torques
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
             },
