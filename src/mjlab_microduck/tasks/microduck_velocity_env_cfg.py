@@ -24,7 +24,7 @@ KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.9, 1.2)  # -10% to +20%
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
-EXTERNAL_FORCE_MAGNITUDE = (0.5, 1.5)  # Force magnitude range in Newtons
+EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
 
 # Deprecated ranges (kept for compatibility)
 MASS_RANDOMIZATION_RANGE = (0.95, 1.05)  # Don't use alone
