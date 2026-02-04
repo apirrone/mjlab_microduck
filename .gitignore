@@ -24,3 +24,4 @@ artifacts/
 *.npz
 
 src/mjlab_microduck/robot/microduck.bak/*
+*.pkl
