@@ -26,8 +26,8 @@
       <!-- m1 -->
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.03" frictionloss="0.0012" armature="0.0015"/>
-      <!-- kp 100 -->
-      <position kp="0.14" kv="0.0" forcerange="-0.47 0.47" ctrlrange="-10.0 10.0"/> 
+      <!-- kp 200 -->
+      <position kp="0.28" kv="0.0" forcerange="-0.47 0.47" ctrlrange="-10.0 10.0"/> 
     </default>
   </default>
   <!-- Additional sensors.xml -->
