@@ -396,7 +396,7 @@ def make_microduck_velocity_env_cfg(
 
     # Observation noise configuration (edit these values as needed)
     cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4) # was 0.2
-    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.15, n_max=0.15)  # was 0.1
+    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.2, n_max=0.2)  # was 0.15
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # was 2.0
 
