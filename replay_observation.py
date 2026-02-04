@@ -87,13 +87,57 @@ def extract_actions_from_observations(observations: np.ndarray) -> np.ndarray:
     return actions
 
 
-def initialize_robot(model, data):
+def construct_observation(data, last_action):
+    """
+    Construct observation from MuJoCo data state.
+
+    Observation structure (51D):
+    [0:3]    - Base angular velocity
+    [3:6]    - Projected gravity
+    [6:20]   - Joint positions relative (14D)
+    [20:34]  - Joint velocities (14D)
+    [34:48]  - Last action (14D)
+    [48:51]  - Velocity command (3D) [zeros for replay]
+    """
+    obs = np.zeros(51)
+
+    # Base angular velocity (body frame)
+    obs[0:3] = data.qvel[3:6]
+
+    # Projected gravity (rotate gravity vector to body frame)
+    gravity = np.array([0, 0, -1])
+    base_quat = data.qpos[3:7]  # [w, x, y, z]
+    # Convert to rotation matrix and apply inverse rotation
+    base_rot = np.zeros((3, 3))
+    mujoco.mju_quat2Mat(base_rot.ravel(), base_quat)
+    projected_gravity = base_rot.T @ gravity
+    obs[3:6] = projected_gravity
+
+    # Joint positions relative to default (qpos[7:21] are joint positions)
+    obs[6:20] = data.qpos[7:21] - DEFAULT_POSE
+
+    # Joint velocities (qvel[6:20] are joint velocities)
+    obs[20:34] = data.qvel[6:20]
+
+    # Last action
+    obs[34:48] = last_action
+
+    # Velocity command (zeros for replay)
+    obs[48:51] = 0.0
+
+    return obs
+
+
+def initialize_robot(model, data, hang=False):
     """Initialize robot to default standing pose."""
     # Set joint positions to default pose (qpos[7:21] are the joint positions)
     data.qpos[7:21] = DEFAULT_POSE
 
     # Set base position slightly above ground to avoid penetration
-    data.qpos[2] = 0.15  # z-position of base
+    if hang:
+        data.qpos[2] = 0.30  # z-position of base (hanging in air)
+    else:
+        data.qpos[2] = 0.15  # z-position of base
 
     # Reset velocities
     data.qvel[:] = 0.0
@@ -105,8 +149,8 @@ def initialize_robot(model, data):
     mujoco.mj_forward(model, data)
 
 
-def replay_observations_with_viewer(model, data, actions, timestamps, action_scale=0.3,
-                                   real_time=True):
+def replay_observations_with_viewer(model, data, actions, timestamps, action_scale=1.0,
+                                   real_time=True, hang=False, record_output=None, decimation=4):
     """
     Replay actions on the robot with viewer.
 
@@ -115,15 +159,30 @@ def replay_observations_with_viewer(model, data, actions, timestamps, action_sca
         data: MuJoCo data
         actions: Array of actions to replay (N x 14)
         timestamps: Array of timestamps for each action (N,)
-        action_scale: Scaling factor for actions (default: 0.3)
+        action_scale: Scaling factor for actions (default: 1.0)
         real_time: If True, replay at actual timing. If False, step as fast as possible.
+        hang: If True, robot hangs in the air. If False, robot stands on ground.
+        record_output: If provided, save recorded observations to this file path.
     """
     print(f"Replaying {len(actions)} actions...")
     print(f"Duration: {timestamps[-1]:.2f}s")
     print(f"Action scale: {action_scale}")
+    if hang:
+        print("Mode: Hanging in air")
+    if record_output:
+        print(f"Recording observations to: {record_output}")
 
     # Initialize robot
-    initialize_robot(model, data)
+    initialize_robot(model, data, hang=hang)
+
+    # Save initial base position and orientation for hang mode
+    if hang:
+        base_pos = data.qpos[0:3].copy()
+        base_quat = data.qpos[3:7].copy()
+
+    # Lists to record observations
+    recorded_observations = []
+    recorded_timestamps = []
 
     with mujoco.viewer.launch_passive(model, data) as viewer:
         viewer.sync()
@@ -132,55 +191,81 @@ def replay_observations_with_viewer(model, data, actions, timestamps, action_sca
         print("Waiting 1 second in default pose...")
         wait_steps = int(1.0 / model.opt.timestep)
         for _ in range(wait_steps):
+            if hang:
+                # Fix base position and orientation
+                data.qpos[0:3] = base_pos
+                data.qpos[3:7] = base_quat
+                data.qvel[0:6] = 0.0
             mujoco.mj_step(model, data)
             viewer.sync()
             if not viewer.is_running():
-                return
+                return recorded_observations, recorded_timestamps
 
         if real_time:
             time.sleep(1.0)
 
         print("Starting action replay...")
         start_time = time.time()
+        control_dt = decimation * model.opt.timestep
 
-        # Replay actions
-        action_idx = 0
-        sim_time = 0.0
-
-        while viewer.is_running() and action_idx < len(actions):
+        # Record all observations by replaying the action sequence
+        # Key insight: obs[i] is recorded WITH last_action[i], then action[i+1] is applied
+        for i in range(len(actions)):
             step_start = time.time()
 
-            # Find current action based on simulation time
-            while action_idx < len(actions) - 1 and timestamps[action_idx + 1] <= sim_time:
-                action_idx += 1
+            # Fix base position if hanging
+            if hang:
+                data.qpos[0:3] = base_pos
+                data.qpos[3:7] = base_quat
+                data.qvel[0:6] = 0.0
 
-            # Apply action to robot
-            action = actions[action_idx]
-            motor_targets = DEFAULT_POSE + action * action_scale
-            data.ctrl[:] = motor_targets
+            # Record observation at step i with last_action = actions[i]
+            if record_output:
+                obs = construct_observation(data, actions[i])
+                recorded_observations.append(obs)
+                recorded_timestamps.append(timestamps[i])
 
-            # Step simulation
-            mujoco.mj_step(model, data)
-            viewer.sync()
-            sim_time += model.opt.timestep
+            # Apply action for next step (action[i+1]) and simulate
+            if i < len(actions) - 1:
+                action = actions[i + 1]  # Next action to apply
+                motor_targets = DEFAULT_POSE + action * action_scale
+                data.ctrl[:] = motor_targets
 
-            # Real-time pacing
-            if real_time:
-                elapsed = time.time() - step_start
-                sleep_time = model.opt.timestep - elapsed
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                # Step simulation 'decimation' times (matches mjlab env.step and infer_policy.py)
+                for _ in range(decimation):
+                    if hang:
+                        data.qpos[0:3] = base_pos
+                        data.qpos[3:7] = base_quat
+                        data.qvel[0:6] = 0.0
+
+                    mujoco.mj_step(model, data)
+                    viewer.sync()
+
+                if not viewer.is_running():
+                    break
+
+                # Real-time pacing (sleep once per control step)
+                if real_time:
+                    elapsed = time.time() - step_start
+                    sleep_time = control_dt - elapsed
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
 
             # Progress update
-            if action_idx % 50 == 0 and action_idx > 0:
-                print(f"Progress: {action_idx}/{len(actions)} actions ({sim_time:.2f}s)")
+            if i % 50 == 0 and i > 0:
+                print(f"Progress: {i}/{len(actions)} observations ({timestamps[i]:.2f}s)")
 
         print("Replay complete!")
-        time.sleep(2.0)  # Keep viewer open for 2 seconds after completion
+
+        # Only keep viewer open if not recording (for visual inspection)
+        if not record_output:
+            time.sleep(2.0)  # Keep viewer open for 2 seconds after completion
+
+    return recorded_observations, recorded_timestamps
 
 
-def replay_observations_no_viewer(model, data, actions, timestamps, action_scale=0.3,
-                                 real_time=True):
+def replay_observations_no_viewer(model, data, actions, timestamps, action_scale=1.0,
+                                 real_time=True, hang=False, record_output=None, decimation=4):
     """
     Replay actions on the robot without viewer (headless mode).
 
@@ -189,20 +274,40 @@ def replay_observations_no_viewer(model, data, actions, timestamps, action_scale
         data: MuJoCo data
         actions: Array of actions to replay (N x 14)
         timestamps: Array of timestamps for each action (N,)
-        action_scale: Scaling factor for actions (default: 0.3)
+        action_scale: Scaling factor for actions (default: 1.0)
         real_time: If True, replay at actual timing. If False, step as fast as possible.
+        hang: If True, robot hangs in the air. If False, robot stands on ground.
+        record_output: If provided, save recorded observations to this file path.
     """
     print(f"Replaying {len(actions)} actions (no viewer)...")
     print(f"Duration: {timestamps[-1]:.2f}s")
     print(f"Action scale: {action_scale}")
+    if hang:
+        print("Mode: Hanging in air")
+    if record_output:
+        print(f"Recording observations to: {record_output}")
 
     # Initialize robot
-    initialize_robot(model, data)
+    initialize_robot(model, data, hang=hang)
+
+    # Save initial base position and orientation for hang mode
+    if hang:
+        base_pos = data.qpos[0:3].copy()
+        base_quat = data.qpos[3:7].copy()
+
+    # Lists to record observations
+    recorded_observations = []
+    recorded_timestamps = []
 
     # Wait 1 second in default pose
     print("Waiting 1 second in default pose...")
     wait_steps = int(1.0 / model.opt.timestep)
     for _ in range(wait_steps):
+        if hang:
+            # Fix base position and orientation
+            data.qpos[0:3] = base_pos
+            data.qpos[3:7] = base_quat
+            data.qvel[0:6] = 0.0
         mujoco.mj_step(model, data)
 
     if real_time:
@@ -210,39 +315,54 @@ def replay_observations_no_viewer(model, data, actions, timestamps, action_scale
 
     print("Starting action replay...")
     start_time = time.time()
+    control_dt = decimation * model.opt.timestep
 
-    # Replay actions
-    action_idx = 0
-    sim_time = 0.0
-
-    while action_idx < len(actions):
+    # Record all observations by replaying the action sequence
+    # Key insight: obs[i] is recorded WITH last_action[i], then action[i+1] is applied
+    for i in range(len(actions)):
         step_start = time.time()
 
-        # Find current action based on simulation time
-        while action_idx < len(actions) - 1 and timestamps[action_idx + 1] <= sim_time:
-            action_idx += 1
+        # Fix base position if hanging
+        if hang:
+            data.qpos[0:3] = base_pos
+            data.qpos[3:7] = base_quat
+            data.qvel[0:6] = 0.0
 
-        # Apply action to robot
-        action = actions[action_idx]
-        motor_targets = DEFAULT_POSE + action * action_scale
-        data.ctrl[:] = motor_targets
+        # Record observation at step i with last_action = actions[i]
+        if record_output:
+            obs = construct_observation(data, actions[i])
+            recorded_observations.append(obs)
+            recorded_timestamps.append(timestamps[i])
 
-        # Step simulation
-        mujoco.mj_step(model, data)
-        sim_time += model.opt.timestep
+        # Apply action for next step (action[i+1]) and simulate
+        if i < len(actions) - 1:
+            action = actions[i + 1]  # Next action to apply
+            motor_targets = DEFAULT_POSE + action * action_scale
+            data.ctrl[:] = motor_targets
 
-        # Real-time pacing
-        if real_time:
-            elapsed = time.time() - step_start
-            sleep_time = model.opt.timestep - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            # Step simulation 'decimation' times (matches mjlab env.step and infer_policy.py)
+            for _ in range(decimation):
+                if hang:
+                    data.qpos[0:3] = base_pos
+                    data.qpos[3:7] = base_quat
+                    data.qvel[0:6] = 0.0
+
+                mujoco.mj_step(model, data)
+
+            # Real-time pacing (sleep once per control step)
+            if real_time:
+                elapsed = time.time() - step_start
+                sleep_time = control_dt - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
 
         # Progress update
-        if action_idx % 50 == 0 and action_idx > 0:
-            print(f"Progress: {action_idx}/{len(actions)} actions ({sim_time:.2f}s)")
+        if i % 50 == 0 and i > 0:
+            print(f"Progress: {i}/{len(actions)} observations ({timestamps[i]:.2f}s)")
 
     print("Replay complete!")
+
+    return recorded_observations, recorded_timestamps
 
 
 def main():
@@ -257,6 +377,10 @@ def main():
                        help="Run without visualization")
     parser.add_argument("--no-real-time", action="store_true",
                        help="Run as fast as possible without real-time pacing")
+    parser.add_argument("--hang", action="store_true",
+                       help="Robot hangs in the air instead of standing on ground")
+    parser.add_argument("--record-output", type=str,
+                       help="Path to save recorded observations from simulation (e.g., sim_observations.pkl)")
 
     args = parser.parse_args()
 
@@ -284,22 +408,55 @@ def main():
     # Load MuJoCo model
     print(f"Loading MuJoCo model from {args.model}...")
     model = mujoco.MjModel.from_xml_path(args.model)
+
+    # Override timestep to match mjlab (0.005s instead of XML's 0.002s)
+    # mjlab velocity environments use timestep=0.005 for performance/stability
+    model.opt.timestep = 0.005
+
+    # Decimation to match mjlab (control at 50Hz while simulation at 200Hz)
+    decimation = 4
+    control_dt = decimation * model.opt.timestep  # 0.02s per control step
+
     data = mujoco.MjData(model)
+
+    print(f"Simulation timestep: {model.opt.timestep}s (200Hz)")
+    print(f"Control frequency: 50Hz (decimation: {decimation})")
+    print(f"Control dt: {control_dt}s")
 
     # Replay observations
     try:
         if args.no_viewer:
-            replay_observations_no_viewer(
+            recorded_obs, recorded_ts = replay_observations_no_viewer(
                 model, data, actions, timestamps,
                 action_scale=args.action_scale,
-                real_time=not args.no_real_time
+                real_time=not args.no_real_time,
+                hang=args.hang,
+                record_output=args.record_output,
+                decimation=decimation
             )
         else:
-            replay_observations_with_viewer(
+            recorded_obs, recorded_ts = replay_observations_with_viewer(
                 model, data, actions, timestamps,
                 action_scale=args.action_scale,
-                real_time=not args.no_real_time
+                real_time=not args.no_real_time,
+                hang=args.hang,
+                record_output=args.record_output,
+                decimation=decimation
             )
+
+        # Save recorded observations if requested
+        if args.record_output and recorded_obs:
+            print(f"\nSaving {len(recorded_obs)} recorded observations to {args.record_output}...")
+            save_data = {
+                'observations': np.array(recorded_obs),
+                'timestamps': np.array(recorded_ts)
+            }
+            with open(args.record_output, 'wb') as f:
+                pickle.dump(save_data, f)
+            print(f"Saved successfully to {args.record_output}")
+            print(f"Observation shape: {np.array(recorded_obs).shape}")
+            print(f"Time range: {recorded_ts[0]:.3f}s to {recorded_ts[-1]:.3f}s")
+
     except KeyboardInterrupt:
         print("\nReplay interrupted by user")
 

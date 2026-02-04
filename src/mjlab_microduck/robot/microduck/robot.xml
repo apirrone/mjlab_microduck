@@ -29,11 +29,13 @@
       <!-- kp 600 -->
       <!-- <position kp="0.97" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 400 -->
-      <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
+      <!-- <position kp="0.65" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> --> 
       <!-- kp 200 -->
-      <!-- <position kp="0.57" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> -->
+      <!-- <position kp="0.57" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> --> 
       <!-- kp 100 -->
-      <position kp="0.28" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/>
+      <!-- <position kp="0.28" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> --> 
+      <!-- test, corresponds to kp 100 ??-->
+      <position kp="0.97" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> 
     </default>
   </default>
   <!-- Additional sensors.xml -->
