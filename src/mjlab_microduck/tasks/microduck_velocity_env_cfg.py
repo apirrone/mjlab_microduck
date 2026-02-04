@@ -455,6 +455,41 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
+    # Add linear velocity tracking curriculum
+    cfg.curriculum["linear_velocity_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "track_linear_velocity",
+            "weight_stages": [
+                # Start at current weight (2.0), gradually reduce to encourage more robust walking
+                # 250 iterations × 24 steps/iter = 6000 steps
+                {"step": 0, "weight": 2.0},
+                {"step": 500 * 24, "weight": 2.1},
+                {"step": 750 * 24, "weight": 2.2},
+                {"step": 1000 * 24, "weight": 2.3},
+                {"step": 1250 * 24, "weight": 2.4},
+                {"step": 1500 * 24, "weight": 2.5},
+            ],
+        },
+    )
+
+    # Add angular velocity tracking curriculum
+    cfg.curriculum["angular_velocity_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "track_angular_velocity",
+            "weight_stages": [
+                # Start at current weight (2.0), gradually reduce
+                {"step": 0, "weight": 2.0},
+                {"step": 500 * 24, "weight": 2.1},
+                {"step": 750 * 24, "weight": 2.2},
+                {"step": 1000 * 24, "weight": 2.3},
+                {"step": 1250 * 24, "weight": 2.4},
+                {"step": 1500 * 24, "weight": 2.5},
+            ],
+        },
+    )
+
     # # Add standing envs curriculum - gradually increase fraction of standing envs
     # cfg.curriculum["standing_envs"] = CurriculumTermCfg(
         # func=microduck_mdp.standing_envs_curriculum,
