@@ -25,13 +25,15 @@
     <default class="chosen_actuator">
       <!-- m1 -->
       <geom contype="0" conaffinity="0"/>
-      <joint damping="0.032" frictionloss="0.007" armature="0.0016"/>
+      <joint damping="0.057" frictionloss="0.007" armature="0.0016"/>
       <!-- kp 600 -->
       <!-- <position kp="0.97" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 400 -->
       <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 200 -->
-      <position kp="0.29" kv="0.0" forcerange="-0.5 0.5" ctrlrange="-10.0 10.0"/>
+      <!-- <position kp="0.57" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/> -->
+      <!-- kp 100 -->
+      <position kp="0.28" kv="0.0" forcerange="-0.98 0.98" ctrlrange="-10.0 10.0"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->
@@ -44,7 +46,7 @@
   </sensor>
   <worldbody>
     <!-- Link trunk_base -->
-    <body name="trunk_base" pos="0 0 0" quat="1 0 0 0" childclass="microduck">
+    <body name="trunk_base" pos="0 0 0.12" quat="1 0 0 0" childclass="microduck">
       <freejoint name="trunk_base_freejoint"/>
       <inertial pos="-0.010876 -0.000476206 0.0189092" mass="0.307054" fullinertia="0.000306438 0.000406337 0.000265753 -1.68276e-06 -1.79498e-05 -1.57212e-07"/>
       <!-- Part ubec_8v_5v_dc_dc -->
