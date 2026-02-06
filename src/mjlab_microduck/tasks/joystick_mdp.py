@@ -1,0 +1,321 @@
+"""
+MDP functions for joystick motion tracking task.
+
+Includes observations, rewards, and terminations for tracking reference motions.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+import torch
+
+from mjlab.sensor import ContactSensor
+from mjlab.utils.lab_api.math import quat_error_magnitude, quat_apply_inverse, quat_mul, quat_inv, matrix_from_quat
+
+from mjlab_microduck.tasks.joystick_command import JoystickCommand
+
+if TYPE_CHECKING:
+    from mjlab.envs import ManagerBasedRlEnv
+
+
+# ============================================================================
+# Observations
+# ============================================================================
+
+
+def motion_root_pos_b(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Reference root position error in robot's body frame.
+
+    Returns the position difference between reference and robot root,
+    expressed in the robot's local frame.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+
+    # Position error in world frame
+    pos_error_w = command.root_pos - command.robot_root_pos
+
+    # Transform to robot body frame
+    pos_error_b = quat_apply_inverse(command.robot_root_quat, pos_error_w)
+
+    return pos_error_b.view(env.num_envs, -1)
+
+
+def motion_root_ori_b(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Reference root orientation error as rotation matrix columns.
+
+    Returns the first two columns of the relative rotation matrix,
+    representing the orientation error between reference and robot root.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+
+    # Relative orientation: ref_quat * inv(robot_quat)
+    quat_error = quat_mul(command.root_quat, quat_inv(command.robot_root_quat))
+    mat = matrix_from_quat(quat_error)
+    return mat[..., :2].reshape(mat.shape[0], -1)
+
+
+def motion_joint_pos(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Reference joint positions."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return command.joint_pos
+
+
+def motion_joint_pos_error(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Joint position error (reference - robot)."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return command.joint_pos - command.robot_joint_pos
+
+
+def motion_joint_vel(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Reference joint velocities."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return command.joint_vel
+
+
+def motion_joint_vel_error(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Joint velocity error (reference - robot)."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return command.joint_vel - command.robot_joint_vel
+
+
+def motion_phase(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Current gait phase [0, 1)."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return command.phase.unsqueeze(-1)
+
+
+def velocity_command(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
+    """Velocity command (dx, dy, dtheta)."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    return torch.stack(
+        [command.vel_cmd_x, command.vel_cmd_y, command.vel_cmd_yaw], dim=-1
+    )
+
+
+# ============================================================================
+# Rewards
+# ============================================================================
+
+
+def joystick_root_position_error_exp(
+    env: ManagerBasedRlEnv, command_name: str, std: float
+) -> torch.Tensor:
+    """Reward for tracking reference root position."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = torch.sum(
+        torch.square(command.root_pos - command.robot_root_pos), dim=-1
+    )
+    return torch.exp(-error / std**2)
+
+
+def joystick_root_orientation_error_exp(
+    env: ManagerBasedRlEnv, command_name: str, std: float
+) -> torch.Tensor:
+    """Reward for tracking reference root orientation."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = quat_error_magnitude(command.root_quat, command.robot_root_quat) ** 2
+    return torch.exp(-error / std**2)
+
+
+def joystick_joint_position_error(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    joint_names: str | tuple[str, ...] | None = None,
+) -> torch.Tensor:
+    """Negative squared error for tracking reference joint positions.
+
+    Note: Returns negative values (cost). Consider using joystick_joint_position_error_exp
+    for a reward in (0, 1] that increases as tracking improves.
+
+    Args:
+        env: The RL environment.
+        command_name: Name of the joystick command term.
+        joint_names: Optional joint name pattern(s) to consider (supports regex).
+            If None, all joints are used. This allows weighting different joint groups
+            separately (e.g., ".*_leg_.*" for legs, ".*head.*" for head).
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    ref_pos = command.joint_pos
+    robot_pos = command.robot_joint_pos
+    if joint_names is not None:
+        joint_ids, _ = command.robot.find_joints(joint_names, preserve_order=True)
+        ref_pos = ref_pos[:, joint_ids]
+        robot_pos = robot_pos[:, joint_ids]
+    error = torch.sum(torch.square(ref_pos - robot_pos), dim=-1)
+    return -error
+
+
+def joystick_joint_position_error_exp(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    std: float,
+    joint_names: str | tuple[str, ...] | None = None,
+) -> torch.Tensor:
+    """Exponential reward for tracking reference joint positions.
+
+    Returns a reward in (0, 1] that increases toward 1 as error → 0.
+
+    Args:
+        env: The RL environment.
+        command_name: Name of the joystick command term.
+        std: Standard deviation for exponential scaling.
+        joint_names: Optional joint name pattern(s) to consider (supports regex).
+            If None, all joints are used.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    ref_pos = command.joint_pos
+    robot_pos = command.robot_joint_pos
+    if joint_names is not None:
+        joint_ids, _ = command.robot.find_joints(joint_names, preserve_order=True)
+        ref_pos = ref_pos[:, joint_ids]
+        robot_pos = robot_pos[:, joint_ids]
+    error = torch.sum(torch.square(ref_pos - robot_pos), dim=-1)
+    return torch.exp(-error / std**2)
+
+
+def joystick_joint_velocity_error(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    joint_names: str | tuple[str, ...] | None = None,
+) -> torch.Tensor:
+    """Negative squared error for tracking reference joint velocities.
+
+    Note: Returns negative values (cost). Consider using joystick_joint_velocity_error_exp
+    for a reward in (0, 1] that increases as tracking improves.
+
+    Args:
+        env: The RL environment.
+        command_name: Name of the joystick command term.
+        joint_names: Optional joint name pattern(s) to consider (supports regex).
+            If None, all joints are used. This allows weighting different joint groups
+            separately.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    ref_vel = command.joint_vel
+    robot_vel = command.robot_joint_vel
+    if joint_names is not None:
+        joint_ids, _ = command.robot.find_joints(joint_names, preserve_order=True)
+        ref_vel = ref_vel[:, joint_ids]
+        robot_vel = robot_vel[:, joint_ids]
+    error = torch.sum(torch.square(ref_vel - robot_vel), dim=-1)
+    return -error
+
+
+def joystick_joint_velocity_error_exp(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    std: float,
+    joint_names: str | tuple[str, ...] | None = None,
+) -> torch.Tensor:
+    """Exponential reward for tracking reference joint velocities.
+
+    Returns a reward in (0, 1] that increases toward 1 as error → 0.
+
+    Args:
+        env: The RL environment.
+        command_name: Name of the joystick command term.
+        std: Standard deviation for exponential scaling.
+        joint_names: Optional joint name pattern(s) to consider (supports regex).
+            If None, all joints are used.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    ref_vel = command.joint_vel
+    robot_vel = command.robot_joint_vel
+    if joint_names is not None:
+        joint_ids, _ = command.robot.find_joints(joint_names, preserve_order=True)
+        ref_vel = ref_vel[:, joint_ids]
+        robot_vel = robot_vel[:, joint_ids]
+    error = torch.sum(torch.square(ref_vel - robot_vel), dim=-1)
+    return torch.exp(-error / std**2)
+
+
+def joystick_linear_velocity_error_exp(
+    env: ManagerBasedRlEnv, command_name: str, std: float
+) -> torch.Tensor:
+    """Reward for tracking reference world linear velocity."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = torch.sum(
+        torch.square(command.world_linear_vel - command.robot_world_linear_vel), dim=-1
+    )
+    return torch.exp(-error / std**2)
+
+
+def joystick_angular_velocity_error_exp(
+    env: ManagerBasedRlEnv, command_name: str, std: float
+) -> torch.Tensor:
+    """Reward for tracking reference world angular velocity."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = torch.sum(
+        torch.square(command.world_angular_vel - command.robot_world_angular_vel), dim=-1
+    )
+    return torch.exp(-error / std**2)
+
+
+def joystick_velocity_cmd_tracking_exp(
+    env: ManagerBasedRlEnv, command_name: str, std: float
+) -> torch.Tensor:
+    """Reward for tracking commanded velocities (dx, dy, dtheta).
+
+    Velocity commands are in body frame (forward/left/yaw relative to robot),
+    so we compare against body-frame robot velocities.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+
+    # Use body-frame velocities since commands are relative to robot heading
+    robot_lin_vel = command.robot.data.root_link_lin_vel_b
+    robot_ang_vel = command.robot.data.root_link_ang_vel_b
+
+    lin_x_err = (command.vel_cmd_x - robot_lin_vel[:, 0]) ** 2
+    lin_y_err = (command.vel_cmd_y - robot_lin_vel[:, 1]) ** 2
+    ang_yaw_err = (command.vel_cmd_yaw - robot_ang_vel[:, 2]) ** 2
+
+    error = lin_x_err + lin_y_err + ang_yaw_err
+    return torch.exp(-error / std**2)
+
+
+def joystick_foot_contact_match(
+    env: ManagerBasedRlEnv, command_name: str, sensor_name: str
+) -> torch.Tensor:
+    """Reward for matching reference foot contacts.
+
+    Returns 1.0 when actual foot contacts match reference, 0.0 otherwise.
+    Each foot is evaluated separately and the mean is returned.
+    """
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    sensor: ContactSensor = env.scene[sensor_name]
+    assert sensor.data.found is not None
+
+    # Reference foot contacts from motion data (num_envs, 2)
+    ref_contact = command.foot_contacts > 0.5
+
+    # Actual foot contacts from sensor (num_envs, num_slots)
+    # Note: Assuming left-right order matches motion data
+    actual_contact = sensor.data.found.squeeze(-1) > 0
+
+    # Reward when contacts match
+    match = (ref_contact == actual_contact).float()
+    return match.sum(dim=-1)
+
+
+# ============================================================================
+# Terminations
+# ============================================================================
+
+
+def bad_root_pos(
+    env: ManagerBasedRlEnv, command_name: str, threshold: float
+) -> torch.Tensor:
+    """Terminate if robot root position deviates too much from reference."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = torch.norm(command.root_pos - command.robot_root_pos, dim=-1)
+    return error > threshold
+
+
+def bad_root_ori(
+    env: ManagerBasedRlEnv, command_name: str, threshold: float
+) -> torch.Tensor:
+    """Terminate if robot root orientation deviates too much from reference."""
+    command = cast(JoystickCommand, env.command_manager.get_term(command_name))
+    error = quat_error_magnitude(command.root_quat, command.robot_root_quat)
+    return error > threshold

@@ -6,6 +6,7 @@ from .microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
     MicroduckRlCfg,
 )
+from .microduck_joystick_env_cfg import make_microduck_joystick_env_cfg
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -48,3 +49,24 @@ else:
     print(f"Warning: Reference motion file not found at {_reference_motion_path}")
     print("Imitation learning task 'Mjlab-Velocity-Flat-MicroDuck-Imitation' not registered.")
     print("To enable, set MICRODUCK_REFERENCE_MOTION_PATH environment variable or place file at default location.")
+
+# Joystick motion tracking task
+# Uses frame-based reference motions (reference_motion.pkl)
+_joystick_motion_path = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),  # mjlab_microduck package dir
+    "data",
+    "reference_motion.pkl"
+)
+
+if os.path.exists(_joystick_motion_path):
+    register_mjlab_task(
+        task_id="Mjlab-Joystick-Flat-MicroDuck",
+        env_cfg=make_microduck_joystick_env_cfg(),
+        play_env_cfg=make_microduck_joystick_env_cfg(play=True),
+        rl_cfg=MicroduckRlCfg,  # Reuse the same RL config
+        runner_cls=VelocityOnPolicyRunner,
+    )
+    print(f"✓ Joystick task registered: Mjlab-Joystick-Flat-MicroDuck")
+else:
+    print(f"Warning: Joystick motion file not found at {_joystick_motion_path}")
+    print("Joystick task 'Mjlab-Joystick-Flat-MicroDuck' not registered.")
