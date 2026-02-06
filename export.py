@@ -15,6 +15,7 @@ from mjlab.rl import RslRlVecEnvWrapper
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.tracking.mdp import MotionCommandCfg
 from mjlab.utils.os import get_wandb_checkpoint_path
+from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
 from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
@@ -52,24 +53,46 @@ def run_export(task_id: str, cfg: ExportConfig):
     DUMMY_MODE = cfg.agent in {"zero", "random"}
     TRAINED_MODE = not DUMMY_MODE
 
-    # Check if this is a tracking task by checking for motion command.
-    is_tracking_task = (
+    # Check if this is a tracking task by checking for motion or imitation command.
+    is_motion_tracking = (
         env_cfg.commands is not None
         and "motion" in env_cfg.commands
         and isinstance(env_cfg.commands["motion"], MotionCommandCfg)
     )
+    is_imitation_tracking = (
+        env_cfg.commands is not None
+        and "imitation" in env_cfg.commands
+        and isinstance(env_cfg.commands["imitation"], ImitationCommandCfg)
+    )
+    is_tracking_task = is_motion_tracking or is_imitation_tracking
 
     if is_tracking_task and cfg._demo_mode:
         # Demo mode: use uniform sampling to see more diversity with num_envs > 1.
         assert env_cfg.commands is not None
-        motion_cmd = env_cfg.commands["motion"]
-        assert isinstance(motion_cmd, MotionCommandCfg)
-        motion_cmd.sampling_mode = "uniform"
+        if is_motion_tracking:
+            motion_cmd = env_cfg.commands["motion"]
+            assert isinstance(motion_cmd, MotionCommandCfg)
+            motion_cmd.sampling_mode = "uniform"
+        elif is_imitation_tracking:
+            imitation_cmd = env_cfg.commands["imitation"]
+            assert isinstance(imitation_cmd, ImitationCommandCfg)
+            imitation_cmd.sampling_mode = "uniform"
 
     if is_tracking_task:
         assert env_cfg.commands is not None
-        motion_cmd = env_cfg.commands["motion"]
-        assert isinstance(motion_cmd, MotionCommandCfg)
+        if is_motion_tracking:
+            motion_cmd = env_cfg.commands["motion"]
+            assert isinstance(motion_cmd, MotionCommandCfg)
+        elif is_imitation_tracking:
+            motion_cmd = env_cfg.commands["imitation"]
+            assert isinstance(motion_cmd, (MotionCommandCfg, ImitationCommandCfg))
+
+        # Check if motion file is already set and exists (e.g., for imitation tasks with local files)
+        motion_file_already_set = (
+            hasattr(motion_cmd, 'motion_file')
+            and motion_cmd.motion_file is not None
+            and Path(motion_cmd.motion_file).exists()
+        )
 
         if DUMMY_MODE:
             if not cfg.registry_name:
@@ -84,12 +107,20 @@ def run_export(task_id: str, cfg: ExportConfig):
 
             api = wandb.Api()
             artifact = api.artifact(registry_name)
-            motion_cmd.motion_file = str(Path(artifact.download()) / "motion.npz")
+            # MotionCommandCfg uses .npz, ImitationCommandCfg uses .pkl
+            if is_motion_tracking:
+                motion_cmd.motion_file = str(Path(artifact.download()) / "motion.npz")
+            else:
+                motion_cmd.motion_file = str(Path(artifact.download()) / "motion.pkl")
         else:
             if cfg.motion_file is not None:
                 print(f"[INFO]: Using motion file from CLI: {cfg.motion_file}")
                 motion_cmd.motion_file = cfg.motion_file
+            elif motion_file_already_set:
+                # Motion file already configured (e.g., local file in imitation task)
+                print(f"[INFO]: Using motion file from env config: {motion_cmd.motion_file}")
             else:
+                # Try to download from wandb artifacts
                 import wandb
 
                 api = wandb.Api()
@@ -106,7 +137,11 @@ def run_export(task_id: str, cfg: ExportConfig):
                     )
                     if art is None:
                         raise RuntimeError("No motion artifact found in the run.")
-                    motion_cmd.motion_file = str(Path(art.download()) / "motion.npz")
+                    # MotionCommandCfg uses .npz, ImitationCommandCfg uses .pkl
+                    if is_motion_tracking:
+                        motion_cmd.motion_file = str(Path(art.download()) / "motion.npz")
+                    else:
+                        motion_cmd.motion_file = str(Path(art.download()) / "motion.pkl")
 
     log_dir: Path | None = None
     resume_path: Path | None = None

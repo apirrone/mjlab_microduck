@@ -193,9 +193,11 @@ class PolicyInference:
         return self.data.qvel[6:6 + self.n_joints].copy().astype(np.float32)
 
     def get_imitation_phase_obs(self):
-        """Get imitation phase observation [cos(phase * 2π), sin(phase * 2π)]."""
-        angle = self.imitation_phase * 2 * np.pi
-        return np.array([np.cos(angle), np.sin(angle)], dtype=np.float32)
+        """Get imitation phase observation as raw phase value [0, 1).
+
+        This matches ImitationCommand.phase which returns raw phase [0, 1).
+        """
+        return np.array([self.imitation_phase], dtype=np.float32)
 
     def update_phase(self, dt):
         """Update the gait phase based on elapsed time."""
@@ -206,18 +208,35 @@ class PolicyInference:
     def get_observations(self):
         """Collect observations matching policy input.
 
-        Order (from velocity_env_cfg.py after deleting base_lin_vel):
+        Order for velocity task (no imitation):
         1. base_ang_vel (3D)
         2. projected_gravity (3D)
         3. joint_pos (14D) - relative to default
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
         6. command (3D) - velocity command
-        7. imitation_phase (2D) - [cos, sin] (only if use_imitation=True)
+        Total: 51D
 
-        Total: 51D (no imitation) or 53D (with imitation)
+        Order for imitation task (use_imitation=True):
+        1. command (3D) - velocity command
+        2. phase (1D) - raw phase [0, 1)
+        3. base_ang_vel (3D)
+        4. projected_gravity (3D)
+        5. joint_pos (14D) - relative to default
+        6. joint_vel (14D) - relative to default (zero)
+        7. actions (14D) - last action
+        Total: 52D
         """
         obs = []
+
+        if self.use_imitation:
+            # Imitation task: command and phase come first
+            # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
+            obs.append(self.command)
+
+            # Imitation phase (raw phase value) - 1D
+            phase_obs = self.get_imitation_phase_obs()
+            obs.append(phase_obs)
 
         # Base angular velocity from sensor (NO delay, NO noise) - 3D
         ang_vel = self.get_base_ang_vel()
@@ -238,13 +257,10 @@ class PolicyInference:
         # Last action - n_joints
         obs.append(self.last_action)
 
-        # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
-        obs.append(self.command)
-
-        # Imitation phase (only if enabled) - 2D
-        if self.use_imitation:
-            phase_obs = self.get_imitation_phase_obs()
-            obs.append(phase_obs)
+        if not self.use_imitation:
+            # Velocity task: command comes last
+            # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
+            obs.append(self.command)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
@@ -404,17 +420,19 @@ def main():
 
     # Verify observation size
     test_obs = policy.get_observations()
-    expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
     if policy.use_imitation:
-        expected_obs_size += 2  # Add phase observation
+        # Imitation task: command(3) + phase(1) + ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action
+        expected_obs_size = 3 + 1 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
+        breakdown = f"3(command) + 1(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
+    else:
+        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3)
+        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
+        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)"
 
     if test_obs.size != expected_obs_size:
         print(f"\nWARNING: Observation size mismatch!")
         print(f"  Expected: {expected_obs_size}")
         print(f"  Got: {test_obs.size}")
-        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)"
-        if policy.use_imitation:
-            breakdown += " + 2(imitation_phase)"
         print(f"  Breakdown: {breakdown}")
         print()
 
@@ -549,15 +567,25 @@ def main():
                     print(f"  CoM height (root link): {com_height:7.4f}")
                     print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
                     print(f"\nObservation (shape {obs.shape}, total {obs.size}):")
-                    print(f"  Ang vel [0:3]:        {obs[0:3]}")
-                    print(f"  Proj grav [3:6]:      {obs[3:6]}")
-                    print(f"  Joint pos [6:20]:     {obs[6:6+policy.n_joints]}")
-                    print(f"  Joint vel [20:34]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
-                    print(f"  Last action [34:48]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
-                    cmd_end = 6+3*policy.n_joints+3
-                    print(f"  Command [48:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
                     if policy.use_imitation:
-                        print(f"  Phase [cos,sin]:      {obs[cmd_end:]}")
+                        # Imitation order: command, phase, ang_vel, proj_grav, joint_pos, joint_vel, last_action
+                        print(f"  Command [0:3]:        {obs[0:3]}")
+                        print(f"  Phase [3:4]:          {obs[3:4]}")
+                        print(f"  Ang vel [4:7]:        {obs[4:7]}")
+                        print(f"  Proj grav [7:10]:     {obs[7:10]}")
+                        joint_start = 10
+                        print(f"  Joint pos [{joint_start}:{joint_start+policy.n_joints}]:     {obs[joint_start:joint_start+policy.n_joints]}")
+                        print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
+                        print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
+                    else:
+                        # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command
+                        print(f"  Ang vel [0:3]:        {obs[0:3]}")
+                        print(f"  Proj grav [3:6]:      {obs[3:6]}")
+                        print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
+                        print(f"  Joint vel [{6+policy.n_joints}:{6+2*policy.n_joints}]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
+                        print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
+                        cmd_end = 6+3*policy.n_joints+3
+                        print(f"  Command [{6+3*policy.n_joints}:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
                     print(f"\nAction output:")
                     print(f"  Raw action: {action}")
                     print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
