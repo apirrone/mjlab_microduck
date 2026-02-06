@@ -1,5 +1,5 @@
 """
-Joystick command manager for velocity-indexed motion tracking.
+Imitation command manager for velocity-indexed motion tracking.
 
 Adapted from beyondmimic implementation to work with mjlab_microduck.
 """
@@ -25,17 +25,17 @@ if TYPE_CHECKING:
     from mjlab.envs import ManagerBasedRlEnv
 
 
-class JoystickCommand(CommandTerm):
-    """Joystick command that selects reference motion based on velocity commands.
+class ImitationCommand(CommandTerm):
+    """Imitation command that selects reference motion based on velocity commands.
 
     This command maintains velocity targets (dx, dy, dtheta) for each environment
     and looks up the corresponding reference motion from a velocity-indexed library.
     """
 
-    cfg: JoystickCommandCfg
+    cfg: ImitationCommandCfg
     _env: ManagerBasedRlEnv
 
-    def __init__(self, cfg: JoystickCommandCfg, env: ManagerBasedRlEnv):
+    def __init__(self, cfg: ImitationCommandCfg, env: ManagerBasedRlEnv):
         super().__init__(cfg, env)
 
         self.robot: Entity = env.scene[cfg.entity_name]
@@ -360,10 +360,10 @@ class JoystickCommand(CommandTerm):
 
 
 @dataclass(kw_only=True)
-class JoystickCommandCfg(CommandTermCfg):
-    """Configuration for joystick velocity command.
+class ImitationCommandCfg(CommandTermCfg):
+    """Configuration for imitation velocity command.
 
-    The joystick command samples velocity targets (dx, dy, dtheta) and looks up
+    The imitation command samples velocity targets (dx, dy, dtheta) and looks up
     the corresponding reference motion from a velocity-indexed motion library.
     """
 
@@ -397,7 +397,7 @@ class JoystickCommandCfg(CommandTermCfg):
     viz: VizCfg = field(default_factory=VizCfg)
     """Visualization configuration for ghost rendering."""
 
-    class_type: type[CommandTerm] = JoystickCommand
+    class_type: type[CommandTerm] = ImitationCommand
 
     def __post_init__(self):
         """Set default velocity ranges if not provided."""
