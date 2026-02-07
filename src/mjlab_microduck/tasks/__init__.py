@@ -60,8 +60,11 @@ _imitation_motion_path = os.path.join(
 )
 
 if os.path.exists(_imitation_motion_path):
-    # Check if ghost visualization should be enabled (via --ghost flag)
-    _enable_ghost_vis = "--ghost" in sys.argv
+    # Check if ghost visualization should be enabled (via GHOST env var or --ghost in argv)
+    _enable_ghost_vis = (
+        os.environ.get("GHOST", "0") == "1" or
+        "--ghost" in sys.argv
+    )
 
     register_mjlab_task(
         task_id="Mjlab-Imitation-Flat-MicroDuck",
