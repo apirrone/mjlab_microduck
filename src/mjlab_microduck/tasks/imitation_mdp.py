@@ -435,3 +435,50 @@ def bad_root_ori(
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     error = quat_error_magnitude(command.root_quat, command.robot_root_quat)
     return error > threshold
+
+
+# ============================================================================
+# Curriculum
+# ============================================================================
+
+
+def termination_threshold_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    termination_name: str,
+    threshold_stages: list[dict],
+) -> torch.Tensor:
+    """Update termination threshold based on training progress.
+
+    Allows gradually relaxing termination criteria to encourage robustness.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        termination_name: Name of the termination term to update
+        threshold_stages: List of dicts with 'step' and 'threshold' keys
+            Example: [
+                {"step": 0, "threshold": 0.15},
+                {"step": 12000, "threshold": 0.3},
+                {"step": 24000, "threshold": 1.0},  # Effectively disabled
+            ]
+
+    Returns:
+        Current threshold value as a tensor
+    """
+    del env_ids  # Unused
+
+    term = env.termination_manager.get_term(termination_name)
+    if term is None:
+        return torch.tensor([0.0])
+
+    # Update threshold based on current step
+    current_threshold = term.cfg.params.get("threshold", 0.0)
+    for stage in threshold_stages:
+        if env.common_step_counter >= stage["step"]:
+            current_threshold = stage["threshold"]
+
+    # Update the termination config
+    term.cfg.params["threshold"] = current_threshold
+
+    return torch.tensor([current_threshold])

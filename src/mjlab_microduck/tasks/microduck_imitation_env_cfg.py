@@ -400,6 +400,32 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
+        "root_pos_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "termination_name": "root_pos_error",
+                "threshold_stages": [
+                    # Start strict, then relax to allow recovery from pushes
+                    {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
+                    {"step": 500 * 24, "threshold": 0.3},  # After 500 iters: 30cm
+                    {"step": 1000 * 24, "threshold": 0.5},  # After 1000 iters: 50cm
+                    {"step": 1500 * 24, "threshold": 1.0},  # After 1500 iters: 1m (very relaxed)
+                ],
+            },
+        ),
+        "root_ori_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "termination_name": "root_ori_error",
+                "threshold_stages": [
+                    # Start strict, then relax
+                    {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
+                    {"step": 500 * 24, "threshold": 1.2},  # After 500 iters: ~69 degrees
+                    {"step": 1000 * 24, "threshold": 1.6},  # After 1000 iters: ~92 degrees
+                    {"step": 1500 * 24, "threshold": 2.5},  # After 1500 iters: ~143 degrees (very relaxed)
+                ],
+            },
+        ),
     }
 
     # Extend episode length for play mode
