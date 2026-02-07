@@ -275,12 +275,17 @@ def imitation_velocity_cmd_tracking_exp(
 
 
 def imitation_foot_contact_match(
-    env: ManagerBasedRlEnv, command_name: str, sensor_name: str
+    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, force_threshold: float = 2.5
 ) -> torch.Tensor:
     """Reward for matching reference foot contacts.
 
     Returns 1.0 when actual foot contacts match reference, 0.0 otherwise.
     Each foot is evaluated separately and the mean is returned.
+
+    Args:
+        force_threshold: Minimum force (in Newtons) to consider as foot contact.
+            Should be high enough to distinguish between "foot firmly planted"
+            and "foot lightly dragging". Default 2.5 N (~35% of robot weight per foot).
     """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     sensor: ContactSensor = env.scene[sensor_name]
@@ -291,7 +296,8 @@ def imitation_foot_contact_match(
 
     # Actual foot contacts from sensor (num_envs, num_slots)
     # Note: Assuming left-right order matches motion data
-    actual_contact = sensor.data.found.squeeze(-1) > 0
+    # Use force threshold to detect meaningful ground contact (not just dragging)
+    actual_contact = sensor.data.found.squeeze(-1) > force_threshold
 
     # Reward when contacts match
     match = (ref_contact == actual_contact).float()
