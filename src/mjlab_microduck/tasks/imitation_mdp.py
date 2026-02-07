@@ -468,17 +468,19 @@ def termination_threshold_curriculum(
     """
     del env_ids  # Unused
 
-    term = env.termination_manager.get_term(termination_name)
-    if term is None:
+    # Access the termination term from the manager's internal dict
+    if termination_name not in env.termination_manager._terms:
         return torch.tensor([0.0])
 
+    term_cfg = env.termination_manager._terms[termination_name].cfg
+
     # Update threshold based on current step
-    current_threshold = term.cfg.params.get("threshold", 0.0)
+    current_threshold = term_cfg.params.get("threshold", 0.0)
     for stage in threshold_stages:
         if env.common_step_counter >= stage["step"]:
             current_threshold = stage["threshold"]
 
     # Update the termination config
-    term.cfg.params["threshold"] = current_threshold
+    term_cfg.params["threshold"] = current_threshold
 
     return torch.tensor([current_threshold])
