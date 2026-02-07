@@ -313,6 +313,34 @@ def double_support_penalty(
     return -excess_contacts
 
 
+def smooth_foot_forces(
+    env: ManagerBasedRlEnv, sensor_name: str
+) -> torch.Tensor:
+    """Penalty for rapid changes in foot contact forces.
+
+    Encourages smooth, gradual contact transitions instead of abrupt "tap tap" behavior.
+    Penalizes the L2 norm of force changes between timesteps.
+    """
+    sensor: ContactSensor = env.scene[sensor_name]
+    forces = sensor.data.found.squeeze(-1)  # (num_envs, 2)
+
+    # Initialize storage for previous forces if needed
+    if not hasattr(env, '_prev_foot_forces'):
+        env._prev_foot_forces = forces.clone()
+        return torch.zeros(env.num_envs, device=env.device)
+
+    # Compute force rate of change
+    force_rate = forces - env._prev_foot_forces  # (num_envs, 2)
+
+    # Store current forces for next step
+    env._prev_foot_forces = forces.clone()
+
+    # Penalize large force changes (L2 norm across both feet)
+    penalty = torch.sum(torch.square(force_rate), dim=-1)  # (num_envs,)
+
+    return -penalty
+
+
 def imitation_velocity_cmd_tracking_exp(
     env: ManagerBasedRlEnv, command_name: str, std: float
 ) -> torch.Tensor:

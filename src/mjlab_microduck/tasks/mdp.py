@@ -114,6 +114,12 @@ def reset_action_history(
             contacts = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2]
             env._prev_contacts_for_freq[env_ids] = contacts
 
+    # Reset foot force smoothness tracking
+    if hasattr(env, '_prev_foot_forces'):
+        if "feet_ground_contact" in env.scene.sensors:
+            forces = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2].squeeze(-1)
+            env._prev_foot_forces[env_ids] = forces
+
     # Reset imitation phase tracking
     if imitation_state is not None and imitation_state.phase is not None:
         imitation_state.reset_phases(env_ids)

@@ -1,4 +1,5 @@
 import os
+import sys
 from mjlab.tasks.registry import register_mjlab_task
 from mjlab.tasks.velocity.rl import VelocityOnPolicyRunner
 
@@ -59,14 +60,18 @@ _imitation_motion_path = os.path.join(
 )
 
 if os.path.exists(_imitation_motion_path):
+    # Check if ghost visualization should be enabled (via --ghost flag)
+    _enable_ghost_vis = "--ghost" in sys.argv
+
     register_mjlab_task(
         task_id="Mjlab-Imitation-Flat-MicroDuck",
-        env_cfg=make_microduck_imitation_env_cfg(),
-        play_env_cfg=make_microduck_imitation_env_cfg(play=True),
+        env_cfg=make_microduck_imitation_env_cfg(ghost_vis=False),  # Never show ghost during training
+        play_env_cfg=make_microduck_imitation_env_cfg(play=True, ghost_vis=_enable_ghost_vis),
         rl_cfg=MicroduckRlCfg,  # Reuse the same RL config
         runner_cls=VelocityOnPolicyRunner,
     )
-    print(f"✓ Imitation task registered: Mjlab-Imitation-Flat-MicroDuck")
+    ghost_status = "enabled" if _enable_ghost_vis else "disabled"
+    print(f"✓ Imitation task registered: Mjlab-Imitation-Flat-MicroDuck (ghost vis: {ghost_status})")
 else:
     print(f"Warning: Imitation motion file not found at {_imitation_motion_path}")
     print("Imitation task 'Mjlab-Imitation-Flat-MicroDuck' not registered.")

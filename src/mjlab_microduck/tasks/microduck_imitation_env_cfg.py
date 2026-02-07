@@ -16,7 +16,7 @@ from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab_microduck.tasks.microduck_velocity_env_cfg import make_microduck_velocity_env_cfg
 
 
-def make_microduck_imitation_env_cfg(play: bool = False):
+def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
     """Create Microduck imitation (motion tracking) environment configuration.
 
     Starts from the base velocity config and replaces commands, observations, and rewards
@@ -24,6 +24,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
 
     Args:
         play: If True, disables observation corruption and extends episode length for visualization.
+        ghost_vis: If True, enables ghost visualization of reference motion. Default False.
 
     Returns:
         Environment configuration for imitation motion tracking task.
@@ -44,7 +45,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
             entity_name="robot",
             motion_file=motion_file,
             resampling_time_range=(1.0e9, 1.0e9),  # Never resample (motion handles resets)
-            debug_vis=True,  # Enable ghost visualization
+            debug_vis=ghost_vis,  # Enable ghost visualization only if requested
             velocity_cmd_range={
                 "x": (-0.1, 0.15),
                 "y": (-0.15, 0.15),
@@ -169,7 +170,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=10.0,  # Increased from 1.0 - contact matching is critical
+            weight=8.0,  # Reduced from 10.0 - still important but less dominant
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -179,7 +180,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "foot_clearance": RewardTermCfg(
             func=imitation_mdp.foot_clearance_reward,
-            weight=5.0,  # Reward for lifting feet during swing phase
+            weight=2.0,  # Reduced from 5.0 - prevent excessive lifting
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -188,7 +189,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "no_double_support": RewardTermCfg(
             func=imitation_mdp.double_support_penalty,
-            weight=5.0,  # Penalize having both feet down when one should swing
+            weight=2.0,  # Reduced from 5.0 - allow more natural transitions
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -215,7 +216,12 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "soft_landing": RewardTermCfg(
             func=velocity_mdp.soft_landing,
-            weight=-1e-5,
+            weight=-0.01,  # Increased from -1e-5 to discourage aggressive landings
+            params={"sensor_name": "feet_ground_contact"},
+        ),
+        "smooth_contacts": RewardTermCfg(
+            func=imitation_mdp.smooth_foot_forces,
+            weight=-0.001,  # Penalize rapid force changes (prevents "tap tap")
             params={"sensor_name": "feet_ground_contact"},
         ),
     }
