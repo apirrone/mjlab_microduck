@@ -254,11 +254,19 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
 
     cfg.terminations["root_pos_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_pos,
-        params={"command_name": "imitation", "threshold": 0.15},
+        params={
+            "command_name": "imitation",
+            "threshold": 0.15,
+            "curriculum_threshold_name": "root_pos_threshold",
+        },
     )
     cfg.terminations["root_ori_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_ori,
-        params={"command_name": "imitation", "threshold": 0.8},
+        params={
+            "command_name": "imitation",
+            "threshold": 0.8,
+            "curriculum_threshold_name": "root_ori_threshold",
+        },
     )
     # Keep the fell_over termination from base config
 
@@ -403,7 +411,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         "root_pos_termination": CurriculumTermCfg(
             func=imitation_mdp.termination_threshold_curriculum,
             params={
-                "termination_name": "root_pos_error",
+                "threshold_param_name": "root_pos_threshold",
                 "threshold_stages": [
                     # Start strict, then relax to allow recovery from pushes
                     {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
@@ -416,7 +424,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         "root_ori_termination": CurriculumTermCfg(
             func=imitation_mdp.termination_threshold_curriculum,
             params={
-                "termination_name": "root_ori_error",
+                "threshold_param_name": "root_ori_threshold",
                 "threshold_stages": [
                     # Start strict, then relax
                     {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees

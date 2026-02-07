@@ -420,20 +420,38 @@ def imitation_foot_contact_match(
 
 
 def bad_root_pos(
-    env: ManagerBasedRlEnv, command_name: str, threshold: float
+    env: ManagerBasedRlEnv, command_name: str, threshold: float, curriculum_threshold_name: str | None = None
 ) -> torch.Tensor:
-    """Terminate if robot root position deviates too much from reference."""
+    """Terminate if robot root position deviates too much from reference.
+
+    Args:
+        curriculum_threshold_name: If provided, read threshold from curriculum instead of parameter
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     error = torch.norm(command.root_pos - command.robot_root_pos, dim=-1)
+
+    # Use curriculum threshold if available
+    if curriculum_threshold_name and hasattr(env, '_curriculum_thresholds'):
+        threshold = env._curriculum_thresholds.get(curriculum_threshold_name, threshold)
+
     return error > threshold
 
 
 def bad_root_ori(
-    env: ManagerBasedRlEnv, command_name: str, threshold: float
+    env: ManagerBasedRlEnv, command_name: str, threshold: float, curriculum_threshold_name: str | None = None
 ) -> torch.Tensor:
-    """Terminate if robot root orientation deviates too much from reference."""
+    """Terminate if robot root orientation deviates too much from reference.
+
+    Args:
+        curriculum_threshold_name: If provided, read threshold from curriculum instead of parameter
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     error = quat_error_magnitude(command.root_quat, command.robot_root_quat)
+
+    # Use curriculum threshold if available
+    if curriculum_threshold_name and hasattr(env, '_curriculum_thresholds'):
+        threshold = env._curriculum_thresholds.get(curriculum_threshold_name, threshold)
+
     return error > threshold
 
 
@@ -445,17 +463,17 @@ def bad_root_ori(
 def termination_threshold_curriculum(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
-    termination_name: str,
+    threshold_param_name: str,
     threshold_stages: list[dict],
 ) -> torch.Tensor:
     """Update termination threshold based on training progress.
 
-    Allows gradually relaxing termination criteria to encourage robustness.
+    Stores the threshold in the environment object for termination functions to read.
 
     Args:
         env: The RL environment
         env_ids: Environment IDs (unused, but required by curriculum interface)
-        termination_name: Name of the termination term to update
+        threshold_param_name: Name to store threshold under (e.g., "root_pos_threshold")
         threshold_stages: List of dicts with 'step' and 'threshold' keys
             Example: [
                 {"step": 0, "threshold": 0.15},
@@ -468,19 +486,17 @@ def termination_threshold_curriculum(
     """
     del env_ids  # Unused
 
-    # Access the termination term from the manager's internal dict
-    if termination_name not in env.termination_manager._terms:
-        return torch.tensor([0.0])
+    # Initialize threshold storage if needed
+    if not hasattr(env, '_curriculum_thresholds'):
+        env._curriculum_thresholds = {}
 
-    term_cfg = env.termination_manager._terms[termination_name].cfg
-
-    # Update threshold based on current step
-    current_threshold = term_cfg.params.get("threshold", 0.0)
+    # Find current threshold based on training progress
+    current_threshold = threshold_stages[0]["threshold"]  # Default to first stage
     for stage in threshold_stages:
         if env.common_step_counter >= stage["step"]:
             current_threshold = stage["threshold"]
 
-    # Update the termination config
-    term_cfg.params["threshold"] = current_threshold
+    # Store threshold in environment
+    env._curriculum_thresholds[threshold_param_name] = current_threshold
 
     return torch.tensor([current_threshold])
