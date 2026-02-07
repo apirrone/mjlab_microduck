@@ -1,8 +1,11 @@
 """Microduck imitation (motion tracking) environment configuration."""
 
+from copy import deepcopy
 from pathlib import Path
 
 from mjlab.managers.manager_term_config import (
+    CurriculumTermCfg,
+    EventTermCfg,
     ObservationGroupCfg,
     ObservationTermCfg,
     RewardTermCfg,
@@ -10,10 +13,29 @@ from mjlab.managers.manager_term_config import (
 )
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.tasks.velocity import mdp as velocity_mdp
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
-from mjlab_microduck.tasks import imitation_mdp
+from mjlab_microduck.tasks import imitation_mdp, mdp as microduck_mdp
 from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
-from mjlab_microduck.tasks.microduck_velocity_env_cfg import make_microduck_velocity_env_cfg
+from mjlab_microduck.tasks.microduck_velocity_env_cfg import (
+    make_microduck_velocity_env_cfg,
+    # Import domain randomization settings
+    ENABLE_COM_RANDOMIZATION,
+    ENABLE_KP_RANDOMIZATION,
+    ENABLE_KD_RANDOMIZATION,
+    ENABLE_MASS_INERTIA_RANDOMIZATION,
+    ENABLE_JOINT_FRICTION_RANDOMIZATION,
+    ENABLE_JOINT_DAMPING_RANDOMIZATION,
+    ENABLE_EXTERNAL_FORCE_DISTURBANCES,
+    COM_RANDOMIZATION_RANGE,
+    MASS_INERTIA_RANDOMIZATION_RANGE,
+    KP_RANDOMIZATION_RANGE,
+    KD_RANDOMIZATION_RANGE,
+    JOINT_FRICTION_RANDOMIZATION_RANGE,
+    JOINT_DAMPING_RANDOMIZATION_RANGE,
+    EXTERNAL_FORCE_INTERVAL_S,
+    EXTERNAL_FORCE_MAGNITUDE,
+)
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -241,10 +263,144 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     # Keep the fell_over termination from base config
 
     ##
-    # Curriculum - Disable velocity curriculum (doesn't apply to motion tracking)
+    # Observation Noise (disable in play mode)
     ##
 
-    cfg.curriculum = {}
+    if not play:
+        cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
+            cfg.observations["policy"].terms["base_ang_vel"]
+        )
+        cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
+            cfg.observations["policy"].terms["projected_gravity"]
+        )
+        cfg.observations["policy"].terms["joint_pos"] = deepcopy(
+            cfg.observations["policy"].terms["joint_pos"]
+        )
+        cfg.observations["policy"].terms["joint_vel"] = deepcopy(
+            cfg.observations["policy"].terms["joint_vel"]
+        )
+
+        # Add noise and delay to observations
+        cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 0
+        cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3
+        cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
+        cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4)
+
+        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
+        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
+        cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+        cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.15, n_max=0.15)
+
+        cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)
+        cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)
+
+    ##
+    # Domain Randomization Events
+    ##
+
+    # External force disturbances during episode
+    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
+        cfg.events["push_robot"] = EventTermCfg(
+            func=velocity_mdp.apply_external_force_torque,
+            mode="interval",
+            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            params={
+                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
+                "torque_range": (0.0, 0.0),
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            },
+        )
+
+    # CoM randomization
+    if ENABLE_COM_RANDOMIZATION:
+        cfg.events["randomize_com"] = EventTermCfg(
+            func=velocity_mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "operation": "add",
+                "field": "body_ipos",
+                "ranges": (-COM_RANDOMIZATION_RANGE, COM_RANDOMIZATION_RANGE),
+            },
+        )
+
+    # PD gains randomization
+    if ENABLE_KP_RANDOMIZATION or ENABLE_KD_RANDOMIZATION:
+        kp_range = KP_RANDOMIZATION_RANGE if ENABLE_KP_RANDOMIZATION else (1.0, 1.0)
+        kd_range = KD_RANDOMIZATION_RANGE if ENABLE_KD_RANDOMIZATION else (1.0, 1.0)
+        cfg.events["randomize_motor_gains"] = EventTermCfg(
+            func=microduck_mdp.randomize_delayed_actuator_gains,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "operation": "scale",
+                "kp_range": kp_range,
+                "kd_range": kd_range,
+            },
+        )
+
+    # Mass and inertia randomization
+    if ENABLE_MASS_INERTIA_RANDOMIZATION:
+        cfg.events["randomize_mass_inertia"] = EventTermCfg(
+            func=microduck_mdp.randomize_mass_and_inertia,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "scale_range": MASS_INERTIA_RANDOMIZATION_RANGE,
+            },
+        )
+
+    # Joint friction randomization (disabled by default)
+    if ENABLE_JOINT_FRICTION_RANDOMIZATION:
+        cfg.events["randomize_joint_friction"] = EventTermCfg(
+            func=velocity_mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
+                "operation": "scale",
+                "field": "dof_frictionloss",
+                "ranges": JOINT_FRICTION_RANDOMIZATION_RANGE,
+            },
+        )
+
+    # Joint damping randomization (disabled by default)
+    if ENABLE_JOINT_DAMPING_RANDOMIZATION:
+        cfg.events["randomize_joint_damping"] = EventTermCfg(
+            func=velocity_mdp.randomize_field,
+            mode="reset",
+            domain_randomization=True,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
+                "operation": "scale",
+                "field": "dof_damping",
+                "ranges": JOINT_DAMPING_RANDOMIZATION_RANGE,
+            },
+        )
+
+    ##
+    # Curriculum - Action rate curriculum for smoother movements
+    ##
+
+    cfg.curriculum = {
+        "action_rate_weight": CurriculumTermCfg(
+            func=velocity_mdp.reward_weight,
+            params={
+                "reward_name": "action_rate_l2",
+                "weight_stages": [
+                    # Gradually increase action smoothness penalty
+                    # 250 iterations × 24 steps/iter = 6000 steps
+                    {"step": 0, "weight": -0.1},
+                    {"step": 250 * 24, "weight": -0.2},
+                    {"step": 500 * 24, "weight": -0.3},
+                    {"step": 750 * 24, "weight": -0.4},
+                    {"step": 1000 * 24, "weight": -0.5},
+                    {"step": 1250 * 24, "weight": -0.6},
+                ],
+            },
+        ),
+    }
 
     # Extend episode length for play mode
     if play:
