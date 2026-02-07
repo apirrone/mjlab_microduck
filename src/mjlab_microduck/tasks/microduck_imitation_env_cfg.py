@@ -169,7 +169,7 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=20.0,
+            weight=1.0,
             params={"command_name": "imitation", "sensor_name": "feet_ground_contact"},
         ),
         # Regularization rewards (keep from base config)
