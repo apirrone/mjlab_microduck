@@ -169,11 +169,12 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=20.0,
+            weight=1.0,
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
                 "force_threshold": 2.5,  # Minimum force (N) to count as contact (~35% of 6.86N total weight)
+                "debug_print": play,  # Enable debug printing in play mode
             },
         ),
         # Regularization rewards (keep from base config)
@@ -207,11 +208,11 @@ def make_microduck_imitation_env_cfg(play: bool = False):
 
     cfg.terminations["root_pos_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_pos,
-        params={"command_name": "imitation", "threshold": 0.15},
+        params={"command_name": "imitation", "threshold": 0.5}, # was 0.15
     )
     cfg.terminations["root_ori_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_ori,
-        params={"command_name": "imitation", "threshold": 0.8},
+        params={"command_name": "imitation", "threshold": 1.5}, # was 0.8
     )
     # Keep the fell_over termination from base config
 

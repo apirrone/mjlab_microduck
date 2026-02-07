@@ -275,7 +275,7 @@ def imitation_velocity_cmd_tracking_exp(
 
 
 def imitation_foot_contact_match(
-    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, force_threshold: float = 2.5
+    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, force_threshold: float = 2.5, debug_print: bool = False
 ) -> torch.Tensor:
     """Reward for matching reference foot contacts.
 
@@ -286,6 +286,7 @@ def imitation_foot_contact_match(
         force_threshold: Minimum force (in Newtons) to consider as foot contact.
             Should be high enough to distinguish between "foot firmly planted"
             and "foot lightly dragging". Default 2.5 N (~35% of robot weight per foot).
+        debug_print: If True, print contact info for env 0 every 10 steps.
     """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     sensor: ContactSensor = env.scene[sensor_name]
@@ -297,7 +298,27 @@ def imitation_foot_contact_match(
     # Actual foot contacts from sensor (num_envs, num_slots)
     # Note: Assuming left-right order matches motion data
     # Use force threshold to detect meaningful ground contact (not just dragging)
-    actual_contact = sensor.data.found.squeeze(-1) > force_threshold
+    forces = sensor.data.found.squeeze(-1)
+    actual_contact = forces > force_threshold
+
+    # Debug printing (only env 0, every 10 steps)
+    if debug_print and hasattr(env, '_contact_debug_counter'):
+        env._contact_debug_counter += 1
+        if env._contact_debug_counter >= 10:
+            env._contact_debug_counter = 0
+            left_force = forces[0, 0].item()
+            right_force = forces[0, 1].item()
+            left_ref = "ON" if ref_contact[0, 0].item() else "OFF"
+            right_ref = "ON" if ref_contact[0, 1].item() else "OFF"
+            left_actual = "ON" if actual_contact[0, 0].item() else "OFF"
+            right_actual = "ON" if actual_contact[0, 1].item() else "OFF"
+            left_match = "✓" if ref_contact[0, 0] == actual_contact[0, 0] else "✗"
+            right_match = "✓" if ref_contact[0, 1] == actual_contact[0, 1] else "✗"
+
+            print(f"[Contacts] L: {left_force:5.2f}N ({left_actual}) ref={left_ref} {left_match}  |  "
+                  f"R: {right_force:5.2f}N ({right_actual}) ref={right_ref} {right_match}")
+    elif debug_print and not hasattr(env, '_contact_debug_counter'):
+        env._contact_debug_counter = 0
 
     # Reward when contacts match
     match = (ref_contact == actual_contact).float()
