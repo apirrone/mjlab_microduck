@@ -252,6 +252,67 @@ def imitation_angular_velocity_error_exp(
     return torch.exp(-error / std**2)
 
 
+def foot_clearance_reward(
+    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, target_height: float = 0.02
+) -> torch.Tensor:
+    """Reward for lifting feet during swing phase.
+
+    When reference says foot should be OFF ground, reward if foot is high enough.
+    This encourages proper foot lifting rather than dragging.
+
+    Args:
+        target_height: Minimum height (meters) for foot clearance during swing.
+    """
+    command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+    sensor: ContactSensor = env.scene[sensor_name]
+
+    # Reference foot contacts - which feet should be in swing phase
+    ref_contact = command.foot_contacts > 0.5
+    ref_swing = ~ref_contact  # Feet that should be lifted (num_envs, 2)
+
+    # Contact forces - higher force means foot is on ground
+    forces = sensor.data.found.squeeze(-1)  # (num_envs, 2)
+
+    # During swing phase, reward for LOW contact force (foot lifted)
+    # Use exponential reward: exp(-force) is high when force is low
+    swing_clearance = torch.exp(-forces / 1.0)  # ~1.0 when foot lifted, ~0 when planted
+
+    # Only apply reward during intended swing phase
+    reward = (swing_clearance * ref_swing.float()).sum(dim=-1)
+
+    return reward
+
+
+def double_support_penalty(
+    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, force_threshold: float = 2.5
+) -> torch.Tensor:
+    """Penalty for having both feet on ground when one should be swinging.
+
+    Double support should only happen briefly during transitions.
+    This discourages dragging both feet simultaneously.
+    """
+    command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+    sensor: ContactSensor = env.scene[sensor_name]
+
+    # Check which feet are actually in contact
+    forces = sensor.data.found.squeeze(-1)
+    actual_contact = forces > force_threshold  # (num_envs, 2)
+
+    # Reference contacts - how many feet should be on ground
+    ref_contact = command.foot_contacts > 0.5
+    ref_contact_count = ref_contact.float().sum(dim=-1)  # (num_envs,)
+
+    # Actual contacts count
+    actual_contact_count = actual_contact.float().sum(dim=-1)  # (num_envs,)
+
+    # Penalize when more feet are down than reference wants
+    # e.g., ref wants 1 foot, but robot has 2 feet down
+    excess_contacts = torch.clamp(actual_contact_count - ref_contact_count, min=0.0)
+
+    # Return negative penalty
+    return -excess_contacts
+
+
 def imitation_velocity_cmd_tracking_exp(
     env: ManagerBasedRlEnv, command_name: str, std: float
 ) -> torch.Tensor:

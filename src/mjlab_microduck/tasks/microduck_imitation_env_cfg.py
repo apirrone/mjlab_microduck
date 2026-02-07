@@ -169,12 +169,30 @@ def make_microduck_imitation_env_cfg(play: bool = False):
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=1.0,
+            weight=10.0,  # Increased from 1.0 - contact matching is critical
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
                 "force_threshold": 2.5,  # Minimum force (N) to count as contact (~35% of 6.86N total weight)
                 "debug_print": play,  # Enable debug printing in play mode
+            },
+        ),
+        "foot_clearance": RewardTermCfg(
+            func=imitation_mdp.foot_clearance_reward,
+            weight=5.0,  # Reward for lifting feet during swing phase
+            params={
+                "command_name": "imitation",
+                "sensor_name": "feet_ground_contact",
+                "target_height": 0.02,  # 2cm clearance
+            },
+        ),
+        "no_double_support": RewardTermCfg(
+            func=imitation_mdp.double_support_penalty,
+            weight=5.0,  # Penalize having both feet down when one should swing
+            params={
+                "command_name": "imitation",
+                "sensor_name": "feet_ground_contact",
+                "force_threshold": 2.5,
             },
         ),
         # Regularization rewards (keep from base config)
@@ -208,11 +226,11 @@ def make_microduck_imitation_env_cfg(play: bool = False):
 
     cfg.terminations["root_pos_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_pos,
-        params={"command_name": "imitation", "threshold": 0.5}, # was 0.15
+        params={"command_name": "imitation", "threshold": 0.15},
     )
     cfg.terminations["root_ori_error"] = TerminationTermCfg(
         func=imitation_mdp.bad_root_ori,
-        params={"command_name": "imitation", "threshold": 1.5}, # was 0.8
+        params={"command_name": "imitation", "threshold": 0.8},
     )
     # Keep the fell_over termination from base config
 
