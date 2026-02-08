@@ -419,9 +419,9 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "threshold_stages": [
                     # Start strict, then relax to allow recovery from pushes
                     {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
-                    {"step": 500 * 24, "threshold": 0.3},  # After 500 iters: 30cm
-                    {"step": 1000 * 24, "threshold": 0.5},  # After 1000 iters: 50cm
-                    {"step": 1500 * 24, "threshold": 1.0},  # After 1500 iters: 1m (very relaxed)
+                    {"step": 1000 * 24, "threshold": 0.3},  # After 1000 iters: 30cm
+                    {"step": 2000 * 24, "threshold": 0.5},  # After 2000 iters: 50cm
+                    {"step": 3000 * 24, "threshold": 1.0},  # After 3000 iters: 1m (very relaxed)
                 ],
             },
         ),
@@ -432,9 +432,9 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "threshold_stages": [
                     # Start strict, then relax
                     {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
-                    {"step": 500 * 24, "threshold": 1.2},  # After 500 iters: ~69 degrees
-                    {"step": 1000 * 24, "threshold": 1.6},  # After 1000 iters: ~92 degrees
-                    {"step": 1500 * 24, "threshold": 2.5},  # After 1500 iters: ~143 degrees (very relaxed)
+                    {"step": 1000 * 24, "threshold": 1.2},  # After 1000 iters: ~69 degrees
+                    {"step": 2000 * 24, "threshold": 1.6},  # After 2000 iters: ~92 degrees
+                    {"step": 3000 * 24, "threshold": 2.5},  # After 3000 iters: ~143 degrees (very relaxed)
                 ],
             },
         ),
