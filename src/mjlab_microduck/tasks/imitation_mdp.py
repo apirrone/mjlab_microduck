@@ -500,3 +500,50 @@ def termination_threshold_curriculum(
     env._curriculum_thresholds[threshold_param_name] = current_threshold
 
     return torch.tensor([current_threshold])
+
+
+def external_force_magnitude_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    magnitude_stages: list[dict],
+) -> torch.Tensor:
+    """Update external force magnitude based on training progress.
+
+    Updates the force_range parameter of an external force event.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        event_name: Name of the event to update (e.g., "push_robot")
+        magnitude_stages: List of dicts with 'step' and 'magnitude' keys
+            Example: [
+                {"step": 0, "magnitude": (0.0, 0.0)},  # Disabled
+                {"step": 36000, "magnitude": (0.1, 0.5)},  # Enabled
+            ]
+
+    Returns:
+        Current magnitude max value as a tensor
+    """
+    del env_ids  # Unused
+
+    # Get the event term configuration
+    if event_name not in env.event_manager._terms:
+        return torch.tensor([0.0])
+
+    event_term = env.event_manager._terms[event_name]
+
+    # Find current magnitude based on training progress
+    current_magnitude = magnitude_stages[0]["magnitude"]  # Default to first stage
+    for stage in magnitude_stages:
+        if env.common_step_counter >= stage["step"]:
+            current_magnitude = stage["magnitude"]
+
+    # Update the force_range parameter in the event term's function kwargs
+    if "force_range" in event_term.func_kwargs:
+        event_term.func_kwargs["force_range"] = (
+            -current_magnitude[1],
+            current_magnitude[1],
+        )
+
+    return torch.tensor([current_magnitude[1]])

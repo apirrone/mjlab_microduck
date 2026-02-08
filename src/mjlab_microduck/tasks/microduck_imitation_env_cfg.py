@@ -412,6 +412,18 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
+        "external_force_magnitude": CurriculumTermCfg(
+            func=imitation_mdp.external_force_magnitude_curriculum,
+            params={
+                "event_name": "push_robot",
+                "magnitude_stages": [
+                    # Disable pushes for first 1500 iterations
+                    {"step": 0, "magnitude": (0.0, 0.0)},
+                    # Enable pushes with current values after 1500×24 steps
+                    {"step": 1500 * 24, "magnitude": EXTERNAL_FORCE_MAGNITUDE},
+                ],
+            },
+        ),
         "root_pos_termination": CurriculumTermCfg(
             func=imitation_mdp.termination_threshold_curriculum,
             params={
