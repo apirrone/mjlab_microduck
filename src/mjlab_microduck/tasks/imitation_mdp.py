@@ -527,11 +527,12 @@ def external_force_magnitude_curriculum(
     """
     del env_ids  # Unused
 
-    # Get the event term configuration
-    if event_name not in env.event_manager._terms:
+    # Try to get the event term configuration
+    try:
+        event_term_cfg = env.event_manager.get_term_cfg(event_name)
+    except ValueError:
+        # Event not found, return 0.0
         return torch.tensor([0.0])
-
-    event_term = env.event_manager._terms[event_name]
 
     # Find current magnitude based on training progress
     current_magnitude = magnitude_stages[0]["magnitude"]  # Default to first stage
@@ -539,9 +540,9 @@ def external_force_magnitude_curriculum(
         if env.common_step_counter >= stage["step"]:
             current_magnitude = stage["magnitude"]
 
-    # Update the force_range parameter in the event term's function kwargs
-    if "force_range" in event_term.func_kwargs:
-        event_term.func_kwargs["force_range"] = (
+    # Update the force_range parameter in the event term's params
+    if "force_range" in event_term_cfg.params:
+        event_term_cfg.params["force_range"] = (
             -current_magnitude[1],
             current_magnitude[1],
         )
