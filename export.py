@@ -232,12 +232,40 @@ def run_export(task_id: str, cfg: ExportConfig):
         path=path,
         filename=onnx_path,
     )
+
     attach_onnx_metadata(
         runner.env.unwrapped,
         cfg.checkpoint_file,  # type: ignore
         path=path,
         filename=onnx_path,
     )
+
+    # Add extra metadata for imitation tasks
+    if is_imitation_tracking:
+        # Extract period from reference motion file and add to ONNX metadata
+        try:
+            import pickle
+            import onnx
+
+            motion_file = motion_cmd.motion_file
+            if motion_file and Path(motion_file).exists():
+                with open(motion_file, 'rb') as f:
+                    ref_data = pickle.load(f)
+                # Get period from first motion (they should all have similar periods)
+                first_key = list(ref_data.keys())[0]
+                gait_period = ref_data[first_key]['period']
+
+                # Load ONNX model and add custom metadata
+                model = onnx.load(onnx_path)
+                meta = model.metadata_props.add()
+                meta.key = 'gait_period'
+                meta.value = str(gait_period)
+                onnx.save(model, onnx_path)
+
+                print(f"[INFO] Added gait period to ONNX metadata: {gait_period:.4f}s")
+        except Exception as e:
+            print(f"[WARN] Could not add gait period to ONNX metadata: {e}")
+
     print(f"Written {onnx_path}")
 
     env.close()

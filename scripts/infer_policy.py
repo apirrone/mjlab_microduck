@@ -58,6 +58,18 @@ class PolicyInference:
         print(f"Walking policy input: {self.input_name}, shape: {input_shape}")
         print(f"Walking policy output: {self.output_name}, shape: {output_shape}")
 
+        # Try to read gait period from ONNX metadata
+        try:
+            model_metadata = self.walking_session.get_modelmeta()
+            if hasattr(model_metadata, 'custom_metadata_map') and 'gait_period' in model_metadata.custom_metadata_map:
+                self.default_gait_period_from_onnx = float(model_metadata.custom_metadata_map['gait_period'])
+                print(f"Found gait period in ONNX metadata: {self.default_gait_period_from_onnx:.4f}s")
+            else:
+                self.default_gait_period_from_onnx = None
+        except Exception as e:
+            print(f"Could not read gait period from ONNX metadata: {e}")
+            self.default_gait_period_from_onnx = None
+
         # Load standing policy if provided
         self.standing_session = None
         if standing_onnx_path:
@@ -98,11 +110,13 @@ class PolicyInference:
 
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
-        self.gait_period = 0.72  # Default period in seconds
+        self.gait_period = 0.5  # Fallback default
+
         if self.use_imitation:
             print(f"\nImitation mode enabled")
+
+            # Priority 1: Load from reference motion file if provided
             if reference_motion_path:
-                # Load reference motion to get the actual period
                 import pickle
                 try:
                     with open(reference_motion_path, 'rb') as f:
@@ -110,13 +124,21 @@ class PolicyInference:
                     # Get period from any motion (they should all have similar periods)
                     first_key = list(ref_data.keys())[0]
                     self.gait_period = ref_data[first_key]['period']
-                    print(f"  Loaded reference motion from: {reference_motion_path}")
-                    print(f"  Using gait period: {self.gait_period:.3f}s")
+                    print(f"  Loaded gait period from reference motion file: {self.gait_period:.4f}s")
+                    print(f"  Reference motion: {reference_motion_path}")
                 except Exception as e:
                     print(f"  Warning: Could not load reference motion: {e}")
-                    print(f"  Using default period: {self.gait_period:.3f}s")
-            else:
-                print(f"  Using default gait period: {self.gait_period:.3f}s")
+                    # Fall through to ONNX metadata
+
+            # Priority 2: Use ONNX metadata if available and no reference motion
+            if not reference_motion_path and self.default_gait_period_from_onnx is not None:
+                self.gait_period = self.default_gait_period_from_onnx
+                print(f"  Using gait period from ONNX metadata: {self.gait_period:.4f}s")
+
+            # Priority 3: Fallback to default
+            if reference_motion_path is None and self.default_gait_period_from_onnx is None:
+                print(f"  Warning: No gait period found in ONNX or reference motion")
+                print(f"  Using fallback default period: {self.gait_period:.4f}s")
 
         # Action delay buffer (matches mjlab's DelayedActuatorCfg)
         self.use_delay = self.delay_max_lag > 0

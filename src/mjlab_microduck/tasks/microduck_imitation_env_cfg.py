@@ -192,7 +192,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=8.0,  # Reduced from 10.0 - still important but less dominant
+            weight=4.0,  # Was 8.0
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -202,7 +202,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "foot_clearance": RewardTermCfg(
             func=imitation_mdp.foot_clearance_reward,
-            weight=2.0,  # Reduced from 5.0 - prevent excessive lifting
+            weight=1.0,  # Was 2.0
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -211,7 +211,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "no_double_support": RewardTermCfg(
             func=imitation_mdp.double_support_penalty,
-            weight=2.0,  # Reduced from 5.0 - allow more natural transitions
+            weight=1.0,  # Was 2.0
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -405,6 +405,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                     {"step": 750 * 24, "weight": -0.4},
                     {"step": 1000 * 24, "weight": -0.5},
                     {"step": 1250 * 24, "weight": -0.6},
+                    {"step": 1500 * 24, "weight": -0.7},
+                    {"step": 1750 * 24, "weight": -0.8},
+                    {"step": 2000 * 24, "weight": -0.9},
+                    {"step": 2250 * 24, "weight": -1.0},
                 ],
             },
         ),
