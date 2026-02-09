@@ -423,11 +423,11 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "magnitude_stages": [
                     # Disable pushes for first 1500 iterations
                     {"step": 0, "magnitude": (0.0, 0.0)},
-                    {"step": 500 * 24, "magnitude": (0.05, 0.1},
-                    {"step": 750 * 24, "magnitude": (0.1, 0.2},
-                    {"step": 1000 * 24, "magnitude": (0.1, 0.3},
-                    {"step": 1250 * 24, "magnitude": (0.1, 0.4},
-                    {"step": 1500 * 24, "magnitude": (0.1, 0.5},
+                    {"step": 500 * 24, "magnitude": (0.05, 0.1)},
+                    {"step": 750 * 24, "magnitude": (0.1, 0.2)},
+                    {"step": 1000 * 24, "magnitude": (0.1, 0.3)},
+                    {"step": 1250 * 24, "magnitude": (0.1, 0.4)},
+                    {"step": 1500 * 24, "magnitude": (0.1, 0.5)},
                 ],
             },
         ),
