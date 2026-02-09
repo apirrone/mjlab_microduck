@@ -422,12 +422,12 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             params={
                 "event_name": "push_robot",
                 "magnitude_stages": [
-                    # Gradual push curriculum - learn walking first, then robustness
-                    {"step": 0, "magnitude": (0.0, 0.0)},              # No pushes initially
-                    {"step": 750 * 24, "magnitude": (0.05, 0.15)},     # Gentle pushes
-                    {"step": 1000 * 24, "magnitude": (0.1, 0.25)},     # Medium pushes
-                    {"step": 1250 * 24, "magnitude": (0.1, 0.35)},     # Stronger
-                    {"step": 1500 * 24, "magnitude": (0.1, 0.5)},      # Full strength
+                    # Start pushes from beginning - learn walking + robustness together
+                    # This matches velocity task approach which transfers well
+                    {"step": 0, "magnitude": (0.05, 0.15)},            # Gentle from start
+                    {"step": 250 * 24, "magnitude": (0.1, 0.25)},      # Medium
+                    {"step": 500 * 24, "magnitude": (0.1, 0.35)},      # Stronger
+                    {"step": 750 * 24, "magnitude": (0.1, 0.5)},       # Full strength
                 ],
             },
         ),
