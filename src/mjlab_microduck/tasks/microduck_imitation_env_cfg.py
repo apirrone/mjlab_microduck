@@ -9,7 +9,7 @@ from mjlab.managers.manager_term_config import (
     ObservationGroupCfg,
     ObservationTermCfg,
     RewardTermCfg,
-    TerminationTermCfg,
+    # TerminationTermCfg,  # Not needed - using only fell_over from base config
 )
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.tasks.velocity import mdp as velocity_mdp
@@ -256,22 +256,26 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     # Terminations - Add motion tracking terminations
     ##
 
-    cfg.terminations["root_pos_error"] = TerminationTermCfg(
-        func=imitation_mdp.bad_root_pos,
-        params={
-            "command_name": "imitation",
-            "threshold": 0.15,
-            "curriculum_threshold_name": "root_pos_threshold",
-        },
-    )
-    cfg.terminations["root_ori_error"] = TerminationTermCfg(
-        func=imitation_mdp.bad_root_ori,
-        params={
-            "command_name": "imitation",
-            "threshold": 0.8,
-            "curriculum_threshold_name": "root_ori_threshold",
-        },
-    )
+    # DISABLED: These early terminations prevent learning recovery strategies
+    # and hurt sim2real transfer. The robot needs to learn how to recover from
+    # deviations rather than immediately dying when it deviates from reference.
+    #
+    # cfg.terminations["root_pos_error"] = TerminationTermCfg(
+    #     func=imitation_mdp.bad_root_pos,
+    #     params={
+    #         "command_name": "imitation",
+    #         "threshold": 0.15,
+    #         "curriculum_threshold_name": "root_pos_threshold",
+    #     },
+    # )
+    # cfg.terminations["root_ori_error"] = TerminationTermCfg(
+    #     func=imitation_mdp.bad_root_ori,
+    #     params={
+    #         "command_name": "imitation",
+    #         "threshold": 0.8,
+    #         "curriculum_threshold_name": "root_ori_threshold",
+    #     },
+    # )
     # Keep the fell_over termination from base config
 
     ##
