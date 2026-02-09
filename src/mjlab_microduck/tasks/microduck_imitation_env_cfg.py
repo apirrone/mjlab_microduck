@@ -420,21 +420,21 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
-        "external_force_magnitude": CurriculumTermCfg(
-            func=imitation_mdp.external_force_magnitude_curriculum,
-            params={
-                "event_name": "push_robot",
-                "magnitude_stages": [
-                    # Disable pushes for first 1500 iterations
-                    {"step": 0, "magnitude": (0.0, 0.0)},
-                    # {"step": 500 * 24, "magnitude": (0.05, 0.1)},
-                    # {"step": 750 * 24, "magnitude": (0.1, 0.2)},
-                    # {"step": 1000 * 24, "magnitude": (0.1, 0.3)},
-                    # {"step": 1250 * 24, "magnitude": (0.1, 0.4)},
-                    # {"step": 1500 * 24, "magnitude": (0.1, 0.5)},
-                ],
-            },
-        ),
+        # "external_force_magnitude": CurriculumTermCfg(
+            # func=imitation_mdp.external_force_magnitude_curriculum,
+            # params={
+                # "event_name": "push_robot",
+                # "magnitude_stages": [
+                    # # Disable pushes for first 1500 iterations
+                    # {"step": 0, "magnitude": (0.0, 0.0)},
+                    # # {"step": 500 * 24, "magnitude": (0.05, 0.1)},
+                    # # {"step": 750 * 24, "magnitude": (0.1, 0.2)},
+                    # # {"step": 1000 * 24, "magnitude": (0.1, 0.3)},
+                    # # {"step": 1250 * 24, "magnitude": (0.1, 0.4)},
+                    # # {"step": 1500 * 24, "magnitude": (0.1, 0.5)},
+                # ],
+            # },
+        # ),
         # "root_pos_termination": CurriculumTermCfg(
             # func=imitation_mdp.termination_threshold_curriculum,
             # params={
