@@ -399,57 +399,57 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "weight_stages": [
                     # Gradually increase action smoothness penalty
                     # 250 iterations × 24 steps/iter = 6000 steps
-                    {"step": 0, "weight": -0.1},
-                    {"step": 250 * 24, "weight": -0.2},
-                    {"step": 500 * 24, "weight": -0.3},
-                    {"step": 750 * 24, "weight": -0.4},
-                    {"step": 1000 * 24, "weight": -0.5},
-                    {"step": 1250 * 24, "weight": -0.6},
-                    {"step": 1500 * 24, "weight": -0.7},
-                    {"step": 1750 * 24, "weight": -0.8},
-                    {"step": 2000 * 24, "weight": -0.9},
-                    {"step": 2250 * 24, "weight": -1.0},
+                    {"step": 0, "weight": -0.6}, # initially started at -0.1
+                    {"step": 250 * 24, "weight": -0.7},
+                    {"step": 500 * 24, "weight": -0.8},
+                    {"step": 750 * 24, "weight": -0.9},
+                    {"step": 1000 * 24, "weight": -1.0},
+                    {"step": 1250 * 24, "weight": -1.1},
+                    {"step": 1500 * 24, "weight": -1.2},
+                    {"step": 1750 * 24, "weight": -1.3},
+                    # {"step": 2000 * 24, "weight": -0.9},
+                    # {"step": 2250 * 24, "weight": -1.0},
                 ],
             },
         ),
-        "external_force_magnitude": CurriculumTermCfg(
-            func=imitation_mdp.external_force_magnitude_curriculum,
-            params={
-                "event_name": "push_robot",
-                "magnitude_stages": [
-                    # Disable pushes for first 1500 iterations
-                    {"step": 0, "magnitude": (0.0, 0.0)},
-                    # Enable pushes with current values after 1500×24 steps
-                    {"step": 1500 * 24, "magnitude": EXTERNAL_FORCE_MAGNITUDE},
-                ],
-            },
-        ),
-        "root_pos_termination": CurriculumTermCfg(
-            func=imitation_mdp.termination_threshold_curriculum,
-            params={
-                "threshold_param_name": "root_pos_threshold",
-                "threshold_stages": [
-                    # Start strict, then relax to allow recovery from pushes
-                    {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
-                    {"step": 1000 * 24, "threshold": 0.3},  # After 1000 iters: 30cm
-                    {"step": 2000 * 24, "threshold": 0.5},  # After 2000 iters: 50cm
-                    {"step": 3000 * 24, "threshold": 1.0},  # After 3000 iters: 1m (very relaxed)
-                ],
-            },
-        ),
-        "root_ori_termination": CurriculumTermCfg(
-            func=imitation_mdp.termination_threshold_curriculum,
-            params={
-                "threshold_param_name": "root_ori_threshold",
-                "threshold_stages": [
-                    # Start strict, then relax
-                    {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
-                    {"step": 1000 * 24, "threshold": 1.2},  # After 1000 iters: ~69 degrees
-                    {"step": 2000 * 24, "threshold": 1.6},  # After 2000 iters: ~92 degrees
-                    {"step": 3000 * 24, "threshold": 2.5},  # After 3000 iters: ~143 degrees (very relaxed)
-                ],
-            },
-        ),
+        # "external_force_magnitude": CurriculumTermCfg(
+            # func=imitation_mdp.external_force_magnitude_curriculum,
+            # params={
+                # "event_name": "push_robot",
+                # "magnitude_stages": [
+                    # # Disable pushes for first 1500 iterations
+                    # {"step": 0, "magnitude": (0.0, 0.0)},
+                    # # Enable pushes with current values after 1500×24 steps
+                    # {"step": 1500 * 24, "magnitude": EXTERNAL_FORCE_MAGNITUDE},
+                # ],
+            # },
+        # ),
+        # "root_pos_termination": CurriculumTermCfg(
+            # func=imitation_mdp.termination_threshold_curriculum,
+            # params={
+                # "threshold_param_name": "root_pos_threshold",
+                # "threshold_stages": [
+                    # # Start strict, then relax to allow recovery from pushes
+                    # {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
+                    # {"step": 1000 * 24, "threshold": 0.3},  # After 1000 iters: 30cm
+                    # {"step": 2000 * 24, "threshold": 0.5},  # After 2000 iters: 50cm
+                    # {"step": 3000 * 24, "threshold": 1.0},  # After 3000 iters: 1m (very relaxed)
+                # ],
+            # },
+        # ),
+        # "root_ori_termination": CurriculumTermCfg(
+            # func=imitation_mdp.termination_threshold_curriculum,
+            # params={
+                # "threshold_param_name": "root_ori_threshold",
+                # "threshold_stages": [
+                    # # Start strict, then relax
+                    # {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
+                    # {"step": 1000 * 24, "threshold": 1.2},  # After 1000 iters: ~69 degrees
+                    # {"step": 2000 * 24, "threshold": 1.6},  # After 2000 iters: ~92 degrees
+                    # {"step": 3000 * 24, "threshold": 2.5},  # After 3000 iters: ~143 degrees (very relaxed)
+                # ],
+            # },
+        # ),
     }
 
     # Extend episode length for play mode
