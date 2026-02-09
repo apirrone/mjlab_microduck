@@ -19,23 +19,27 @@ from mjlab_microduck.tasks import imitation_mdp, mdp as microduck_mdp
 from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab_microduck.tasks.microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
-    # Import domain randomization settings
-    ENABLE_COM_RANDOMIZATION,
-    ENABLE_KP_RANDOMIZATION,
-    ENABLE_KD_RANDOMIZATION,
-    ENABLE_MASS_INERTIA_RANDOMIZATION,
-    ENABLE_JOINT_FRICTION_RANDOMIZATION,
-    ENABLE_JOINT_DAMPING_RANDOMIZATION,
-    ENABLE_EXTERNAL_FORCE_DISTURBANCES,
-    COM_RANDOMIZATION_RANGE,
-    MASS_INERTIA_RANDOMIZATION_RANGE,
-    KP_RANDOMIZATION_RANGE,
-    KD_RANDOMIZATION_RANGE,
-    JOINT_FRICTION_RANDOMIZATION_RANGE,
-    JOINT_DAMPING_RANDOMIZATION_RANGE,
-    EXTERNAL_FORCE_INTERVAL_S,
-    EXTERNAL_FORCE_MAGNITUDE,
 )
+
+# Domain randomization toggles
+ENABLE_COM_RANDOMIZATION = True
+ENABLE_KP_RANDOMIZATION = True
+ENABLE_KD_RANDOMIZATION = True
+ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
+ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
+ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
+ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+
+# Domain randomization ranges (adjust as needed)
+# Conservative ranges proven to be stable - can increase gradually if needed
+COM_RANDOMIZATION_RANGE = 0.003  # ±3mm
+MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% applied to BOTH mass and inertia together.
+KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
+KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
+JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
+JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
+EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
+EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -412,44 +416,47 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
-        # "external_force_magnitude": CurriculumTermCfg(
-            # func=imitation_mdp.external_force_magnitude_curriculum,
-            # params={
-                # "event_name": "push_robot",
-                # "magnitude_stages": [
-                    # # Disable pushes for first 1500 iterations
-                    # {"step": 0, "magnitude": (0.0, 0.0)},
-                    # # Enable pushes with current values after 1500×24 steps
-                    # {"step": 1500 * 24, "magnitude": EXTERNAL_FORCE_MAGNITUDE},
-                # ],
-            # },
-        # ),
-        # "root_pos_termination": CurriculumTermCfg(
-            # func=imitation_mdp.termination_threshold_curriculum,
-            # params={
-                # "threshold_param_name": "root_pos_threshold",
-                # "threshold_stages": [
-                    # # Start strict, then relax to allow recovery from pushes
-                    # {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
-                    # {"step": 1000 * 24, "threshold": 0.3},  # After 1000 iters: 30cm
-                    # {"step": 2000 * 24, "threshold": 0.5},  # After 2000 iters: 50cm
-                    # {"step": 3000 * 24, "threshold": 1.0},  # After 3000 iters: 1m (very relaxed)
-                # ],
-            # },
-        # ),
-        # "root_ori_termination": CurriculumTermCfg(
-            # func=imitation_mdp.termination_threshold_curriculum,
-            # params={
-                # "threshold_param_name": "root_ori_threshold",
-                # "threshold_stages": [
-                    # # Start strict, then relax
-                    # {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
-                    # {"step": 1000 * 24, "threshold": 1.2},  # After 1000 iters: ~69 degrees
-                    # {"step": 2000 * 24, "threshold": 1.6},  # After 2000 iters: ~92 degrees
-                    # {"step": 3000 * 24, "threshold": 2.5},  # After 3000 iters: ~143 degrees (very relaxed)
-                # ],
-            # },
-        # ),
+        "external_force_magnitude": CurriculumTermCfg(
+            func=imitation_mdp.external_force_magnitude_curriculum,
+            params={
+                "event_name": "push_robot",
+                "magnitude_stages": [
+                    # Disable pushes for first 1500 iterations
+                    {"step": 0, "magnitude": (0.0, 0.0)},
+                    {"step": 500 * 24, "magnitude": (0.05, 0.1},
+                    {"step": 750 * 24, "magnitude": (0.1, 0.2},
+                    {"step": 1000 * 24, "magnitude": (0.1, 0.3},
+                    {"step": 1250 * 24, "magnitude": (0.1, 0.4},
+                    {"step": 1500 * 24, "magnitude": (0.1, 0.5},
+                ],
+            },
+        ),
+        "root_pos_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "threshold_param_name": "root_pos_threshold",
+                "threshold_stages": [
+                    # Start strict, then relax to allow recovery from pushes
+                    {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
+                    {"step": 500 * 24, "threshold": 0.3},  # After 500 iters: 30cm
+                    {"step": 750 * 24, "threshold": 0.5},  # After 750 iters: 50cm
+                    {"step": 1000 * 24, "threshold": 1.0},  # After 1000 iters: 1m (very relaxed)
+                ],
+            },
+        ),
+        "root_ori_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "threshold_param_name": "root_ori_threshold",
+                "threshold_stages": [
+                    # Start strict, then relax
+                    {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
+                    {"step": 500 * 24, "threshold": 1.2},  # After 500 iters: ~69 degrees
+                    {"step": 750 * 24, "threshold": 1.6},  # After 750 iters: ~92 degrees
+                    {"step": 1000 * 24, "threshold": 2.5},  # After 1000 iters: ~143 degrees (very relaxed)
+                ],
+            },
+        ),
     }
 
     # Extend episode length for play mode
