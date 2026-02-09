@@ -261,7 +261,7 @@ def foot_clearance_reward(
     This encourages proper foot lifting rather than dragging.
 
     Args:
-        target_height: Minimum height (meters) for foot clearance during swing.
+        target_height: Not used - kept for API compatibility. Uses force threshold instead.
     """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     sensor: ContactSensor = env.scene[sensor_name]
@@ -273,14 +273,14 @@ def foot_clearance_reward(
     # Contact forces - higher force means foot is on ground
     forces = sensor.data.found.squeeze(-1)  # (num_envs, 2)
 
-    # During swing phase, reward for LOW contact force (foot lifted)
-    # Use exponential reward: exp(-force/std) is high when force is low
-    # std=0.3 makes dragging (0.5N) get only 0.19 reward instead of 0.61
-    # Force=0N: exp(0)=1.0, Force=0.3N: exp(-1)=0.37, Force=0.6N: exp(-2)=0.14
-    swing_clearance = torch.exp(-forces / 0.3)  # Much steeper - penalize dragging
+    # HARD THRESHOLD: Foot must have <0.5N contact to count as lifted
+    # This prevents "gaming" by weight-shifting without actually lifting
+    # Force <0.5N: 1.0 reward (truly lifted)
+    # Force >=0.5N: 0.0 reward (still touching/dragging)
+    foot_lifted = (forces < 0.5).float()
 
     # Only apply reward during intended swing phase
-    reward = (swing_clearance * ref_swing.float()).sum(dim=-1)
+    reward = (foot_lifted * ref_swing.float()).sum(dim=-1)
 
     return reward
 

@@ -194,34 +194,37 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "joint_names": ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
             },
         ),
-        "foot_contact_match": RewardTermCfg(
-            func=imitation_mdp.imitation_foot_contact_match,
-            weight=2.0,  # Reduced from 4.0 (was 8.0) - soften contact requirements for recovery
-            params={
-                "command_name": "imitation",
-                "sensor_name": "feet_ground_contact",
-                "force_threshold": 2.5,  # Minimum force (N) to count as contact (~35% of 6.86N total weight)
-                "debug_print": play,  # Enable debug printing in play mode
-            },
-        ),
-        "foot_clearance": RewardTermCfg(
-            func=imitation_mdp.foot_clearance_reward,
-            weight=1.0,  # Was 2.0
-            params={
-                "command_name": "imitation",
-                "sensor_name": "feet_ground_contact",
-                "target_height": 0.02,  # 2cm clearance
-            },
-        ),
-        "no_double_support": RewardTermCfg(
-            func=imitation_mdp.double_support_penalty,
-            weight=0.5,  # Reduced from 1.0 (was 2.0) - allow double support during recovery
-            params={
-                "command_name": "imitation",
-                "sensor_name": "feet_ground_contact",
-                "force_threshold": 2.5,
-            },
-        ),
+        # DISABLED: These auxiliary foot rewards conflict with joint position tracking
+        # If joint positions match reference, foot contacts/clearance should emerge naturally
+        # These rewards were causing "gaming" behaviors (wiggling, weight-shifting)
+        # "foot_contact_match": RewardTermCfg(
+        #     func=imitation_mdp.imitation_foot_contact_match,
+        #     weight=2.0,
+        #     params={
+        #         "command_name": "imitation",
+        #         "sensor_name": "feet_ground_contact",
+        #         "force_threshold": 2.5,
+        #         "debug_print": play,
+        #     },
+        # ),
+        # "foot_clearance": RewardTermCfg(
+        #     func=imitation_mdp.foot_clearance_reward,
+        #     weight=1.0,
+        #     params={
+        #         "command_name": "imitation",
+        #         "sensor_name": "feet_ground_contact",
+        #         "target_height": 0.02,
+        #     },
+        # ),
+        # "no_double_support": RewardTermCfg(
+        #     func=imitation_mdp.double_support_penalty,
+        #     weight=0.5,
+        #     params={
+        #         "command_name": "imitation",
+        #         "sensor_name": "feet_ground_contact",
+        #         "force_threshold": 2.5,
+        #     },
+        # ),
         # Regularization rewards (keep from base config)
         "action_rate_l2": RewardTermCfg(
             func=velocity_mdp.action_rate_l2,
