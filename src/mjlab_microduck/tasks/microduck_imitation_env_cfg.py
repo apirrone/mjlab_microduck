@@ -169,7 +169,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=15.0,
+            weight=3.0,  # Reduced from 15.0 - was preventing recovery from pushes
             params={
                 "command_name": "imitation",
                 "joint_names": (
@@ -188,7 +188,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_non_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=100.0,
+            weight=10.0,  # Reduced from 100.0 - was creating unbounded negative rewards
             params={
                 "command_name": "imitation",
                 "joint_names": ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
@@ -196,7 +196,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "foot_contact_match": RewardTermCfg(
             func=imitation_mdp.imitation_foot_contact_match,
-            weight=4.0,  # Was 8.0
+            weight=2.0,  # Reduced from 4.0 (was 8.0) - soften contact requirements for recovery
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -215,7 +215,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "no_double_support": RewardTermCfg(
             func=imitation_mdp.double_support_penalty,
-            weight=1.0,  # Was 2.0
+            weight=0.5,  # Reduced from 1.0 (was 2.0) - allow double support during recovery
             params={
                 "command_name": "imitation",
                 "sensor_name": "feet_ground_contact",
@@ -234,7 +234,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=1.0,
+            weight=5.0,  # Increased from 1.0 - make survival more valuable than perfect tracking
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
