@@ -250,6 +250,11 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             weight=-0.001,  # Penalize rapid force changes (prevents "tap tap")
             params={"sensor_name": "feet_ground_contact"},
         ),
+        "body_ang_vel": RewardTermCfg(
+            func=velocity_mdp.body_ang_vel_l2,
+            weight=-0.05,  # Dampen oscillations (matches velocity task)
+            params={"asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",))},
+        ),
     }
 
     ##
