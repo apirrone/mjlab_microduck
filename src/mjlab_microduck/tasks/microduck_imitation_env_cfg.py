@@ -407,13 +407,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "weight_stages": [
                     # Gradually increase action smoothness penalty
                     # 250 iterations × 24 steps/iter = 6000 steps
-                    {"step": 0, "weight": -0.6}, # initially started at -0.1
+                    {"step": 0, "weight": -0.6},
                     {"step": 250 * 24, "weight": -0.8},
                     {"step": 500 * 24, "weight": -1.0},
-                    {"step": 750 * 24, "weight": -1.2},
-                    {"step": 1000 * 24, "weight": -1.4},
-                    {"step": 1250 * 24, "weight": -1.6},
-                    {"step": 1500 * 24, "weight": -1.8},
+                    {"step": 750 * 24, "weight": -1.0},  # CAPPED - stay reactive
                     # {"step": 1750 * 24, "weight": -1.3},
                     # {"step": 2000 * 24, "weight": -0.9},
                     # {"step": 2250 * 24, "weight": -1.0},
