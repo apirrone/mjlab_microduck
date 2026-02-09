@@ -188,7 +188,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_non_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=50.0,  # Reduced from 100.0 - less rigid head tracking
+            weight=10.0,  # Reduced from 50.0 - allow natural head movements for balance
             params={
                 "command_name": "imitation",
                 "joint_names": ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
