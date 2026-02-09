@@ -159,23 +159,17 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_lin_vel": RewardTermCfg(
             func=imitation_mdp.imitation_linear_velocity_error_exp,
-            weight=3.0,  # INCREASED - outcomes matter more than poses
+            weight=1.0,
             params={"command_name": "imitation", "std": 0.35},
         ),
         "imitation_ang_vel": RewardTermCfg(
             func=imitation_mdp.imitation_angular_velocity_error_exp,
-            weight=3.0,  # INCREASED - must track commanded motion
+            weight=1.0,
             params={"command_name": "imitation", "std": 0.7},
-        ),
-        # Direct velocity command tracking - forces feedback-driven behavior
-        "track_vel_cmd": RewardTermCfg(
-            func=imitation_mdp.imitation_velocity_cmd_tracking_exp,
-            weight=4.0,  # HIGH weight - must actually achieve commanded velocities
-            params={"command_name": "imitation", "std": 0.5},
         ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=2.0,  # DRASTICALLY reduced - guide, don't dictate
+            weight=15.0,
             params={
                 "command_name": "imitation",
                 "joint_names": (
@@ -240,7 +234,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=3.0,  # INCREASED - staying balanced is critical
+            weight=1.0,
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
