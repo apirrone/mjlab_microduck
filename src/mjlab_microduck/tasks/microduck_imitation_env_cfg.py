@@ -167,9 +167,15 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             weight=1.0,
             params={"command_name": "imitation", "std": 0.7},
         ),
+        # Velocity command tracking - prevents standing still strategy
+        "track_vel_command": RewardTermCfg(
+            func=imitation_mdp.imitation_velocity_cmd_tracking_exp,
+            weight=2.0,  # Higher weight - must actually move at commanded velocity
+            params={"command_name": "imitation", "std": 0.5},
+        ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=3.0,  # Reduced from 15.0 - was preventing recovery from pushes
+            weight=5.0,  # Balanced with alive reward (5.0) - track motion but allow recovery
             params={
                 "command_name": "imitation",
                 "joint_names": (
@@ -188,7 +194,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_non_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=10.0,  # Reduced from 100.0 - was creating unbounded negative rewards
+            weight=15.0,  # Keep neck tracking tighter than legs
             params={
                 "command_name": "imitation",
                 "joint_names": ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
@@ -237,7 +243,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=5.0,  # Increased from 1.0 - make survival more valuable than perfect tracking
+            weight=2.0,  # Balanced - survival matters but not more than actually moving
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
