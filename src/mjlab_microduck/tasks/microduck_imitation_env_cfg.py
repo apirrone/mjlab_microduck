@@ -301,14 +301,14 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             cfg.observations["policy"].terms["joint_vel"]
         )
 
-        # Add noise and delay to observations
-        cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 0
-        cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3
+        # Add noise and delay to observations - increased to match real IMU latency
+        cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 2
+        cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 6  # 40-120ms at 50Hz
         cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
         cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4)
 
-        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
+        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 2
+        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 6  # 40-120ms at 50Hz
         cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
         cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.15, n_max=0.15)
 
