@@ -169,7 +169,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=15.0,
+            weight=10.0,  # Reduced from 15.0 - allow feedback-driven leg movements
             params={
                 "command_name": "imitation",
                 "joint_names": (
