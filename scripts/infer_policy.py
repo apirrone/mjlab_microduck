@@ -491,13 +491,13 @@ def main():
             try:
                 # Handle special keys (arrows and space)
                 if key == pynput_keyboard.Key.up:
-                    policy.set_command(0.5, 0.0, 0.0)
+                    policy.set_command(0.15, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
-                    policy.set_command(-0.5, 0.0, 0.0)
+                    policy.set_command(-0.1, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
-                    policy.set_command(0.0, 0.5, 0.0)
+                    policy.set_command(0.0, 0.15, 0.0)
                 elif key == pynput_keyboard.Key.left:
-                    policy.set_command(0.0, -0.5, 0.0)
+                    policy.set_command(0.0, -0.15, 0.0)
                 elif key == pynput_keyboard.Key.space:
                     policy.set_command(0.0, 0.0, 0.0)
                 # Handle character keys
