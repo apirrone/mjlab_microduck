@@ -167,15 +167,9 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             weight=1.0,
             params={"command_name": "imitation", "std": 0.7},
         ),
-        # Velocity command tracking - prevents standing still strategy
-        "track_vel_command": RewardTermCfg(
-            func=imitation_mdp.imitation_velocity_cmd_tracking_exp,
-            weight=2.0,  # Higher weight - must actually move at commanded velocity
-            params={"command_name": "imitation", "std": 0.5},
-        ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=5.0,  # Balanced with alive reward (5.0) - track motion but allow recovery
+            weight=15.0,
             params={
                 "command_name": "imitation",
                 "joint_names": (
@@ -194,43 +188,40 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "imitation_joint_pos_non_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
-            weight=15.0,  # Keep neck tracking tighter than legs
+            weight=100.0,
             params={
                 "command_name": "imitation",
                 "joint_names": ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
             },
         ),
-        # DISABLED: These auxiliary foot rewards conflict with joint position tracking
-        # If joint positions match reference, foot contacts/clearance should emerge naturally
-        # These rewards were causing "gaming" behaviors (wiggling, weight-shifting)
-        # "foot_contact_match": RewardTermCfg(
-        #     func=imitation_mdp.imitation_foot_contact_match,
-        #     weight=2.0,
-        #     params={
-        #         "command_name": "imitation",
-        #         "sensor_name": "feet_ground_contact",
-        #         "force_threshold": 2.5,
-        #         "debug_print": play,
-        #     },
-        # ),
-        # "foot_clearance": RewardTermCfg(
-        #     func=imitation_mdp.foot_clearance_reward,
-        #     weight=1.0,
-        #     params={
-        #         "command_name": "imitation",
-        #         "sensor_name": "feet_ground_contact",
-        #         "target_height": 0.02,
-        #     },
-        # ),
-        # "no_double_support": RewardTermCfg(
-        #     func=imitation_mdp.double_support_penalty,
-        #     weight=0.5,
-        #     params={
-        #         "command_name": "imitation",
-        #         "sensor_name": "feet_ground_contact",
-        #         "force_threshold": 2.5,
-        #     },
-        # ),
+        "foot_contact_match": RewardTermCfg(
+            func=imitation_mdp.imitation_foot_contact_match,
+            weight=4.0,  # Was 8.0
+            params={
+                "command_name": "imitation",
+                "sensor_name": "feet_ground_contact",
+                "force_threshold": 2.5,  # Minimum force (N) to count as contact (~35% of 6.86N total weight)
+                "debug_print": play,  # Enable debug printing in play mode
+            },
+        ),
+        "foot_clearance": RewardTermCfg(
+            func=imitation_mdp.foot_clearance_reward,
+            weight=1.0,  # Was 2.0
+            params={
+                "command_name": "imitation",
+                "sensor_name": "feet_ground_contact",
+                "target_height": 0.02,  # 2cm clearance
+            },
+        ),
+        "no_double_support": RewardTermCfg(
+            func=imitation_mdp.double_support_penalty,
+            weight=1.0,  # Was 2.0
+            params={
+                "command_name": "imitation",
+                "sensor_name": "feet_ground_contact",
+                "force_threshold": 2.5,
+            },
+        ),
         # Regularization rewards (keep from base config)
         "action_rate_l2": RewardTermCfg(
             func=velocity_mdp.action_rate_l2,
@@ -243,7 +234,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=2.0,  # Balanced - survival matters but not more than actually moving
+            weight=1.0,
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
@@ -429,21 +420,20 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
-        # "external_force_magnitude": CurriculumTermCfg(
-            # func=imitation_mdp.external_force_magnitude_curriculum,
-            # params={
-                # "event_name": "push_robot",
-                # "magnitude_stages": [
-                    # # Disable pushes for first 1500 iterations
-                    # {"step": 0, "magnitude": (0.0, 0.0)},
-                    # # {"step": 500 * 24, "magnitude": (0.05, 0.1)},
-                    # # {"step": 750 * 24, "magnitude": (0.1, 0.2)},
-                    # # {"step": 1000 * 24, "magnitude": (0.1, 0.3)},
-                    # # {"step": 1250 * 24, "magnitude": (0.1, 0.4)},
-                    # # {"step": 1500 * 24, "magnitude": (0.1, 0.5)},
-                # ],
-            # },
-        # ),
+        "external_force_magnitude": CurriculumTermCfg(
+            func=imitation_mdp.external_force_magnitude_curriculum,
+            params={
+                "event_name": "push_robot",
+                "magnitude_stages": [
+                    # Gradual push curriculum - learn walking first, then robustness
+                    {"step": 0, "magnitude": (0.0, 0.0)},              # No pushes initially
+                    {"step": 750 * 24, "magnitude": (0.05, 0.15)},     # Gentle pushes
+                    {"step": 1000 * 24, "magnitude": (0.1, 0.25)},     # Medium pushes
+                    {"step": 1250 * 24, "magnitude": (0.1, 0.35)},     # Stronger
+                    {"step": 1500 * 24, "magnitude": (0.1, 0.5)},      # Full strength
+                ],
+            },
+        ),
         # "root_pos_termination": CurriculumTermCfg(
             # func=imitation_mdp.termination_threshold_curriculum,
             # params={
