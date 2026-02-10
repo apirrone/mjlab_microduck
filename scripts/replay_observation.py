@@ -371,7 +371,7 @@ def main():
     parser.add_argument("--model", type=str,
                        default="src/mjlab_microduck/robot/microduck/scene.xml",
                        help="Path to MuJoCo XML model file")
-    parser.add_argument("--action-scale", type=float, default=0.3,
+    parser.add_argument("--action-scale", type=float, default=1.0,
                        help="Scaling factor for actions (default: 0.3)")
     parser.add_argument("--no-viewer", action="store_true",
                        help="Run without visualization")
