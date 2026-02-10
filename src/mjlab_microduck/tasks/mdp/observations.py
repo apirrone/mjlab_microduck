@@ -5,8 +5,8 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from mjlab.assets import Entity
-from mjlab.managers import SceneEntityCfg
+from mjlab.entity import Entity
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 
 if TYPE_CHECKING:
     from mjlab.envs import ManagerBasedRlEnv
