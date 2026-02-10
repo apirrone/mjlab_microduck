@@ -2,6 +2,7 @@
 
 import torch
 from typing import Optional
+import mujoco
 
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 from mjlab.managers.scene_entity_config import SceneEntityCfg
@@ -965,28 +966,37 @@ def raw_accelerometer(
 
     Returns normalized raw accelerometer which mimics what a real IMU measures.
     This is different from pure projected_gravity which only reflects orientation.
-    
+    Reads from the MuJoCo accelerometer sensor "imu_accel".
+
     Returns:
         torch.Tensor: Normalized raw accelerometer reading (num_envs, 3)
     """
     asset: Entity = env.scene[asset_cfg.name]
 
-    # Get linear acceleration in body frame
-    lin_acc_b = asset.data.root_link_lin_acc_b
+    # Access the model to find the sensor address
+    # The accelerometer sensor is the 5th sensor (index 4) in robot.xml
+    # Sensors: framequat, gyro, gyro, velocimeter, accelerometer, subtreeangmom
+    mj_model = asset.data.model
 
-    # Get projected gravity in body frame
-    proj_grav_b = asset.data.projected_gravity_b
+    # Get sensor address from model arrays (sensor_adr is torch tensor)
+    sensor_adr_array = mj_model.sensor_adr  # This is a TorchArray/tensor
+    sensor_id = 4  # imu_accel is the 5th sensor (0-indexed)
+    sensor_adr = int(sensor_adr_array[sensor_id].item())  # Convert to Python int
 
-    # Raw accelerometer = projected_gravity - linear_acceleration
-    # (accelerometer measures specific force)
-    raw_accel = proj_grav_b - lin_acc_b
+    # Read accelerometer data (specific force measured by sensor)
+    # Shape: (num_envs, 3)
+    accel_raw = asset.data.data.sensordata[:, sensor_adr:sensor_adr+3]
+
+    # MuJoCo accelerometer measures specific force (like real sensor)
+    # Negate to match convention: when at rest upright, should point down
+    accel_negated = -accel_raw
 
     # Normalize to unit vector
-    raw_accel_norm = torch.norm(raw_accel, dim=-1, keepdim=True)
-    raw_accel_normalized = torch.where(
-        raw_accel_norm > 0.1,
-        raw_accel / raw_accel_norm,
-        proj_grav_b
+    accel_norm = torch.norm(accel_negated, dim=-1, keepdim=True)
+    accel_normalized = torch.where(
+        accel_norm > 0.1,
+        accel_negated / accel_norm,
+        asset.data.projected_gravity_b  # Fallback to projected gravity
     )
 
-    return raw_accel_normalized
+    return accel_normalized

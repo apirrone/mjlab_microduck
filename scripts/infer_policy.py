@@ -173,25 +173,35 @@ class PolicyInference:
         return vec - w * t + np.cross(xyz, t)
 
     def get_projected_gravity(self):
-        """Get raw accelerometer reading (NOT pure projected gravity).
+        """Get raw accelerometer reading from MuJoCo sensor.
 
         Returns normalized raw accelerometer which includes gravity + linear acceleration.
         This matches what the real BNO055 accelerometer measures.
+        Reads from the 'imu_accel' sensor in the MuJoCo model.
         """
-        # Get body orientation for projected gravity component
-        quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
-        world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
-        proj_grav = self.quat_rotate_inverse(quat, world_gravity)
+        # Find the accelerometer sensor and read from sensordata
+        sensor_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SENSOR, "imu_accel")
+        if sensor_id < 0:
+            raise ValueError("Sensor 'imu_accel' not found in model")
 
-        # Get linear acceleration in body frame from cvel[3:6]
-        lin_acc_b = self.data.cvel[self.trunk_base_id, 3:6].copy().astype(np.float32)
+        sensor_adr = self.model.sensor_adr[sensor_id]
 
-        # Raw accelerometer = projected_gravity - linear_acceleration
-        raw_accel = proj_grav - lin_acc_b
+        # Read accelerometer data (specific force measured by sensor)
+        accel_raw = self.data.sensordata[sensor_adr:sensor_adr+3].copy().astype(np.float32)
+
+        # MuJoCo accelerometer measures specific force (like real sensor)
+        # Negate to match convention: when at rest upright, should point down
+        accel_negated = -accel_raw
 
         # Normalize
-        mag = np.linalg.norm(raw_accel)
-        return (raw_accel / mag) if mag > 0.1 else proj_grav
+        mag = np.linalg.norm(accel_negated)
+        if mag > 0.1:
+            return accel_negated / mag
+        else:
+            # Fallback to projected gravity
+            quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
+            world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+            return self.quat_rotate_inverse(quat, world_gravity)
 
     def get_base_ang_vel(self):
         """Get base angular velocity from IMU gyro sensor.
