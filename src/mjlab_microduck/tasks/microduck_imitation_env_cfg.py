@@ -95,12 +95,17 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             func=imitation_mdp.motion_phase,
             params={"command_name": "imitation"},
         ),
-        # Keep the rest from base config
+        # Keep the rest from base config, but replace projected_gravity with raw_accelerometer
         **{
             k: v
             for k, v in cfg.observations["policy"].terms.items()
-            if k not in ["command", "phase"]
+            if k not in ["command", "phase", "projected_gravity"]
         },
+        # Use raw accelerometer instead of projected gravity
+        "raw_accelerometer": ObservationTermCfg(
+            func=microduck_mdp.raw_accelerometer,
+            scale=1.0,
+        ),
     }
 
     # Critic observations (privileged information including reference motion)
@@ -291,12 +296,8 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
             cfg.observations["policy"].terms["base_ang_vel"]
         )
-        # Remove old projected_gravity observation and replace with raw_accelerometer
-        del cfg.observations["policy"].terms["projected_gravity"]
-        # Use raw accelerometer (includes gravity + linear acceleration + dynamics)
-        cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
-            func=microduck_mdp.raw_accelerometer,
-            scale=1.0,
+        cfg.observations["policy"].terms["raw_accelerometer"] = deepcopy(
+            cfg.observations["policy"].terms["raw_accelerometer"]
         )
         cfg.observations["policy"].terms["joint_pos"] = deepcopy(
             cfg.observations["policy"].terms["joint_pos"]
