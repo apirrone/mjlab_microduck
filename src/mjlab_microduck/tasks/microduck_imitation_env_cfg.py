@@ -29,7 +29,7 @@ ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
-ENABLE_IMU_ORIENTATION_RANDOMIZATION = False  # Simulates mounting errors
+ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
@@ -41,7 +41,7 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
 EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
-IMU_ORIENTATION_RANDOMIZATION_ANGLE = 2.0  # ±2° IMU mounting error
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
