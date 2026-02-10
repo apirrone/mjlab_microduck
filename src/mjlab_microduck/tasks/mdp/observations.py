@@ -5,11 +5,11 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from omni.isaac.lab.assets import Entity
-from omni.isaac.lab.managers import SceneEntityCfg
+from mjlab.assets import Entity
+from mjlab.managers import SceneEntityCfg
 
 if TYPE_CHECKING:
-    from omni.isaac.lab.envs import ManagerBasedRlEnv
+    from mjlab.envs import ManagerBasedRlEnv
 
 
 def raw_accelerometer(
