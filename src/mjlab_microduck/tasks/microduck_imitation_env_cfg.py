@@ -240,6 +240,15 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             func=velocity_mdp.action_rate_l2,
             weight=-0.1,
         ),
+        # Action acceleration penalties (2nd derivative) for smoother actions
+        "leg_action_acceleration": RewardTermCfg(
+            func=microduck_mdp.leg_action_acceleration_l2,
+            weight=-0.01,  # Start small - can increase gradually
+        ),
+        "neck_action_acceleration": RewardTermCfg(
+            func=microduck_mdp.neck_action_acceleration_l2,
+            weight=-0.01,  # Start small - can increase gradually
+        ),
         "self_collisions": RewardTermCfg(
             func=velocity_mdp.self_collision_cost,
             weight=-10.0,
@@ -437,7 +446,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                     # Gradually increase action smoothness penalty
                     {"step": 0, "weight": -0.6},
                     {"step": 250 * 24, "weight": -0.8},
-                    # {"step": 500 * 24, "weight": -1.0},
+                    {"step": 500 * 24, "weight": -1.0},  # Smoother actions for sim2real
                 ],
             },
         ),
