@@ -291,8 +291,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
             cfg.observations["policy"].terms["base_ang_vel"]
         )
-        # Use raw accelerometer instead of projected gravity (includes linear acceleration)
-        cfg.observations["policy"].terms["projected_gravity"] = ObservationTermCfg(
+        # Remove old projected_gravity observation and replace with raw_accelerometer
+        del cfg.observations["policy"].terms["projected_gravity"]
+        # Use raw accelerometer (includes gravity + linear acceleration + dynamics)
+        cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
             func=microduck_mdp.raw_accelerometer,
             scale=1.0,
         )
@@ -309,10 +311,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
         cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4)
 
-        cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-        cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
-        cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
-        cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.05, n_max=0.05) # Was 0.15
+        cfg.observations["policy"].terms["raw_accelerometer"].delay_min_lag = 0
+        cfg.observations["policy"].terms["raw_accelerometer"].delay_max_lag = 3
+        cfg.observations["policy"].terms["raw_accelerometer"].delay_update_period = 64
+        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.15, n_max=0.15) # Was 0.15
 
         cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)
         cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)
