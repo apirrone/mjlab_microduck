@@ -16,6 +16,7 @@ from mjlab.tasks.velocity import mdp as velocity_mdp
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.tasks import imitation_mdp, mdp as microduck_mdp
+from mjlab_microduck.tasks.mdp import observations as custom_obs
 from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab_microduck.tasks.microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
@@ -291,8 +292,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
             cfg.observations["policy"].terms["base_ang_vel"]
         )
-        cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
-            cfg.observations["policy"].terms["projected_gravity"]
+        # Use raw accelerometer instead of projected gravity (includes linear acceleration)
+        cfg.observations["policy"].terms["projected_gravity"] = ObservationTermCfg(
+            func=custom_obs.raw_accelerometer,
+            scale=1.0,
         )
         cfg.observations["policy"].terms["joint_pos"] = deepcopy(
             cfg.observations["policy"].terms["joint_pos"]

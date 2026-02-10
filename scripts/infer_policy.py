@@ -173,19 +173,25 @@ class PolicyInference:
         return vec - w * t + np.cross(xyz, t)
 
     def get_projected_gravity(self):
-        """Get gravity vector projected into body frame using body quaternion.
+        """Get raw accelerometer reading (NOT pure projected gravity).
 
-        This matches mdp.projected_gravity which uses asset.data.projected_gravity_b,
-        computed from root_link_quat_w (body frame), NOT from sensors.
+        Returns normalized raw accelerometer which includes gravity + linear acceleration.
+        This matches what the real BNO055 accelerometer measures.
         """
-        # Get body orientation quaternion from xquat (w, x, y, z format in MuJoCo)
+        # Get body orientation for projected gravity component
         quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
-
-        # World gravity (pointing down)
         world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        proj_grav = self.quat_rotate_inverse(quat, world_gravity)
 
-        # Rotate into body frame
-        return self.quat_rotate_inverse(quat, world_gravity)
+        # Get linear acceleration in body frame from cvel[3:6]
+        lin_acc_b = self.data.cvel[self.trunk_base_id, 3:6].copy().astype(np.float32)
+
+        # Raw accelerometer = projected_gravity - linear_acceleration
+        raw_accel = proj_grav - lin_acc_b
+
+        # Normalize
+        mag = np.linalg.norm(raw_accel)
+        return (raw_accel / mag) if mag > 0.1 else proj_grav
 
     def get_base_ang_vel(self):
         """Get base angular velocity from IMU gyro sensor.
