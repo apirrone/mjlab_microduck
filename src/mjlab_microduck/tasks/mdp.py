@@ -1000,3 +1000,70 @@ def raw_accelerometer(
     )
 
     return accel_normalized
+
+def randomize_imu_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_angle_deg: float = 2.0,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize IMU sensor mounting orientation by small angles.
+    
+    Simulates slight mounting errors or calibration offsets in the real robot.
+    The IMU orientation is randomized by rotating around random axes by up to max_angle_deg.
+    
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize
+        max_angle_deg: Maximum rotation angle in degrees (default 2.0°)
+        asset_cfg: Asset configuration
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+    
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # IMU site is the first site (index 0) in robot.xml
+    # Sites: imu (0), left_foot (1), right_foot (2)
+    site_id = 0
+    
+    # Store original orientation on first call
+    if not hasattr(env, '_original_imu_quat'):
+        env._original_imu_quat = env.sim.model.site_quat[0, site_id].clone()
+    
+    # Generate random rotations for each environment
+    num_envs = len(env_ids)
+    max_angle_rad = max_angle_deg * torch.pi / 180.0
+    
+    # Random rotation angles [-max_angle, +max_angle] for each axis
+    angles = (torch.rand(num_envs, 3, device=env.device) * 2 - 1) * max_angle_rad
+    
+    # Convert Euler angles to quaternions (small angle approximation for efficiency)
+    # For small angles: quat ≈ [1, θx/2, θy/2, θz/2]
+    half_angles = angles / 2.0
+    quats_delta = torch.zeros(num_envs, 4, device=env.device)
+    quats_delta[:, 0] = 1.0  # w component
+    quats_delta[:, 1:] = half_angles  # x, y, z components
+    
+    # Normalize the quaternion
+    quats_delta = quats_delta / torch.norm(quats_delta, dim=1, keepdim=True)
+    
+    # Get original quaternion and apply delta rotation
+    original_quat = env._original_imu_quat.unsqueeze(0).expand(num_envs, -1)
+    
+    # Quaternion multiplication: q_new = q_delta * q_original
+    # q1 * q2 = [w1*w2 - dot(v1,v2), w1*v2 + w2*v1 + cross(v1,v2)]
+    w1, x1, y1, z1 = quats_delta[:, 0], quats_delta[:, 1], quats_delta[:, 2], quats_delta[:, 3]
+    w2, x2, y2, z2 = original_quat[:, 0], original_quat[:, 1], original_quat[:, 2], original_quat[:, 3]
+    
+    new_quat = torch.stack([
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,  # w
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,  # x
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,  # y
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,  # z
+    ], dim=1)
+    
+    # Apply to the selected environments
+    env.sim.model.site_quat[env_ids, site_id] = new_quat

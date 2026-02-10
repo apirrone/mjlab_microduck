@@ -29,6 +29,7 @@ ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
 ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+ENABLE_IMU_ORIENTATION_RANDOMIZATION = False  # Simulates mounting errors
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
@@ -40,6 +41,7 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
 EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 2.0  # ±2° IMU mounting error
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -86,6 +88,8 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     ##
 
     # Policy observations (what the robot can actually sense)
+    # Build in specific order: command, phase, base_ang_vel, raw_accelerometer, joint_pos, joint_vel, actions
+    base_obs = cfg.observations["policy"].terms
     policy_terms = {
         "command": ObservationTermCfg(
             func=imitation_mdp.velocity_command,
@@ -95,17 +99,15 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             func=imitation_mdp.motion_phase,
             params={"command_name": "imitation"},
         ),
-        # Keep the rest from base config, but replace projected_gravity with raw_accelerometer
-        **{
-            k: v
-            for k, v in cfg.observations["policy"].terms.items()
-            if k not in ["command", "phase", "projected_gravity"]
-        },
+        "base_ang_vel": base_obs["base_ang_vel"],
         # Use raw accelerometer instead of projected gravity
         "raw_accelerometer": ObservationTermCfg(
             func=microduck_mdp.raw_accelerometer,
             scale=1.0,
         ),
+        "joint_pos": base_obs["joint_pos"],
+        "joint_vel": base_obs["joint_vel"],
+        "actions": base_obs["actions"],
     }
 
     # Critic observations (privileged information including reference motion)
@@ -374,6 +376,17 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             params={
                 "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
                 "scale_range": MASS_INERTIA_RANDOMIZATION_RANGE,
+            },
+        )
+
+    # IMU orientation randomization (simulates mounting errors)
+    if ENABLE_IMU_ORIENTATION_RANDOMIZATION:
+        cfg.events["randomize_imu_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_imu_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_angle_deg": IMU_ORIENTATION_RANDOMIZATION_ANGLE,
             },
         )
 
