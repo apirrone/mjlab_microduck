@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import pickle
 import time
 import numpy as np
 import mujoco
@@ -391,6 +392,7 @@ def main():
     parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
+    parser.add_argument("--record", type=str, default=None, help="Enable recording mode: save observations to pickle file on Ctrl+C")
     parser.add_argument("--switch-threshold", type=float, default=0.05, help="Command magnitude threshold for switching between standing and walking policy (default: 0.05)")
     args = parser.parse_args()
 
@@ -499,6 +501,9 @@ def main():
     # Data collection for CSV
     csv_data = [] if args.save_csv else None
 
+    # Data collection for recording (pickle)
+    recorded_observations = [] if args.record else None
+
     # Setup keyboard listener using pynput
     try:
         from pynput import keyboard as pynput_keyboard
@@ -551,99 +556,112 @@ def main():
         viewer.sync()
         start_time = time.time()
 
-        while viewer.is_running():
-            step_start = time.time()
+        try:
+            while viewer.is_running():
+                step_start = time.time()
 
-            # Update phase for imitation learning
-            policy.update_phase(control_dt)
+                # Update phase for imitation learning
+                policy.update_phase(control_dt)
 
-            # Control loop: run inference and apply action
-            action = policy.infer()
-            policy.apply_action(action)
+                # Control loop: run inference and apply action
+                action = policy.infer()
+                policy.apply_action(action)
 
-            control_step_count += 1
+                control_step_count += 1
 
-            # Save data for CSV if requested
-            if csv_data is not None:
-                obs = policy.get_observations()
-
-                # Create row: step, time, obs(51), action(14)
-                row = {
-                    'step': control_step_count,
-                    'time': control_step_count * control_dt,
-                }
-
-                # Add observations
-                for i in range(obs.size):
-                    row[f'obs_{i}'] = obs[i]
-
-                # Add actions
-                for i in range(action.size):
-                    row[f'action_{i}'] = action[i]
-
-                csv_data.append(row)
-
-            # Debug: print observations and actions
-            if args.debug:
-                # Print every step for first 10 steps, then every 50
-                should_print = control_step_count <= 10 or control_step_count % 50 == 0
-
-                if should_print:
+                # Save data for CSV if requested
+                if csv_data is not None:
                     obs = policy.get_observations()
-                    pos = data.qpos[qpos_adr:qpos_adr + 3]
-                    quat = data.qpos[qpos_adr + 3:qpos_adr + 7]
-                    # Use root link position (matches reward calculation)
-                    com_height = pos[2]
 
-                    print(f"\n{'='*70}")
-                    print(f"Step {control_step_count} DEBUG:")
-                    print(f"{'='*70}")
-                    if policy.use_imitation:
-                        print(f"Imitation phase: {policy.imitation_phase:.4f} (period: {policy.gait_period:.3f}s)")
-                    print(f"Base state:")
-                    print(f"  Position: [{pos[0]:7.4f}, {pos[1]:7.4f}, {pos[2]:7.4f}]")
-                    print(f"  CoM height (root link): {com_height:7.4f}")
-                    print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
-                    print(f"\nObservation (shape {obs.shape}, total {obs.size}):")
-                    if policy.use_imitation:
-                        # Imitation order: command, phase, ang_vel, proj_grav, joint_pos, joint_vel, last_action
-                        print(f"  Command [0:3]:        {obs[0:3]}")
-                        print(f"  Phase [3:4]:          {obs[3:4]}")
-                        print(f"  Ang vel [4:7]:        {obs[4:7]}")
-                        print(f"  Proj grav [7:10]:     {obs[7:10]}")
-                        joint_start = 10
-                        print(f"  Joint pos [{joint_start}:{joint_start+policy.n_joints}]:     {obs[joint_start:joint_start+policy.n_joints]}")
-                        print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
-                        print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
-                    else:
-                        # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command
-                        print(f"  Ang vel [0:3]:        {obs[0:3]}")
-                        print(f"  Proj grav [3:6]:      {obs[3:6]}")
-                        print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
-                        print(f"  Joint vel [{6+policy.n_joints}:{6+2*policy.n_joints}]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
-                        print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
-                        cmd_end = 6+3*policy.n_joints+3
-                        print(f"  Command [{6+3*policy.n_joints}:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
-                    print(f"\nAction output:")
-                    print(f"  Raw action: {action}")
-                    print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
-                    if policy.use_delay:
-                        print(f"  Delay: {policy.current_lag} timesteps (buffered)")
-                    print(f"  Applied ctrl (first 5): {data.ctrl[:5]}")
-                    print(f"  Applied ctrl (last 5):  {data.ctrl[-5:]}")
+                    # Create row: step, time, obs(51), action(14)
+                    row = {
+                        'step': control_step_count,
+                        'time': control_step_count * control_dt,
+                    }
 
-            # Step simulation 'decimation' times (matches mjlab env.step behavior)
-            for _ in range(decimation):
-                mujoco.mj_step(model, data)
+                    # Add observations
+                    for i in range(obs.size):
+                        row[f'obs_{i}'] = obs[i]
 
-            # Sync viewer
-            viewer.sync()
+                    # Add actions
+                    for i in range(action.size):
+                        row[f'action_{i}'] = action[i]
 
-            # Sleep to maintain real-time pacing
-            elapsed = time.time() - step_start
-            sleep_time = control_dt - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+                    csv_data.append(row)
+
+                # Record observations if requested
+                if recorded_observations is not None:
+                    obs = policy.get_observations()
+                    timestamp = time.time() - start_time
+                    recorded_observations.append({
+                        'timestamp': timestamp,
+                        'observation': obs.tolist()
+                    })
+
+                # Debug: print observations and actions
+                if args.debug:
+                    # Print every step for first 10 steps, then every 50
+                    should_print = control_step_count <= 10 or control_step_count % 50 == 0
+
+                    if should_print:
+                        obs = policy.get_observations()
+                        pos = data.qpos[qpos_adr:qpos_adr + 3]
+                        quat = data.qpos[qpos_adr + 3:qpos_adr + 7]
+                        # Use root link position (matches reward calculation)
+                        com_height = pos[2]
+    
+                        print(f"\n{'='*70}")
+                        print(f"Step {control_step_count} DEBUG:")
+                        print(f"{'='*70}")
+                        if policy.use_imitation:
+                            print(f"Imitation phase: {policy.imitation_phase:.4f} (period: {policy.gait_period:.3f}s)")
+                        print(f"Base state:")
+                        print(f"  Position: [{pos[0]:7.4f}, {pos[1]:7.4f}, {pos[2]:7.4f}]")
+                        print(f"  CoM height (root link): {com_height:7.4f}")
+                        print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
+                        print(f"\nObservation (shape {obs.shape}, total {obs.size}):")
+                        if policy.use_imitation:
+                            # Imitation order: command, phase, ang_vel, proj_grav, joint_pos, joint_vel, last_action
+                            print(f"  Command [0:3]:        {obs[0:3]}")
+                            print(f"  Phase [3:4]:          {obs[3:4]}")
+                            print(f"  Ang vel [4:7]:        {obs[4:7]}")
+                            print(f"  Proj grav [7:10]:     {obs[7:10]}")
+                            joint_start = 10
+                            print(f"  Joint pos [{joint_start}:{joint_start+policy.n_joints}]:     {obs[joint_start:joint_start+policy.n_joints]}")
+                            print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
+                            print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
+                        else:
+                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command
+                            print(f"  Ang vel [0:3]:        {obs[0:3]}")
+                            print(f"  Proj grav [3:6]:      {obs[3:6]}")
+                            print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
+                            print(f"  Joint vel [{6+policy.n_joints}:{6+2*policy.n_joints}]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
+                            print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
+                            cmd_end = 6+3*policy.n_joints+3
+                            print(f"  Command [{6+3*policy.n_joints}:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
+                        print(f"\nAction output:")
+                        print(f"  Raw action: {action}")
+                        print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
+                        if policy.use_delay:
+                            print(f"  Delay: {policy.current_lag} timesteps (buffered)")
+                        print(f"  Applied ctrl (first 5): {data.ctrl[:5]}")
+                        print(f"  Applied ctrl (last 5):  {data.ctrl[-5:]}")
+
+                # Step simulation 'decimation' times (matches mjlab env.step behavior)
+                for _ in range(decimation):
+                    mujoco.mj_step(model, data)
+
+                # Sync viewer
+                viewer.sync()
+
+                # Sleep to maintain real-time pacing
+                elapsed = time.time() - step_start
+                sleep_time = control_dt - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+        except KeyboardInterrupt:
+            print("\n\nKeyboardInterrupt received (Ctrl+C). Saving data...")
 
     print("\nInference stopped.")
 
@@ -661,6 +679,17 @@ def main():
         print(f"CSV file saved successfully!")
         print(f"  Columns: {len(fieldnames)}")
         print(f"  Rows: {len(csv_data)}")
+
+    # Save recorded observations if requested
+    if recorded_observations is not None and len(recorded_observations) > 0:
+        print(f"\nSaving {len(recorded_observations)} recorded observations to: {args.record}")
+
+        with open(args.record, 'wb') as f:
+            pickle.dump(recorded_observations, f)
+
+        print(f"✓ Recorded observations saved to {args.record}")
+        print(f"  Observations: {len(recorded_observations)}")
+        print(f"  Duration: {recorded_observations[-1]['timestamp']:.2f}s")
 
 
 if __name__ == "__main__":
