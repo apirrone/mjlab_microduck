@@ -40,8 +40,8 @@ FULL_COLLISION = CollisionCfg(
 )
 
 actuators = DelayedActuatorCfg(
-    delay_min_lag=2,  # Increased from 0 - real actuators have consistent delay
-    delay_max_lag=5,  # Increased from 3 - force lower-gain control
+    delay_min_lag=0,  # Increased from 0 - real actuators have consistent delay
+    delay_max_lag=3,  # Increased from 3 - force lower-gain control
     base_cfg=XmlPositionActuatorCfg(joint_names_expr=(r".*",)),
 )
 
