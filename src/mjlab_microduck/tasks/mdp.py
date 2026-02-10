@@ -955,3 +955,38 @@ def standing_envs_curriculum(
             cfg.rel_standing_envs = stage["rel_standing_envs"]
 
     return torch.tensor([cfg.rel_standing_envs])
+
+
+def raw_accelerometer(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Raw accelerometer reading (includes gravity + linear acceleration).
+
+    Returns normalized raw accelerometer which mimics what a real IMU measures.
+    This is different from pure projected_gravity which only reflects orientation.
+    
+    Returns:
+        torch.Tensor: Normalized raw accelerometer reading (num_envs, 3)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get linear acceleration in body frame
+    lin_acc_b = asset.data.root_link_lin_acc_b
+
+    # Get projected gravity in body frame
+    proj_grav_b = asset.data.projected_gravity_b
+
+    # Raw accelerometer = projected_gravity - linear_acceleration
+    # (accelerometer measures specific force)
+    raw_accel = proj_grav_b - lin_acc_b
+
+    # Normalize to unit vector
+    raw_accel_norm = torch.norm(raw_accel, dim=-1, keepdim=True)
+    raw_accel_normalized = torch.where(
+        raw_accel_norm > 0.1,
+        raw_accel / raw_accel_norm,
+        proj_grav_b
+    )
+
+    return raw_accel_normalized
