@@ -174,6 +174,12 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             weight=1.0,
             params={"command_name": "imitation", "std": 0.7},
         ),
+        # Velocity command tracking - reward for following velocity commands
+        "velocity_cmd_tracking": RewardTermCfg(
+            func=imitation_mdp.imitation_velocity_cmd_tracking_exp,
+            weight=1.0,  # Start small - can increase gradually (try 2.0, 3.0, etc.)
+            params={"command_name": "imitation", "std": 0.5},
+        ),
         "imitation_joint_pos_legs": RewardTermCfg(
             func=imitation_mdp.imitation_joint_position_error,
             weight=10.0,  # Reduced from 15.0 - allow feedback-driven leg movements
