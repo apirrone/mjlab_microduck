@@ -172,7 +172,7 @@ class PolicyInference:
         # result = vec - w * t + xyz × t
         return vec - w * t + np.cross(xyz, t)
 
-    def get_projected_gravity(self):
+    def get_raw_accelerometer(self):
         """Get raw accelerometer reading from MuJoCo sensor.
 
         Returns normalized raw accelerometer which includes gravity + linear acceleration.
@@ -248,7 +248,7 @@ class PolicyInference:
 
         Order for velocity task (no imitation):
         1. base_ang_vel (3D)
-        2. projected_gravity (3D)
+        2. raw_accelerometer (3D)
         3. joint_pos (14D) - relative to default
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
@@ -259,7 +259,7 @@ class PolicyInference:
         1. command (3D) - velocity command
         2. phase (1D) - raw phase [0, 1)
         3. base_ang_vel (3D)
-        4. projected_gravity (3D)
+        4. raw_accelerometer (3D)
         5. joint_pos (14D) - relative to default
         6. joint_vel (14D) - relative to default (zero)
         7. actions (14D) - last action
@@ -280,9 +280,9 @@ class PolicyInference:
         ang_vel = self.get_base_ang_vel()
         obs.append(ang_vel)
 
-        # Projected gravity from body frame (NO delay, NO noise) - 3D
-        proj_grav = self.get_projected_gravity()
-        obs.append(proj_grav)
+        # Raw accelerometer from sensor (NO delay, NO noise) - 3D
+        raw_accel = self.get_raw_accelerometer()
+        obs.append(raw_accel)
 
         # Joint positions (relative to default pose, NO noise) - n_joints
         joint_pos_rel = self.get_joint_pos_relative()
