@@ -252,7 +252,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         ),
         "body_ang_vel": RewardTermCfg(
             func=velocity_mdp.body_angular_velocity_penalty,
-            weight=-0.15,  # Increased from -0.05 - stronger damping to prevent oscillations
+            weight=-0.05,
             params={"asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",))},
         ),
     }
