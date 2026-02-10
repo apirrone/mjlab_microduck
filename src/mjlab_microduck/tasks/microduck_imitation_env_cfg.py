@@ -315,7 +315,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["raw_accelerometer"].delay_min_lag = 0
         cfg.observations["policy"].terms["raw_accelerometer"].delay_max_lag = 3
         cfg.observations["policy"].terms["raw_accelerometer"].delay_update_period = 64
-        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.05, n_max=0.05)
+        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.1, n_max=0.1)
 
         cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)
         cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)
