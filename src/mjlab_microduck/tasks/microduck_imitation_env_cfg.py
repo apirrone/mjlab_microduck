@@ -447,9 +447,9 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "magnitude_stages": [
                     # Start pushes from beginning - learn walking + robustness together
                     # This matches velocity task approach which transfers well
-                    {"step": 0, "magnitude": (0.05, 0.15)},            # Gentle from start
-                    {"step": 250 * 24, "magnitude": (0.1, 0.25)},      # Medium
-                    {"step": 500 * 24, "magnitude": (0.1, 0.35)},      # Stronger
+                    {"step": 0, "magnitude": (0.1, 0.25)},            # Gentle from start
+                    {"step": 250 * 24, "magnitude": (0.1, 0.35)},      # Medium
+                    {"step": 500 * 24, "magnitude": (0.1, 0.45)},      # Stronger
                     {"step": 750 * 24, "magnitude": (0.1, 0.5)},       # Full strength
                 ],
             },
