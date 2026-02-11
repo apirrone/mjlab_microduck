@@ -334,10 +334,10 @@ def make_microduck_standing_env_cfg(play: bool = False):
             params={
                 "event_name": "push_robot",
                 "magnitude_stages": [
-                    {"step": 0, "magnitude": (0.1, 0.2)},  # Start gentle
-                    {"step": 250 * 24, "magnitude": (0.1, 0.3)},
-                    {"step": 500 * 24, "magnitude": (0.1, 0.4)},
-                    {"step": 750 * 24, "magnitude": (0.1, 0.5)},  # Full strength
+                    {"step": 0, "magnitude": (0.1, 0.4)},  # Start gentle
+                    {"step": 250 * 24, "magnitude": (0.1, 0.5)},
+                    {"step": 500 * 24, "magnitude": (0.1, 0.6)},
+                    {"step": 750 * 24, "magnitude": (0.1, 0.7)},  # Full strength
                 ],
             },
         ),
