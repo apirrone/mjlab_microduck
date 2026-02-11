@@ -1067,3 +1067,28 @@ def randomize_imu_orientation(
     
     # Apply to the selected environments
     env.sim.model.site_quat[env_ids, site_id] = new_quat
+
+
+def standing_phase(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Simple time-based phase for standing task.
+
+    Returns a scalar phase value that cycles from 0 to 1 based on time.
+    This allows the policy to have a sense of time progression even when standing.
+
+    Args:
+        env: The RL environment
+        asset_cfg: Not used, but kept for API consistency
+
+    Returns:
+        Phase value [0, 1] as tensor of shape (num_envs, 1)
+    """
+    # Simple time-based phase that cycles every 2 seconds
+    # This gives the policy a time-varying signal
+    phase_period = 2.0  # seconds
+    time = env.episode_length_buf * env.step_dt
+    phase = (time % phase_period) / phase_period
+
+    return phase.unsqueeze(-1)  # Shape: (num_envs, 1)

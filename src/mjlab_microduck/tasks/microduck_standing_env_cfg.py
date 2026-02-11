@@ -16,6 +16,7 @@ from mjlab.tasks.velocity import mdp as velocity_mdp
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.tasks import imitation_mdp, mdp as microduck_mdp
+from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab_microduck.tasks.microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
 )
@@ -56,29 +57,48 @@ def make_microduck_standing_env_cfg(play: bool = False):
 
     cfg = make_microduck_velocity_env_cfg(play=play)
 
-    ##
-    # Commands - No velocity commands, just standing
-    ##
-
-    # Set all command velocities to zero (standing only)
-    command = cfg.commands["twist"]
-    command.rel_standing_envs = 1.0  # 100% standing environments
-    command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.0, 0.0)
-    command.ranges.lin_vel_y = (0.0, 0.0)
-    command.ranges.ang_vel_z = (0.0, 0.0)
+    # Determine motion file path (same as imitation task)
+    motion_file = str(Path(__file__).parent.parent / "data" / "reference_motion.pkl")
 
     ##
-    # Observations - Same as imitation task (raw accelerometer instead of projected gravity)
+    # Commands - Use ImitationCommand with zero velocity for compatibility
+    ##
+
+    # Use ImitationCommand so we have the same phase signal as imitation task
+    # This allows dynamic switching between standing and walking policies
+    cfg.commands = {
+        "imitation": ImitationCommandCfg(
+            entity_name="robot",
+            motion_file=motion_file,
+            resampling_time_range=(1.0e9, 1.0e9),  # Never resample
+            debug_vis=False,  # No ghost for standing
+            velocity_cmd_range={
+                "x": (0.0, 0.0),  # Standing only - no velocity commands
+                "y": (0.0, 0.0),
+                "yaw": (0.0, 0.0),
+            },
+            sampling_mode="uniform" if not play else "adaptive",
+        )
+    }
+
+    ##
+    # Observations - EXACT same as imitation task
     ##
 
     # Get base observations from velocity config
     base_obs = cfg.observations["policy"].terms
 
-    # Replace policy observations with standing-specific ones
-    # Order: base_ang_vel, raw_accelerometer, joint_pos, joint_vel, actions
-    # (no command needed since we're always standing)
+    # IMPORTANT: Keep exact same observation order as imitation task
+    # Order: command, phase, base_ang_vel, raw_accelerometer, joint_pos, joint_vel, actions
     policy_terms = {
+        "command": ObservationTermCfg(
+            func=imitation_mdp.velocity_command,
+            params={"command_name": "imitation"},
+        ),
+        "phase": ObservationTermCfg(
+            func=imitation_mdp.motion_phase,
+            params={"command_name": "imitation"},
+        ),
         "base_ang_vel": base_obs["base_ang_vel"],
         "raw_accelerometer": ObservationTermCfg(
             func=microduck_mdp.raw_accelerometer,
@@ -95,7 +115,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         concatenate_terms=True,
     )
 
-    # Critic gets same observations plus privileged info
+    # Critic gets same observations
     critic_terms = deepcopy(policy_terms)
     cfg.observations["critic"] = ObservationGroupCfg(
         terms=critic_terms,
@@ -124,10 +144,10 @@ def make_microduck_standing_env_cfg(play: bool = False):
         # Main reward: Match default standing pose
         "pose": RewardTermCfg(
             func=velocity_mdp.variable_posture,
-            weight=2.0,  # Primary reward for standing
+            weight=5.0,  # Increased - primary reward for standing
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
-                "command_name": "twist",
+                "command_name": "imitation",  # Use imitation command for consistency
                 "std_standing": std_standing,
                 "std_walking": std_standing,
                 "std_running": std_standing,
