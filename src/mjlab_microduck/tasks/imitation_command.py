@@ -252,15 +252,42 @@ class ImitationCommand(CommandTerm):
         vel_y_range = self.cfg.velocity_cmd_range.get("y", (0.0, 0.0))
         vel_yaw_range = self.cfg.velocity_cmd_range.get("yaw", (0.0, 0.0))
 
-        self.vel_cmd_x[env_ids] = sample_uniform(
-            vel_x_range[0], vel_x_range[1], (len(env_ids),), device=self.device
-        )
-        self.vel_cmd_y[env_ids] = sample_uniform(
-            vel_y_range[0], vel_y_range[1], (len(env_ids),), device=self.device
-        )
-        self.vel_cmd_yaw[env_ids] = sample_uniform(
-            vel_yaw_range[0], vel_yaw_range[1], (len(env_ids),), device=self.device
-        )
+        # Determine which environments should be standing (zero velocity)
+        if self.cfg.rel_standing_envs > 0:
+            # Randomly select a fraction of environments to have zero velocity
+            standing_mask = torch.rand(len(env_ids), device=self.device) < self.cfg.rel_standing_envs
+            moving_mask = ~standing_mask
+
+            # Sample velocities for moving environments
+            moving_env_ids = env_ids[moving_mask]
+            if len(moving_env_ids) > 0:
+                self.vel_cmd_x[moving_env_ids] = sample_uniform(
+                    vel_x_range[0], vel_x_range[1], (len(moving_env_ids),), device=self.device
+                )
+                self.vel_cmd_y[moving_env_ids] = sample_uniform(
+                    vel_y_range[0], vel_y_range[1], (len(moving_env_ids),), device=self.device
+                )
+                self.vel_cmd_yaw[moving_env_ids] = sample_uniform(
+                    vel_yaw_range[0], vel_yaw_range[1], (len(moving_env_ids),), device=self.device
+                )
+
+            # Set zero velocity for standing environments
+            standing_env_ids = env_ids[standing_mask]
+            if len(standing_env_ids) > 0:
+                self.vel_cmd_x[standing_env_ids] = 0.0
+                self.vel_cmd_y[standing_env_ids] = 0.0
+                self.vel_cmd_yaw[standing_env_ids] = 0.0
+        else:
+            # No standing environments, sample all uniformly
+            self.vel_cmd_x[env_ids] = sample_uniform(
+                vel_x_range[0], vel_x_range[1], (len(env_ids),), device=self.device
+            )
+            self.vel_cmd_y[env_ids] = sample_uniform(
+                vel_y_range[0], vel_y_range[1], (len(env_ids),), device=self.device
+            )
+            self.vel_cmd_yaw[env_ids] = sample_uniform(
+                vel_yaw_range[0], vel_yaw_range[1], (len(env_ids),), device=self.device
+            )
 
         # Update motion selection to match new velocity commands
         self._update_motion_selection()
@@ -382,6 +409,10 @@ class ImitationCommandCfg(CommandTermCfg):
     - 'uniform': phase sampled uniformly in [0, 1), velocity sampled uniformly from ranges
     - 'adaptive': phase sampled uniformly, motion (velocity) sampled proportional to failure rate
     """
+
+    rel_standing_envs: float = 0.0
+    """Fraction of environments that should have zero velocity commands (standing).
+    These environments will not track reference motion."""
 
     adaptive_uniform_ratio: float = 0.1
     """Baseline uniform probability added to failure-weighted sampling (prevents collapse)."""

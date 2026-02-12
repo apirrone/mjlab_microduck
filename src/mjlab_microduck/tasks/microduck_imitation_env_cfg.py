@@ -80,6 +80,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "yaw": (-1.0, 1.0),
             },
             sampling_mode="uniform" if not play else "adaptive",
+            rel_standing_envs=0.1,  # 10% of environments have zero velocity (standing)
         )
     }
 

@@ -98,32 +98,75 @@ def velocity_command(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
 # ============================================================================
 
 
+def _is_standing_command(command: ImitationCommand, threshold: float = 0.01) -> torch.Tensor:
+    """Check if command velocity is below threshold (standing environments).
+
+    Args:
+        command: The imitation command term
+        threshold: Velocity magnitude threshold (m/s)
+
+    Returns:
+        Boolean tensor of shape (num_envs,) indicating which envs are standing
+    """
+    vel_magnitude = torch.sqrt(
+        command.vel_cmd_x**2 + command.vel_cmd_y**2 + command.vel_cmd_yaw**2
+    )
+    return vel_magnitude < threshold
+
+
 def imitation_root_position_error_exp(
-    env: ManagerBasedRlEnv, command_name: str, std: float
+    env: ManagerBasedRlEnv, command_name: str, std: float, command_threshold: float = 0.01
 ) -> torch.Tensor:
-    """Reward for tracking reference root position."""
+    """Reward for tracking reference root position.
+
+    Skips tracking for standing environments (command magnitude < threshold).
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+
+    # Check which environments are standing (zero velocity command)
+    is_standing = _is_standing_command(command, command_threshold)
+
+    # Compute tracking error
     error = torch.sum(
         torch.square(command.root_pos - command.robot_root_pos), dim=-1
     )
-    return torch.exp(-error / std**2)
+    reward = torch.exp(-error / std**2)
+
+    # Return neutral reward (1.0) for standing environments
+    reward = torch.where(is_standing, torch.ones_like(reward), reward)
+    return reward
 
 
 def imitation_root_orientation_error_exp(
-    env: ManagerBasedRlEnv, command_name: str, std: float
+    env: ManagerBasedRlEnv, command_name: str, std: float, command_threshold: float = 0.01
 ) -> torch.Tensor:
-    """Reward for tracking reference root orientation."""
+    """Reward for tracking reference root orientation.
+
+    Skips tracking for standing environments (command magnitude < threshold).
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+
+    # Check which environments are standing
+    is_standing = _is_standing_command(command, command_threshold)
+
+    # Compute tracking error
     error = quat_error_magnitude(command.root_quat, command.robot_root_quat) ** 2
-    return torch.exp(-error / std**2)
+    reward = torch.exp(-error / std**2)
+
+    # Return neutral reward for standing environments
+    reward = torch.where(is_standing, torch.ones_like(reward), reward)
+    return reward
 
 
 def imitation_joint_position_error(
     env: ManagerBasedRlEnv,
     command_name: str,
     joint_names: str | tuple[str, ...] | None = None,
+    command_threshold: float = 0.01,
 ) -> torch.Tensor:
     """Negative squared error for tracking reference joint positions.
+
+    Skips tracking for standing environments (command magnitude < threshold).
 
     Note: Returns negative values (cost). Consider using imitation_joint_position_error_exp
     for a reward in (0, 1] that increases as tracking improves.
@@ -134,8 +177,13 @@ def imitation_joint_position_error(
         joint_names: Optional joint name pattern(s) to consider (supports regex).
             If None, all joints are used. This allows weighting different joint groups
             separately (e.g., ".*_leg_.*" for legs, ".*head.*" for head).
+        command_threshold: Velocity magnitude threshold to skip tracking (m/s).
     """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+
+    # Check which environments are standing
+    is_standing = _is_standing_command(command, command_threshold)
+
     ref_pos = command.joint_pos
     robot_pos = command.robot_joint_pos
     if joint_names is not None:
@@ -143,7 +191,11 @@ def imitation_joint_position_error(
         ref_pos = ref_pos[:, joint_ids]
         robot_pos = robot_pos[:, joint_ids]
     error = torch.sum(torch.square(ref_pos - robot_pos), dim=-1)
-    return -error
+    reward = -error
+
+    # Return neutral reward (0.0) for standing environments
+    reward = torch.where(is_standing, torch.zeros_like(reward), reward)
+    return reward
 
 
 def imitation_joint_position_error_exp(
@@ -231,25 +283,47 @@ def imitation_joint_velocity_error_exp(
 
 
 def imitation_linear_velocity_error_exp(
-    env: ManagerBasedRlEnv, command_name: str, std: float
+    env: ManagerBasedRlEnv, command_name: str, std: float, command_threshold: float = 0.01
 ) -> torch.Tensor:
-    """Reward for tracking reference world linear velocity."""
+    """Reward for tracking reference world linear velocity.
+
+    Skips tracking for standing environments (command magnitude < threshold).
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+
+    # Check which environments are standing
+    is_standing = _is_standing_command(command, command_threshold)
+
     error = torch.sum(
         torch.square(command.world_linear_vel - command.robot_world_linear_vel), dim=-1
     )
-    return torch.exp(-error / std**2)
+    reward = torch.exp(-error / std**2)
+
+    # Return neutral reward for standing environments
+    reward = torch.where(is_standing, torch.ones_like(reward), reward)
+    return reward
 
 
 def imitation_angular_velocity_error_exp(
-    env: ManagerBasedRlEnv, command_name: str, std: float
+    env: ManagerBasedRlEnv, command_name: str, std: float, command_threshold: float = 0.01
 ) -> torch.Tensor:
-    """Reward for tracking reference world angular velocity."""
+    """Reward for tracking reference world angular velocity.
+
+    Skips tracking for standing environments (command magnitude < threshold).
+    """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
+
+    # Check which environments are standing
+    is_standing = _is_standing_command(command, command_threshold)
+
     error = torch.sum(
         torch.square(command.world_angular_vel - command.robot_world_angular_vel), dim=-1
     )
-    return torch.exp(-error / std**2)
+    reward = torch.exp(-error / std**2)
+
+    # Return neutral reward for standing environments
+    reward = torch.where(is_standing, torch.ones_like(reward), reward)
+    return reward
 
 
 def foot_clearance_reward(
@@ -364,9 +438,16 @@ def imitation_velocity_cmd_tracking_exp(
 
 
 def imitation_foot_contact_match(
-    env: ManagerBasedRlEnv, command_name: str, sensor_name: str, force_threshold: float = 2.5, debug_print: bool = False
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    sensor_name: str,
+    force_threshold: float = 2.5,
+    debug_print: bool = False,
+    command_threshold: float = 0.01,
 ) -> torch.Tensor:
     """Reward for matching reference foot contacts.
+
+    Skips tracking for standing environments (command magnitude < threshold).
 
     Returns 1.0 when actual foot contacts match reference, 0.0 otherwise.
     Each foot is evaluated separately and the mean is returned.
@@ -376,10 +457,14 @@ def imitation_foot_contact_match(
             Should be high enough to distinguish between "foot firmly planted"
             and "foot lightly dragging". Default 2.5 N (~35% of robot weight per foot).
         debug_print: If True, print contact info for env 0 every 10 steps.
+        command_threshold: Velocity magnitude threshold to skip tracking (m/s).
     """
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
     sensor: ContactSensor = env.scene[sensor_name]
     assert sensor.data.found is not None
+
+    # Check which environments are standing
+    is_standing = _is_standing_command(command, command_threshold)
 
     # Reference foot contacts from motion data (num_envs, 2)
     ref_contact = command.foot_contacts > 0.5
@@ -411,7 +496,11 @@ def imitation_foot_contact_match(
 
     # Reward when contacts match
     match = (ref_contact == actual_contact).float()
-    return match.sum(dim=-1)
+    reward = match.sum(dim=-1)
+
+    # Return neutral reward (2.0 = perfect match for 2 feet) for standing environments
+    reward = torch.where(is_standing, torch.full_like(reward, 2.0), reward)
+    return reward
 
 
 # ============================================================================
