@@ -33,15 +33,15 @@ ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
-COM_RANDOMIZATION_RANGE = 0.003  # ±3mm
-MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)  # ±5% applied to BOTH mass and inertia together.
-KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
-KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
+COM_RANDOMIZATION_RANGE = 0.005  # ±3mm
+MASS_INERTIA_RANDOMIZATION_RANGE = (0.90, 1.0)  # ±5% applied to BOTH mass and inertia together.
+KP_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±15%
+KD_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
-IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 2.0  # ±2° IMU mounting error
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -80,7 +80,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "yaw": (-1.0, 1.0),
             },
             sampling_mode="uniform" if not play else "adaptive",
-            rel_standing_envs=0.1,  # 10% of environments have zero velocity (standing)
+            rel_standing_envs=0.0,  # Disable for now
         )
     }
 
@@ -333,7 +333,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["raw_accelerometer"].delay_min_lag = 0
         cfg.observations["policy"].terms["raw_accelerometer"].delay_max_lag = 3
         cfg.observations["policy"].terms["raw_accelerometer"].delay_update_period = 64
-        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.1, n_max=0.1)
+        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.15, n_max=0.15)
 
         cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)
         cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)
