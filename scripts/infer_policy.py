@@ -505,6 +505,15 @@ def main():
     # Data collection for recording (pickle)
     recorded_observations = [] if args.record else None
 
+    # Policy control for recording mode (start disabled, enable after 1s)
+    policy_enabled = not args.record  # Disabled if recording, enabled otherwise
+    policy_enable_time = None
+
+    # Save original kp gains for restoring after standby
+    original_kp = None
+    if args.record:
+        original_kp = model.actuator_gainprm[:, 0].copy()
+
     # Setup keyboard listener using pynput
     try:
         from pynput import keyboard as pynput_keyboard
@@ -557,12 +566,38 @@ def main():
         viewer.sync()
         start_time = time.time()
 
+        # Set policy enable time for recording mode
+        if args.record:
+            policy_enable_time = start_time + 1.0  # Enable after 1 second
+            print("Recording mode: policy will be enabled after 1 second standby")
+
+            # Set kp to 2.0 during standby to prevent falling (sim2real gap workaround)
+            # Note: Real robot is stable at kp=0.28, but sim needs higher kp to hold position
+            for i in range(model.nu):
+                model.actuator_gainprm[i, 0] = 2.0  # kp
+                model.actuator_biasprm[i, 1] = -2.0  # bias = -kp
+            print("  Standby mode: kp set to 2.0 to prevent falling (sim needs this, real doesn't)")
+
         try:
             # Track previous step time for accurate phase updates
             prev_step_time = time.time()
 
             while viewer.is_running():
                 step_start = time.time()
+
+                # Enable policy after 1 second in recording mode
+                if not policy_enabled and policy_enable_time is not None:
+                    if step_start >= policy_enable_time:
+                        policy_enabled = True
+
+                        # Restore original kp gains (back to training kp=0.28)
+                        if original_kp is not None:
+                            for i in range(model.nu):
+                                kp = original_kp[i]
+                                model.actuator_gainprm[i, 0] = kp
+                                model.actuator_biasprm[i, 1] = -kp
+                            print("✓ Policy inference enabled (after 1s standby)")
+                            print(f"  Restored original kp gains (range: [{original_kp.min():.2f}, {original_kp.max():.2f}])")
 
                 # Calculate actual elapsed time since last step
                 actual_dt = step_start - prev_step_time
@@ -572,8 +607,12 @@ def main():
                 # This ensures phase stays synchronized even if control loop runs faster/slower than target
                 policy.update_phase(actual_dt)
 
-                # Control loop: run inference and apply action
-                action = policy.infer()
+                # Control loop: run inference and apply action (or hold default position during standby)
+                if policy_enabled:
+                    action = policy.infer()
+                else:
+                    # During standby, use zero actions (hold default position)
+                    action = np.zeros(policy.n_joints, dtype=np.float32)
                 policy.apply_action(action)
 
                 control_step_count += 1
