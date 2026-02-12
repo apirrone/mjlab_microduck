@@ -465,10 +465,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 "velocity_stages": [
                     # Start pushes from beginning - learn walking + robustness together
                     # This matches velocity task approach which transfers well
-                    {"step": 0, "velocity_range": (-0.3, 0.3)},       # Gentle from start
-                    {"step": 250 * 24, "velocity_range": (-0.4, 0.4)},  # Medium
-                    {"step": 500 * 24, "velocity_range": (-0.5, 0.5)},  # Stronger
-                    {"step": 750 * 24, "velocity_range": (-0.6, 0.6)},  # Full strength
+                    {"step": 0, "velocity_range": (-0.4, 0.4)},       # Gentle from start
+                    {"step": 250 * 24, "velocity_range": (-0.6, 0.6)},  # Medium
+                    {"step": 500 * 24, "velocity_range": (-0.8, 0.8)},  # Stronger
+                    {"step": 750 * 24, "velocity_range": (-1.0, 1.0)},  # Full strength
                 ],
             },
         ),
