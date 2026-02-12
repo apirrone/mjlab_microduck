@@ -1171,3 +1171,66 @@ def adaptive_pose_weight(
     )
 
     return base_pose_reward * weight
+
+
+def randomize_base_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_pitch_deg: float = 10.0,
+    max_roll_deg: float = 5.0,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize base orientation at episode start to force reactive behavior.
+
+    Adds random pitch and roll to the robot's base orientation at the start of
+    each episode. This prevents the policy from memorizing a single initial state
+    and forces it to use feedback to adapt to different orientations.
+
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize
+        max_pitch_deg: Maximum pitch angle in degrees (forward/backward tilt)
+        max_roll_deg: Maximum roll angle in degrees (side-to-side tilt)
+        asset_cfg: Asset configuration
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+
+    asset: Entity = env.scene[asset_cfg.name]
+    num_envs = len(env_ids)
+
+    # Generate random pitch and roll angles
+    max_pitch_rad = max_pitch_deg * torch.pi / 180.0
+    max_roll_rad = max_roll_deg * torch.pi / 180.0
+
+    pitch = (torch.rand(num_envs, device=env.device) * 2 - 1) * max_pitch_rad
+    roll = (torch.rand(num_envs, device=env.device) * 2 - 1) * max_roll_rad
+    yaw = torch.zeros(num_envs, device=env.device)  # Keep yaw at 0
+
+    # Convert Euler angles (roll, pitch, yaw) to quaternion
+    # Using the standard aerospace sequence (ZYX)
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    cp = torch.cos(pitch * 0.5)
+    sp = torch.sin(pitch * 0.5)
+    cr = torch.cos(roll * 0.5)
+    sr = torch.sin(roll * 0.5)
+
+    quat_w = cr * cp * cy + sr * sp * sy
+    quat_x = sr * cp * cy - cr * sp * sy
+    quat_y = cr * sp * cy + sr * cp * sy
+    quat_z = cr * cp * sy - sr * sp * cy
+
+    new_quat = torch.stack([quat_w, quat_x, quat_y, quat_z], dim=1)
+
+    # Normalize quaternion
+    new_quat = new_quat / torch.norm(new_quat, dim=1, keepdim=True)
+
+    # Get root position index (freejoint starts at qpos index 0)
+    # Freejoint: [x, y, z, qw, qx, qy, qz]
+    root_quat_idx = 3  # Quaternion starts at index 3
+
+    # Apply the randomized orientation to selected environments
+    env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat

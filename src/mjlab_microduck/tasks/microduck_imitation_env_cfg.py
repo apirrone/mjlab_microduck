@@ -30,11 +30,12 @@ ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint mo
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
 ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
+ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
 COM_RANDOMIZATION_RANGE = 0.005  # ±3mm
-MASS_INERTIA_RANDOMIZATION_RANGE = (0.90, 1.0)  # ±5% applied to BOTH mass and inertia together.
+MASS_INERTIA_RANDOMIZATION_RANGE = (0.90, 1.1)  # ±5% applied to BOTH mass and inertia together.
 KP_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.8, 1.2)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
@@ -42,6 +43,8 @@ JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - aff
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
+BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
+BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -288,22 +291,22 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     # and hurt sim2real transfer. The robot needs to learn how to recover from
     # deviations rather than immediately dying when it deviates from reference.
     #
-    cfg.terminations["root_pos_error"] = TerminationTermCfg(
-        func=imitation_mdp.bad_root_pos,
-        params={
-            "command_name": "imitation",
-            "threshold": 0.15,
-            "curriculum_threshold_name": "root_pos_threshold",
-        },
-    )
-    cfg.terminations["root_ori_error"] = TerminationTermCfg(
-        func=imitation_mdp.bad_root_ori,
-        params={
-            "command_name": "imitation",
-            "threshold": 0.8,
-            "curriculum_threshold_name": "root_ori_threshold",
-        },
-    )
+    # cfg.terminations["root_pos_error"] = TerminationTermCfg(
+        # func=imitation_mdp.bad_root_pos,
+        # params={
+            # "command_name": "imitation",
+            # "threshold": 0.15,
+            # "curriculum_threshold_name": "root_pos_threshold",
+        # },
+    # )
+    # cfg.terminations["root_ori_error"] = TerminationTermCfg(
+        # func=imitation_mdp.bad_root_ori,
+        # params={
+            # "command_name": "imitation",
+            # "threshold": 0.8,
+            # "curriculum_threshold_name": "root_ori_threshold",
+        # },
+    # )
     # Keep the fell_over termination from base config
 
     ##
@@ -413,6 +416,18 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
                 "max_angle_deg": IMU_ORIENTATION_RANDOMIZATION_ANGLE,
+            },
+        )
+
+    # Base orientation randomization (forces reactive behavior)
+    if ENABLE_BASE_ORIENTATION_RANDOMIZATION:
+        cfg.events["randomize_base_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_base_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_pitch_deg": BASE_ORIENTATION_MAX_PITCH_DEG,
+                "max_roll_deg": BASE_ORIENTATION_MAX_ROLL_DEG,
             },
         )
 
