@@ -143,9 +143,10 @@ def make_microduck_standing_env_cfg(play: bool = False):
 
     cfg.rewards = {
         # Main reward: Match default standing pose
+        # Reduced weight to allow recovery stepping
         "pose": RewardTermCfg(
             func=velocity_mdp.variable_posture,
-            weight=4.0,
+            weight=2.5,  # Reduced from 4.0 to allow stepping
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
                 "command_name": "imitation",  # Use imitation command for consistency
@@ -154,6 +155,16 @@ def make_microduck_standing_env_cfg(play: bool = False):
                 "std_running": std_standing,
                 "walking_threshold": 0.01,  # Always use standing std
                 "running_threshold": 1.5,
+            },
+        ),
+        # Reward taking steps when pushed (recovery behavior)
+        "recovery_stepping": RewardTermCfg(
+            func=microduck_mdp.recovery_stepping_reward,
+            weight=3.0,  # Encourage stepping when velocity is high
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "velocity_threshold": 0.3,  # Start rewarding stepping above 0.3 m/s
+                "air_time_threshold": 0.05,  # Foot must be in air for at least 50ms
             },
         ),
         # Stay upright
@@ -212,7 +223,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=2.0,
+            weight=3.0,  # Increased to encourage survival via recovery steps
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,

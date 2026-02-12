@@ -1092,3 +1092,82 @@ def standing_phase(
     phase = (time % phase_period) / phase_period
 
     return phase.unsqueeze(-1)  # Shape: (num_envs, 1)
+
+
+def recovery_stepping_reward(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    velocity_threshold: float = 0.3,
+    air_time_threshold: float = 0.05,
+) -> torch.Tensor:
+    """Reward foot air time only when robot has high velocity (recovering from push).
+
+    This encourages the robot to take steps to recover balance when pushed,
+    but doesn't reward unnecessary stepping when standing still.
+
+    Args:
+        env: The RL environment
+        asset_cfg: Asset configuration (unused but kept for API consistency)
+        velocity_threshold: Linear velocity threshold to activate stepping reward (m/s)
+        air_time_threshold: Minimum air time to count as a step (seconds)
+
+    Returns:
+        Reward tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get base linear velocity magnitude
+    base_lin_vel = asset.data.root_link_vel_w[:, :3]  # (num_envs, 3)
+    vel_magnitude = torch.norm(base_lin_vel[:, :2], dim=1)  # Only XY plane
+
+    # Only reward stepping when velocity is high (being pushed)
+    should_step = vel_magnitude > velocity_threshold
+
+    # Get foot air time from contact sensor
+    contact_sensor = env.scene.sensors["feet_ground_contact"]
+    air_time = contact_sensor.data.last_air_time[:, :2]  # (num_envs, 2) - left and right foot
+
+    # Reward if either foot has been in air recently
+    foot_in_air = (air_time > air_time_threshold).any(dim=1)  # (num_envs,)
+
+    # Only give reward when both conditions are met
+    reward = should_step.float() * foot_in_air.float()
+
+    return reward
+
+
+def adaptive_pose_weight(
+    env: ManagerBasedRlEnv,
+    base_pose_reward: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    velocity_threshold: float = 0.3,
+    min_weight: float = 0.3,
+) -> torch.Tensor:
+    """Reduce pose tracking weight when robot has high velocity (recovering from push).
+
+    This gives the robot freedom to deviate from the standing pose when taking
+    recovery steps, while maintaining strict pose tracking when standing still.
+
+    Args:
+        env: The RL environment
+        base_pose_reward: The original pose reward (before weighting)
+        asset_cfg: Asset configuration (unused but kept for API consistency)
+        velocity_threshold: Linear velocity threshold to start reducing weight (m/s)
+        min_weight: Minimum weight multiplier (0-1) at high velocities
+
+    Returns:
+        Weighted reward tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get base linear velocity magnitude
+    base_lin_vel = asset.data.root_link_vel_w[:, :3]  # (num_envs, 3)
+    vel_magnitude = torch.norm(base_lin_vel[:, :2], dim=1)  # Only XY plane
+
+    # Compute weight: 1.0 when stationary, min_weight at high velocity
+    # Use smooth transition via sigmoid-like function
+    weight = min_weight + (1.0 - min_weight) * torch.exp(
+        -((vel_magnitude - velocity_threshold) / velocity_threshold).clamp(min=0.0) ** 2
+    )
+
+    return base_pose_reward * weight
