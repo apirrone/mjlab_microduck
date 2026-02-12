@@ -9,7 +9,7 @@ ENABLE_KD_RANDOMIZATION = True
 ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
-ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
@@ -19,8 +19,8 @@ KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
-EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
-EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
+VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
+VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -277,28 +277,28 @@ def make_microduck_velocity_env_cfg(
     ].geom_names = foot_frictions_geom_names
     cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
 
-    # External force disturbances during episode
-    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
+    # Velocity-based pushes for robustness training
+    if ENABLE_VELOCITY_PUSHES:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Replace push_robot with apply_external_force_torque for better physical realism
-        # Forces need to be symmetric (positive and negative) for random directions
+
+        # In play mode, use shorter interval for better visibility
+        interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
+        velocity_range = (
+            (-1.5, 1.5) if play else VELOCITY_PUSH_RANGE
+        )  # Larger pushes in play mode for visibility
+
         cfg.events["push_robot"] = EventTermCfg(
-            func=mdp.apply_external_force_torque,
+            func=mdp.push_by_setting_velocity,
             mode="interval",
-            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            interval_range_s=interval,
             params={
-                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
-                "torque_range": (0.0, 0.0),  # Only linear forces, no torques
-                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "velocity_range": {
+                    "x": velocity_range,
+                    "y": velocity_range,
+                },
+                "asset_cfg": SceneEntityCfg("robot"),
             },
         )
-    else:
-        # Keep original velocity-based push but with very long interval
-        cfg.events["push_robot"].params["velocity_range"] = {
-            "x": (-0.3, 0.3),
-            "y": (-0.3, 0.3),
-        }
-        cfg.events["push_robot"].interval_range_s = (1e6, 1e6)
 
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:

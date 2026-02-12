@@ -28,7 +28,7 @@ ENABLE_KD_RANDOMIZATION = True
 ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
-ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 
 # Domain randomization ranges (adjust as needed)
@@ -39,8 +39,8 @@ KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
-EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
-EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
+VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
+VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
 
 
@@ -341,16 +341,24 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     # Domain Randomization Events
     ##
 
-    # External force disturbances during episode
-    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
+    # Velocity-based pushes for robustness training
+    if ENABLE_VELOCITY_PUSHES:
+        # In play mode, use shorter interval for better visibility
+        interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
+        velocity_range = (
+            (-1.5, 1.5) if play else VELOCITY_PUSH_RANGE
+        )  # Larger pushes in play mode for visibility
+
         cfg.events["push_robot"] = EventTermCfg(
-            func=velocity_mdp.apply_external_force_torque,
+            func=velocity_mdp.push_by_setting_velocity,
             mode="interval",
-            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            interval_range_s=interval,
             params={
-                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
-                "torque_range": (0.0, 0.0),
-                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "velocity_range": {
+                    "x": velocity_range,
+                    "y": velocity_range,
+                },
+                "asset_cfg": SceneEntityCfg("robot"),
             },
         )
 
@@ -450,17 +458,17 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
-        "external_force_magnitude": CurriculumTermCfg(
-            func=imitation_mdp.external_force_magnitude_curriculum,
+        "velocity_push_magnitude": CurriculumTermCfg(
+            func=imitation_mdp.velocity_push_magnitude_curriculum,
             params={
                 "event_name": "push_robot",
-                "magnitude_stages": [
+                "velocity_stages": [
                     # Start pushes from beginning - learn walking + robustness together
                     # This matches velocity task approach which transfers well
-                    {"step": 0, "magnitude": (0.1, 0.25)},            # Gentle from start
-                    {"step": 250 * 24, "magnitude": (0.1, 0.35)},      # Medium
-                    {"step": 500 * 24, "magnitude": (0.1, 0.45)},      # Stronger
-                    {"step": 750 * 24, "magnitude": (0.1, 0.5)},       # Full strength
+                    {"step": 0, "velocity_range": (-0.3, 0.3)},       # Gentle from start
+                    {"step": 250 * 24, "velocity_range": (-0.4, 0.4)},  # Medium
+                    {"step": 500 * 24, "velocity_range": (-0.5, 0.5)},  # Stronger
+                    {"step": 750 * 24, "velocity_range": (-0.6, 0.6)},  # Full strength
                 ],
             },
         ),

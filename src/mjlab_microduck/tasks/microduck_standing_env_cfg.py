@@ -21,6 +21,7 @@ from mjlab_microduck.tasks.microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
 )
 
+
 # Domain randomization toggles - same as imitation
 ENABLE_COM_RANDOMIZATION = True
 ENABLE_KP_RANDOMIZATION = True
@@ -28,7 +29,7 @@ ENABLE_KD_RANDOMIZATION = True
 ENABLE_MASS_INERTIA_RANDOMIZATION = True
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False
-ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True
 
 # Domain randomization ranges (same as imitation)
@@ -38,8 +39,8 @@ KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10%
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2%
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2%
-EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
-EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
+VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
+VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±1° IMU mounting error
 
 
@@ -294,16 +295,24 @@ def make_microduck_standing_env_cfg(play: bool = False):
             },
         )
 
-    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
-        # External force perturbations to teach robustness
+    if ENABLE_VELOCITY_PUSHES:
+        # Velocity-based pushes for robustness training
+        # In play mode, use shorter interval for better visibility
+        interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
+        velocity_range = (
+            (-1.5, 1.5) if play else VELOCITY_PUSH_RANGE
+        )  # Larger pushes in play mode for visibility
+
         cfg.events["push_robot"] = EventTermCfg(
-            func=velocity_mdp.apply_external_force_torque,
+            func=velocity_mdp.push_by_setting_velocity,
             mode="interval",
-            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            interval_range_s=interval,
             params={
-                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
-                "torque_range": (0.0, 0.0),
-                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "velocity_range": {
+                    "x": velocity_range,
+                    "y": velocity_range,
+                },
+                "asset_cfg": SceneEntityCfg("robot"),
             },
         )
 
@@ -328,16 +337,17 @@ def make_microduck_standing_env_cfg(play: bool = False):
     ##
 
     cfg.curriculum = {
-        # Gradually increase external force magnitude
-        "external_force_magnitude": CurriculumTermCfg(
-            func=imitation_mdp.external_force_magnitude_curriculum,
+        # Gradually increase velocity push magnitude for progressive robustness training
+        "velocity_push_magnitude": CurriculumTermCfg(
+            func=imitation_mdp.velocity_push_magnitude_curriculum,
             params={
                 "event_name": "push_robot",
-                "magnitude_stages": [
-                    {"step": 0, "magnitude": (0.1, 0.6)},
-                    {"step": 250 * 24, "magnitude": (0.1, 0.7)},
-                    {"step": 500 * 24, "magnitude": (0.1, 0.8)},
-                    {"step": 750 * 24, "magnitude": (0.1, 1.0)},
+                "velocity_stages": [
+                    {"step": 0, "velocity_range": (-0.3, 0.3)},  # Start gentle
+                    {"step": 250 * 24, "velocity_range": (-0.4, 0.4)},
+                    {"step": 500 * 24, "velocity_range": (-0.5, 0.5)},
+                    {"step": 750 * 24, "velocity_range": (-0.6, 0.6)},
+                    {"step": 1000 * 24, "velocity_range": (-0.7, 0.7)},
                 ],
             },
         ),

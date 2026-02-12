@@ -548,3 +548,49 @@ def external_force_magnitude_curriculum(
         )
 
     return torch.tensor([current_magnitude[1]])
+
+
+def velocity_push_magnitude_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    velocity_stages: list[dict],
+) -> torch.Tensor:
+    """Update velocity push magnitude based on training progress.
+
+    Updates the velocity_range parameter of a velocity push event.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        event_name: Name of the event to update (e.g., "push_robot")
+        velocity_stages: List of dicts with 'step' and 'velocity_range' keys
+            Example: [
+                {"step": 0, "velocity_range": (-0.3, 0.3)},  # Gentle
+                {"step": 36000, "velocity_range": (-0.5, 0.5)},  # Strong
+            ]
+
+    Returns:
+        Current velocity range max value as a tensor
+    """
+    del env_ids  # Unused
+
+    # Try to get the event term configuration
+    try:
+        event_term_cfg = env.event_manager.get_term_cfg(event_name)
+    except ValueError:
+        # Event not found, return 0.0
+        return torch.tensor([0.0])
+
+    # Find current velocity range based on training progress
+    current_velocity = velocity_stages[0]["velocity_range"]  # Default to first stage
+    for stage in velocity_stages:
+        if env.common_step_counter >= stage["step"]:
+            current_velocity = stage["velocity_range"]
+
+    # Update the velocity_range parameter in the event term's params
+    if "velocity_range" in event_term_cfg.params:
+        event_term_cfg.params["velocity_range"]["x"] = current_velocity
+        event_term_cfg.params["velocity_range"]["y"] = current_velocity
+
+    return torch.tensor([current_velocity[1]])
