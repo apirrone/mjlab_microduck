@@ -40,7 +40,7 @@ KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10%
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2%
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2%
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
-VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
+VELOCITY_PUSH_RANGE = (-0.6, 0.6)  # Velocity change range in m/s
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±1° IMU mounting error
 
 
@@ -145,7 +145,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         # Main reward: Match default standing pose
         "pose": RewardTermCfg(
             func=velocity_mdp.variable_posture,
-            weight=5.0,  # Increased - primary reward for standing
+            weight=3.0,  # Increased - primary reward for standing
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
                 "command_name": "imitation",  # Use imitation command for consistency
@@ -212,7 +212,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=1.0,
+            weight=10.0,
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
