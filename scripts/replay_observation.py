@@ -66,64 +66,117 @@ def load_observations(pkl_path: str):
     return np.array(observations), np.array(timestamps)
 
 
-def extract_actions_from_observations(observations: np.ndarray) -> np.ndarray:
+def extract_actions_from_observations(observations: np.ndarray, imitation: bool = False) -> np.ndarray:
     """
     Extract actions from observation vectors.
 
-    Observation structure (51D or 53D):
+    Standard observation structure (51D):
     [0:3]    - Base angular velocity
     [3:6]    - Projected gravity
     [6:20]   - Joint positions relative (14D)
     [20:34]  - Joint velocities (14D)
     [34:48]  - Last action (14D) <- THIS IS WHAT WE WANT
     [48:51]  - Velocity command (3D)
-    [51:53]  - Imitation phase [optional] (2D)
-    """
-    if observations.shape[1] < 48:
-        raise ValueError(f"Observation dimension too small: {observations.shape[1]}, expected at least 48")
 
-    # Extract actions from indices 34:48
-    actions = observations[:, 34:48]
+    Imitation observation structure (53D):
+    [0:3]    - Velocity command (3D)
+    [3:5]    - Phase (2D) - [cos(2π*phase), sin(2π*phase)]
+    [5:8]    - Base angular velocity (3D)
+    [8:11]   - Raw accelerometer (3D)
+    [11:25]  - Joint positions relative (14D)
+    [25:39]  - Joint velocities (14D)
+    [39:53]  - Last action (14D) <- THIS IS WHAT WE WANT
+    """
+    if imitation:
+        if observations.shape[1] < 53:
+            raise ValueError(f"Imitation observation dimension too small: {observations.shape[1]}, expected 53")
+        # Extract actions from indices 39:53 for imitation
+        actions = observations[:, 39:53]
+    else:
+        if observations.shape[1] < 48:
+            raise ValueError(f"Observation dimension too small: {observations.shape[1]}, expected at least 48")
+        # Extract actions from indices 34:48 for standard
+        actions = observations[:, 34:48]
     return actions
 
 
-def construct_observation(data, last_action):
+def construct_observation(data, last_action, imitation=False):
     """
     Construct observation from MuJoCo data state.
 
-    Observation structure (51D):
+    Standard observation structure (51D):
     [0:3]    - Base angular velocity
     [3:6]    - Projected gravity
     [6:20]   - Joint positions relative (14D)
     [20:34]  - Joint velocities (14D)
     [34:48]  - Last action (14D)
     [48:51]  - Velocity command (3D) [zeros for replay]
+
+    Imitation observation structure (53D):
+    [0:3]    - Velocity command (3D) [zeros for replay]
+    [3:5]    - Phase (2D) - [cos(2π*phase), sin(2π*phase)] [set to [1, 0] for phase=0]
+    [5:8]    - Base angular velocity (3D)
+    [8:11]   - Raw accelerometer (3D)
+    [11:25]  - Joint positions relative (14D)
+    [25:39]  - Joint velocities (14D)
+    [39:53]  - Last action (14D)
     """
-    obs = np.zeros(51)
+    if imitation:
+        obs = np.zeros(53)
 
-    # Base angular velocity (body frame)
-    obs[0:3] = data.qvel[3:6]
+        # Velocity command (zeros for replay)
+        obs[0:3] = 0.0
 
-    # Projected gravity (rotate gravity vector to body frame)
-    gravity = np.array([0, 0, -1])
-    base_quat = data.qpos[3:7]  # [w, x, y, z]
-    # Convert to rotation matrix and apply inverse rotation
-    base_rot = np.zeros((3, 3))
-    mujoco.mju_quat2Mat(base_rot.ravel(), base_quat)
-    projected_gravity = base_rot.T @ gravity
-    obs[3:6] = projected_gravity
+        # Phase [cos, sin] (set to [1, 0] for phase=0)
+        obs[3:5] = [1.0, 0.0]
 
-    # Joint positions relative to default (qpos[7:21] are joint positions)
-    obs[6:20] = data.qpos[7:21] - DEFAULT_POSE
+        # Base angular velocity (body frame)
+        obs[5:8] = data.qvel[3:6]
 
-    # Joint velocities (qvel[6:20] are joint velocities)
-    obs[20:34] = data.qvel[6:20]
+        # Raw accelerometer (linear acceleration in body frame)
+        # Approximate as projected gravity for stationary replay
+        gravity = np.array([0, 0, -9.81])
+        base_quat = data.qpos[3:7]  # [w, x, y, z]
+        base_rot = np.zeros((3, 3))
+        mujoco.mju_quat2Mat(base_rot.ravel(), base_quat)
+        raw_accel = base_rot.T @ gravity
+        obs[8:11] = raw_accel
 
-    # Last action
-    obs[34:48] = last_action
+        # Joint positions relative to default
+        obs[11:25] = data.qpos[7:21] - DEFAULT_POSE
 
-    # Velocity command (zeros for replay)
-    obs[48:51] = 0.0
+        # Joint velocities
+        obs[25:39] = data.qvel[6:20]
+
+        # Last action
+        obs[39:53] = last_action
+
+    else:
+        obs = np.zeros(51)
+
+        # Base angular velocity (body frame)
+        obs[0:3] = data.qvel[3:6]
+
+        # Projected gravity (rotate gravity vector to body frame)
+        gravity = np.array([0, 0, -1])
+        base_quat = data.qpos[3:7]  # [w, x, y, z]
+        # Convert to rotation matrix and apply inverse rotation
+        base_rot = np.zeros((3, 3))
+        mujoco.mju_quat2Mat(base_rot.ravel(), base_quat)
+        projected_gravity = base_rot.T @ gravity
+        obs[3:6] = projected_gravity
+
+        # Joint positions relative to default (qpos[7:21] are joint positions)
+        obs[6:20] = data.qpos[7:21] - DEFAULT_POSE
+
+        # Joint velocities (qvel[6:20] are joint velocities)
+        obs[20:34] = data.qvel[6:20]
+
+        # Last action
+        obs[34:48] = last_action
+
+        # Velocity command (zeros for replay)
+        obs[48:51] = 0.0
 
     return obs
 
@@ -150,7 +203,7 @@ def initialize_robot(model, data, hang=False):
 
 
 def replay_observations_with_viewer(model, data, actions, timestamps, action_scale=1.0,
-                                   real_time=True, hang=False, record_output=None, decimation=4):
+                                   real_time=True, hang=False, record_output=None, decimation=4, imitation=False):
     """
     Replay actions on the robot with viewer.
 
@@ -163,6 +216,7 @@ def replay_observations_with_viewer(model, data, actions, timestamps, action_sca
         real_time: If True, replay at actual timing. If False, step as fast as possible.
         hang: If True, robot hangs in the air. If False, robot stands on ground.
         record_output: If provided, save recorded observations to this file path.
+        imitation: If True, use imitation observation structure (53D instead of 51D).
     """
     print(f"Replaying {len(actions)} actions...")
     print(f"Duration: {timestamps[-1]:.2f}s")
@@ -221,7 +275,7 @@ def replay_observations_with_viewer(model, data, actions, timestamps, action_sca
 
             # Record observation at step i with last_action = actions[i]
             if record_output:
-                obs = construct_observation(data, actions[i])
+                obs = construct_observation(data, actions[i], imitation=imitation)
                 recorded_observations.append(obs)
                 recorded_timestamps.append(timestamps[i])
 
@@ -265,7 +319,7 @@ def replay_observations_with_viewer(model, data, actions, timestamps, action_sca
 
 
 def replay_observations_no_viewer(model, data, actions, timestamps, action_scale=1.0,
-                                 real_time=True, hang=False, record_output=None, decimation=4):
+                                 real_time=True, hang=False, record_output=None, decimation=4, imitation=False):
     """
     Replay actions on the robot without viewer (headless mode).
 
@@ -278,6 +332,7 @@ def replay_observations_no_viewer(model, data, actions, timestamps, action_scale
         real_time: If True, replay at actual timing. If False, step as fast as possible.
         hang: If True, robot hangs in the air. If False, robot stands on ground.
         record_output: If provided, save recorded observations to this file path.
+        imitation: If True, use imitation observation structure (53D instead of 51D).
     """
     print(f"Replaying {len(actions)} actions (no viewer)...")
     print(f"Duration: {timestamps[-1]:.2f}s")
@@ -330,7 +385,7 @@ def replay_observations_no_viewer(model, data, actions, timestamps, action_scale
 
         # Record observation at step i with last_action = actions[i]
         if record_output:
-            obs = construct_observation(data, actions[i])
+            obs = construct_observation(data, actions[i], imitation=imitation)
             recorded_observations.append(obs)
             recorded_timestamps.append(timestamps[i])
 
@@ -381,6 +436,8 @@ def main():
                        help="Robot hangs in the air instead of standing on ground")
     parser.add_argument("--record-output", type=str,
                        help="Path to save recorded observations from simulation (e.g., sim_observations.pkl)")
+    parser.add_argument("--imitation", action="store_true",
+                       help="Use imitation observation structure (53D: command[3], phase[2], base_ang_vel[3], raw_accel[3], joints[28], actions[14])")
 
     args = parser.parse_args()
 
@@ -402,7 +459,9 @@ def main():
 
     # Extract actions
     print("Extracting actions from observations...")
-    actions = extract_actions_from_observations(observations)
+    if args.imitation:
+        print("Using imitation observation structure (53D)")
+    actions = extract_actions_from_observations(observations, imitation=args.imitation)
     print(f"Extracted {len(actions)} actions (shape: {actions.shape})")
 
     # Load MuJoCo model
@@ -432,7 +491,8 @@ def main():
                 real_time=not args.no_real_time,
                 hang=args.hang,
                 record_output=args.record_output,
-                decimation=decimation
+                decimation=decimation,
+                imitation=args.imitation
             )
         else:
             recorded_obs, recorded_ts = replay_observations_with_viewer(
@@ -441,7 +501,8 @@ def main():
                 real_time=not args.no_real_time,
                 hang=args.hang,
                 record_output=args.record_output,
-                decimation=decimation
+                decimation=decimation,
+                imitation=args.imitation
             )
 
         # Save recorded observations if requested

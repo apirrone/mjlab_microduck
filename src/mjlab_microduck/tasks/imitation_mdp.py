@@ -80,9 +80,10 @@ def motion_joint_vel_error(env: ManagerBasedRlEnv, command_name: str) -> torch.T
 
 
 def motion_phase(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:
-    """Current gait phase [0, 1)."""
+    """Current gait phase as [cos(2π*phase), sin(2π*phase)]."""
     command = cast(ImitationCommand, env.command_manager.get_term(command_name))
-    return command.phase.unsqueeze(-1)
+    phase_rad = command.phase * 2 * torch.pi
+    return torch.stack([torch.cos(phase_rad), torch.sin(phase_rad)], dim=-1)
 
 
 def velocity_command(env: ManagerBasedRlEnv, command_name: str) -> torch.Tensor:

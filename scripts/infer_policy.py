@@ -232,11 +232,12 @@ class PolicyInference:
         return self.data.qvel[6:6 + self.n_joints].copy().astype(np.float32)
 
     def get_imitation_phase_obs(self):
-        """Get imitation phase observation as raw phase value [0, 1).
+        """Get imitation phase observation as [cos(2π*phase), sin(2π*phase)].
 
-        This matches ImitationCommand.phase which returns raw phase [0, 1).
+        This matches ImitationCommand.phase encoding.
         """
-        return np.array([self.imitation_phase], dtype=np.float32)
+        phase_rad = self.imitation_phase * 2 * np.pi
+        return np.array([np.cos(phase_rad), np.sin(phase_rad)], dtype=np.float32)
 
     def update_phase(self, dt):
         """Update the gait phase based on elapsed time."""
@@ -258,13 +259,13 @@ class PolicyInference:
 
         Order for imitation task (use_imitation=True):
         1. command (3D) - velocity command
-        2. phase (1D) - raw phase [0, 1)
+        2. phase (2D) - [cos(2π*phase), sin(2π*phase)]
         3. base_ang_vel (3D)
         4. raw_accelerometer (3D)
         5. joint_pos (14D) - relative to default
         6. joint_vel (14D) - relative to default (zero)
         7. actions (14D) - last action
-        Total: 52D
+        Total: 53D
         """
         obs = []
 
@@ -273,7 +274,7 @@ class PolicyInference:
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
 
-            # Imitation phase (raw phase value) - 1D
+            # Imitation phase [cos, sin] - 2D
             phase_obs = self.get_imitation_phase_obs()
             obs.append(phase_obs)
 
@@ -461,9 +462,9 @@ def main():
     # Verify observation size
     test_obs = policy.get_observations()
     if policy.use_imitation:
-        # Imitation task: command(3) + phase(1) + ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action
-        expected_obs_size = 3 + 1 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
-        breakdown = f"3(command) + 1(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
+        # Imitation task: command(3) + phase(2) + ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action
+        expected_obs_size = 3 + 2 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
+        breakdown = f"3(command) + 2(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
     else:
         # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3)
         expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
@@ -557,11 +558,19 @@ def main():
         start_time = time.time()
 
         try:
+            # Track previous step time for accurate phase updates
+            prev_step_time = time.time()
+
             while viewer.is_running():
                 step_start = time.time()
 
-                # Update phase for imitation learning
-                policy.update_phase(control_dt)
+                # Calculate actual elapsed time since last step
+                actual_dt = step_start - prev_step_time
+                prev_step_time = step_start
+
+                # Update phase for imitation learning using actual elapsed time
+                # This ensures phase stays synchronized even if control loop runs faster/slower than target
+                policy.update_phase(actual_dt)
 
                 # Control loop: run inference and apply action
                 action = policy.infer()
@@ -623,10 +632,10 @@ def main():
                         if policy.use_imitation:
                             # Imitation order: command, phase, ang_vel, proj_grav, joint_pos, joint_vel, last_action
                             print(f"  Command [0:3]:        {obs[0:3]}")
-                            print(f"  Phase [3:4]:          {obs[3:4]}")
-                            print(f"  Ang vel [4:7]:        {obs[4:7]}")
-                            print(f"  Proj grav [7:10]:     {obs[7:10]}")
-                            joint_start = 10
+                            print(f"  Phase [3:5]:          {obs[3:5]} (cos, sin)")
+                            print(f"  Ang vel [5:8]:        {obs[5:8]}")
+                            print(f"  Proj grav [8:11]:     {obs[8:11]}")
+                            joint_start = 11
                             print(f"  Joint pos [{joint_start}:{joint_start+policy.n_joints}]:     {obs[joint_start:joint_start+policy.n_joints]}")
                             print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
                             print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")

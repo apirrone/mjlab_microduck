@@ -47,7 +47,7 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
     If sim_obs is None, only plots real data.
 
     Args:
-        imitation: If True, observations include command (3) + phase (1) at the start
+        imitation: If True, observations include command (3) + phase (2) at the start
     """
 
     # Joint names
@@ -60,15 +60,15 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
     obs_dim = real_obs.shape[1] if sim_obs is None else min(real_obs.shape[1], sim_obs.shape[1])
 
     # Observation indices depend on whether this is imitation or velocity
-    # Imitation (52D): command (3) + phase (1) + ang_vel (3) + proj_grav (3) + joint_pos (14) + joint_vel (14) + actions (14)
+    # Imitation (53D): command (3) + phase (2) + ang_vel (3) + proj_grav (3) + joint_pos (14) + joint_vel (14) + actions (14)
     # Velocity (51D): ang_vel (3) + proj_grav (3) + joint_pos (14) + joint_vel (14) + actions (14) + command (3)
 
     if imitation:
-        base_ang_vel_start = 4
-        gravity_start = 7
-        joint_pos_start = 10
-        joint_vel_start = 24
-        action_start = 38
+        base_ang_vel_start = 5
+        gravity_start = 8
+        joint_pos_start = 11
+        joint_vel_start = 25
+        action_start = 39
     else:
         base_ang_vel_start = 0
         gravity_start = 3
@@ -82,7 +82,7 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
     # Command and phase (only for imitation)
     if imitation:
         subplot_titles.extend(['<b>COMMAND</b><br>vel_x', 'vel_y', 'ang_z', ''])
-        subplot_titles.extend(['<b>PHASE</b><br>phase', '', '', ''])
+        subplot_titles.extend(['<b>PHASE</b><br>cos(2π*φ)', 'sin(2π*φ)', '', ''])
 
     # Base angular velocity (3)
     subplot_titles.extend(['<b>BASE ANG VEL</b><br>ω_x', 'ω_y', 'ω_z', ''])
@@ -160,18 +160,19 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
         # Empty slot
         plot_idx += 1
 
-        # Phase (1 subplot)
-        row, col = divmod(plot_idx, 4)
-        row += 1
-        col += 1
-        phase_data.append(real_obs[:, 3])
-        if sim_obs is not None:
-            phase_data.append(sim_obs[:, 3])
-        add_traces(row, col, real_obs[:, 3], None if sim_obs is None else sim_obs[:, 3])
-        fig.update_yaxes(title_text='phase', row=row, col=col)
-        plot_idx += 1
+        # Phase (2 subplots: cos and sin)
+        for i in range(2):
+            row, col = divmod(plot_idx, 4)
+            row += 1
+            col += 1
+            phase_data.append(real_obs[:, 3+i])
+            if sim_obs is not None:
+                phase_data.append(sim_obs[:, 3+i])
+            add_traces(row, col, real_obs[:, 3+i], None if sim_obs is None else sim_obs[:, 3+i])
+            fig.update_yaxes(title_text='cos' if i == 0 else 'sin', row=row, col=col)
+            plot_idx += 1
         # Empty slots
-        plot_idx += 3
+        plot_idx += 2
 
     # 1. Base angular velocity (3 subplots)
     for i in range(3):
@@ -278,10 +279,11 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
             plot_idx += 1
         plot_idx += 1
 
-        row, col = divmod(plot_idx, 4)
-        fig.update_yaxes(range=phase_range, row=row+1, col=col+1)
-        plot_idx += 1
-        plot_idx += 3
+        for i in range(2):
+            row, col = divmod(plot_idx, 4)
+            fig.update_yaxes(range=phase_range, row=row+1, col=col+1)
+            plot_idx += 1
+        plot_idx += 2
 
     for i in range(3):  # Base ang vel
         row, col = divmod(plot_idx, 4)
@@ -341,7 +343,7 @@ def main():
     parser.add_argument("sim_pkl", type=str, nargs='?', default=None,
                        help="Path to .pkl file with simulated observations (optional)")
     parser.add_argument("--imitation", action='store_true',
-                       help="Use imitation observation structure (includes command + phase)")
+                       help="Use imitation observation structure (includes command + phase as cos/sin)")
 
     args = parser.parse_args()
 
