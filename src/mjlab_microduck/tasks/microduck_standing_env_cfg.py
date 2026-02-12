@@ -145,7 +145,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         # Main reward: Match default standing pose
         "pose": RewardTermCfg(
             func=velocity_mdp.variable_posture,
-            weight=3.0,  # Increased - primary reward for standing
+            weight=4.0,
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
                 "command_name": "imitation",  # Use imitation command for consistency
@@ -180,7 +180,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         # CoM height target - maintain standing height
         "com_height_target": RewardTermCfg(
             func=microduck_mdp.com_height_target,
-            weight=1.5,
+            weight=2.0,
             params={
                 "target_height_min": 0.08,
                 "target_height_max": 0.11,
@@ -212,7 +212,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=10.0,
+            weight=2.0,
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
