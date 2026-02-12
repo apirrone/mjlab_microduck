@@ -343,11 +343,11 @@ def make_microduck_standing_env_cfg(play: bool = False):
             params={
                 "event_name": "push_robot",
                 "velocity_stages": [
-                    {"step": 0, "velocity_range": (-0.3, 0.3)},  # Start gentle
-                    {"step": 250 * 24, "velocity_range": (-0.4, 0.4)},
-                    {"step": 500 * 24, "velocity_range": (-0.5, 0.5)},
-                    {"step": 750 * 24, "velocity_range": (-0.6, 0.6)},
-                    {"step": 1000 * 24, "velocity_range": (-0.7, 0.7)},
+                    {"step": 0, "velocity_range": (-0.6, 0.6)},  # Start gentle
+                    {"step": 250 * 24, "velocity_range": (-0.8, 0.8)},
+                    {"step": 500 * 24, "velocity_range": (-1.0, 1.0)},
+                    {"step": 750 * 24, "velocity_range": (-1.2, 1.2)},
+                    {"step": 1000 * 24, "velocity_range": (-1.4, 1.4)},
                 ],
             },
         ),
