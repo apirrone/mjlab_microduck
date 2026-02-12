@@ -143,10 +143,9 @@ def make_microduck_standing_env_cfg(play: bool = False):
 
     cfg.rewards = {
         # Main reward: Match default standing pose
-        # Reduced weight to allow recovery stepping
         "pose": RewardTermCfg(
             func=velocity_mdp.variable_posture,
-            weight=2.5,  # Reduced from 4.0 to allow stepping
+            weight=3.5,  # Balanced: high enough to maintain posture, low enough to allow steps
             params={
                 "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
                 "command_name": "imitation",  # Use imitation command for consistency
@@ -160,11 +159,11 @@ def make_microduck_standing_env_cfg(play: bool = False):
         # Reward taking steps when pushed (recovery behavior)
         "recovery_stepping": RewardTermCfg(
             func=microduck_mdp.recovery_stepping_reward,
-            weight=3.0,  # Encourage stepping when velocity is high
+            weight=2.0,  # Reduced to not dominate over pose
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
-                "velocity_threshold": 0.3,  # Start rewarding stepping above 0.3 m/s
-                "air_time_threshold": 0.05,  # Foot must be in air for at least 50ms
+                "velocity_threshold": 0.2,  # Lower threshold = activate sooner
+                "air_time_threshold": 0.03,  # Lower threshold = easier to trigger
             },
         ),
         # Stay upright
@@ -188,10 +187,10 @@ def make_microduck_standing_env_cfg(play: bool = False):
             weight=-0.05,
             params={"sensor_name": "robot/root_angmom"},
         ),
-        # CoM height target - maintain standing height
+        # CoM height target - maintain standing height (prevent crouching)
         "com_height_target": RewardTermCfg(
             func=microduck_mdp.com_height_target,
-            weight=2.0,
+            weight=5.0,  # High weight to strongly prevent crouching
             params={
                 "target_height_min": 0.08,
                 "target_height_max": 0.11,
@@ -223,7 +222,7 @@ def make_microduck_standing_env_cfg(play: bool = False):
         ),
         "alive": RewardTermCfg(
             func=velocity_mdp.is_alive,
-            weight=3.0,  # Increased to encourage survival via recovery steps
+            weight=2.5,  # Moderate weight - survival matters but not at cost of posture
         ),
         "termination": RewardTermCfg(
             func=velocity_mdp.is_terminated,
@@ -398,7 +397,8 @@ MicroduckStandingRlCfg = RslRlOnPolicyRunnerCfg(
         max_grad_norm=1.0,
     ),
     wandb_project="mjlab_microduck",
-    experiment_name="standing",  # Shorter name for cleaner wandb run names
+    experiment_name="standing",  # Directory name
+    run_name="standing",  # Appended to datetime in wandb: <datetime>_standing
     save_interval=250,
     num_steps_per_env=24,
     max_iterations=10_000,  # Standing task should converge faster

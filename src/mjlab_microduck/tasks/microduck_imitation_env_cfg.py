@@ -538,7 +538,8 @@ MicroduckImitationRlCfg = RslRlOnPolicyRunnerCfg(
         max_grad_norm=1.0,
     ),
     wandb_project="mjlab_microduck",
-    experiment_name="imitation",  # Shorter name for cleaner wandb run names
+    experiment_name="imitation",  # Directory name
+    run_name="imitation",  # Appended to datetime in wandb: <datetime>_imitation
     save_interval=250,
     num_steps_per_env=24,
     max_iterations=50_000,

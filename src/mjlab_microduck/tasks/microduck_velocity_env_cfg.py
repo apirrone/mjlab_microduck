@@ -539,7 +539,8 @@ MicroduckRlCfg = RslRlOnPolicyRunnerCfg(
         max_grad_norm=1.0,
     ),
     wandb_project="mjlab_microduck",
-    experiment_name="velocity",  # Shorter name for cleaner wandb run names
+    experiment_name="velocity",  # Directory name
+    run_name="velocity",  # Appended to datetime in wandb: <datetime>_velocity
     save_interval=250,
     num_steps_per_env=24,
     max_iterations=50_000,
