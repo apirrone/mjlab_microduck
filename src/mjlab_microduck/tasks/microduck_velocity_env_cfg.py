@@ -398,7 +398,7 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.024, n_max=0.024) # was 0.2
     cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
-    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # was 2.0
+    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
     # Add imitation observations if using imitation
     if use_imitation and reference_motion_path and imitation_state is not None:

@@ -338,7 +338,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.007, n_max=0.007)  # 2.5x measured
 
         cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # 2.5x measured
-        cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # Keep for now (not measured)
+        cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # 2.5x measured
 
     ##
     # Domain Randomization Events
