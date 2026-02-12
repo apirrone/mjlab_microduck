@@ -7,7 +7,10 @@ from .microduck_velocity_env_cfg import (
     make_microduck_velocity_env_cfg,
     MicroduckRlCfg,
 )
-from .microduck_imitation_env_cfg import make_microduck_imitation_env_cfg
+from .microduck_imitation_env_cfg import (
+    make_microduck_imitation_env_cfg,
+    MicroduckImitationRlCfg,
+)
 from .microduck_standing_env_cfg import (
     make_microduck_standing_env_cfg,
     MicroduckStandingRlCfg,
@@ -84,7 +87,7 @@ if os.path.exists(_imitation_motion_path):
         task_id="Mjlab-Imitation-Flat-MicroDuck",
         env_cfg=make_microduck_imitation_env_cfg(ghost_vis=False),  # Never show ghost during training
         play_env_cfg=make_microduck_imitation_env_cfg(play=True, ghost_vis=_enable_ghost_vis),
-        rl_cfg=MicroduckRlCfg,  # Reuse the same RL config
+        rl_cfg=MicroduckImitationRlCfg,  # Use dedicated RL config with "imitation" prefix
         runner_cls=VelocityOnPolicyRunner,
     )
     ghost_status = "enabled" if _enable_ghost_vis else "disabled"
