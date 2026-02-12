@@ -324,19 +324,21 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             cfg.observations["policy"].terms["joint_vel"]
         )
 
-        # Add noise and delay to observations - increased to match real IMU latency
+        # Add noise and delay to observations - matched to real robot measurements
+        # Noise levels measured from real robot (hanging still): gyro=0.0056 rad/s, accel=0.0017
+        # Using 2.5x measured values for robustness while keeping observations useful
         cfg.observations["policy"].terms["base_ang_vel"].delay_min_lag = 0
         cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3  # 40-120ms at 50Hz
         cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
-        cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4)
+        cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # 2.5x measured
 
         cfg.observations["policy"].terms["raw_accelerometer"].delay_min_lag = 0
         cfg.observations["policy"].terms["raw_accelerometer"].delay_max_lag = 3
         cfg.observations["policy"].terms["raw_accelerometer"].delay_update_period = 64
-        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.15, n_max=0.15)
+        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.007, n_max=0.007)  # 2.5x measured
 
-        cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)
-        cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)
+        cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # 2.5x measured
+        cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # Keep for now (not measured)
 
     ##
     # Domain Randomization Events

@@ -87,8 +87,8 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
     # Base angular velocity (3)
     subplot_titles.extend(['<b>BASE ANG VEL</b><br>ω_x', 'ω_y', 'ω_z', ''])
 
-    # Projected gravity (3)
-    subplot_titles.extend(['<b>PROJECTED GRAVITY</b><br>g_x', 'g_y', 'g_z', ''])
+    # Raw accelero (3)
+    subplot_titles.extend(['<b>Raw Accelero</b><br>g_x', 'g_y', 'g_z', ''])
 
     # Joint positions (14 + 2 empty)
     subplot_titles.append(f'<b>JOINT POSITIONS</b><br>{joint_names[0]}')
@@ -189,7 +189,7 @@ def plot_comparison(real_obs, real_ts, sim_obs=None, sim_ts=None, imitation=Fals
     # Empty slot
     plot_idx += 1
 
-    # 2. Projected gravity (3 subplots)
+    # 2. Raw accelero (3 subplots)
     for i in range(3):
         row, col = divmod(plot_idx, 4)
         row += 1
