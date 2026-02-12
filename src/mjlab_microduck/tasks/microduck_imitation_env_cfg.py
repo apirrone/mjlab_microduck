@@ -291,22 +291,22 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
     # and hurt sim2real transfer. The robot needs to learn how to recover from
     # deviations rather than immediately dying when it deviates from reference.
     #
-    # cfg.terminations["root_pos_error"] = TerminationTermCfg(
-        # func=imitation_mdp.bad_root_pos,
-        # params={
-            # "command_name": "imitation",
-            # "threshold": 0.15,
-            # "curriculum_threshold_name": "root_pos_threshold",
-        # },
-    # )
-    # cfg.terminations["root_ori_error"] = TerminationTermCfg(
-        # func=imitation_mdp.bad_root_ori,
-        # params={
-            # "command_name": "imitation",
-            # "threshold": 0.8,
-            # "curriculum_threshold_name": "root_ori_threshold",
-        # },
-    # )
+    cfg.terminations["root_pos_error"] = TerminationTermCfg(
+        func=imitation_mdp.bad_root_pos,
+        params={
+            "command_name": "imitation",
+            "threshold": 0.15,
+            "curriculum_threshold_name": "root_pos_threshold",
+        },
+    )
+    cfg.terminations["root_ori_error"] = TerminationTermCfg(
+        func=imitation_mdp.bad_root_ori,
+        params={
+            "command_name": "imitation",
+            "threshold": 0.8,
+            "curriculum_threshold_name": "root_ori_threshold",
+        },
+    )
     # Keep the fell_over termination from base config
 
     ##
@@ -491,32 +491,32 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                 ],
             },
         ),
-        # "root_pos_termination": CurriculumTermCfg(
-            # func=imitation_mdp.termination_threshold_curriculum,
-            # params={
-                # "threshold_param_name": "root_pos_threshold",
-                # "threshold_stages": [
-                    # # Start strict, then relax to allow recovery from pushes
-                    # {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
-                    # {"step": 500 * 24, "threshold": 0.3},  # After 500 iters: 30cm
-                    # {"step": 750 * 24, "threshold": 0.5},  # After 750 iters: 50cm
-                    # {"step": 1000 * 24, "threshold": 1.0},  # After 1000 iters: 1m (very relaxed)
-                # ],
-            # },
-        # ),
-        # "root_ori_termination": CurriculumTermCfg(
-            # func=imitation_mdp.termination_threshold_curriculum,
-            # params={
-                # "threshold_param_name": "root_ori_threshold",
-                # "threshold_stages": [
-                    # # Start strict, then relax
-                    # {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
-                    # {"step": 500 * 24, "threshold": 1.2},  # After 500 iters: ~69 degrees
-                    # {"step": 750 * 24, "threshold": 1.6},  # After 750 iters: ~92 degrees
-                    # {"step": 1000 * 24, "threshold": 2.5},  # After 1000 iters: ~143 degrees (very relaxed)
-                # ],
-            # },
-        # ),
+        "root_pos_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "threshold_param_name": "root_pos_threshold",
+                "threshold_stages": [
+                    # Start strict, then relax to allow recovery from pushes
+                    {"step": 0, "threshold": 0.15},  # Initial: 15cm deviation = terminate
+                    {"step": 250 * 24, "threshold": 0.3},  # After 500 iters: 30cm
+                    {"step": 500 * 24, "threshold": 0.5},  # After 750 iters: 50cm
+                    {"step": 1000 * 24, "threshold": 1.0},  # After 1000 iters: 1m (very relaxed)
+                ],
+            },
+        ),
+        "root_ori_termination": CurriculumTermCfg(
+            func=imitation_mdp.termination_threshold_curriculum,
+            params={
+                "threshold_param_name": "root_ori_threshold",
+                "threshold_stages": [
+                    # Start strict, then relax
+                    {"step": 0, "threshold": 0.8},  # Initial: ~46 degrees
+                    {"step": 250 * 24, "threshold": 1.2},  # After 500 iters: ~69 degrees
+                    {"step": 500 * 24, "threshold": 1.6},  # After 750 iters: ~92 degrees
+                    {"step": 1000 * 24, "threshold": 2.5},  # After 1000 iters: ~143 degrees (very relaxed)
+                ],
+            },
+        ),
     }
 
     # Extend episode length for play mode
