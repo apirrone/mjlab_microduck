@@ -41,7 +41,7 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
-IMU_ORIENTATION_RANDOMIZATION_ANGLE = 2.0  # ±2° IMU mounting error
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
 
 
 def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False):
@@ -244,7 +244,7 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         # Action acceleration penalties (2nd derivative) for smoother actions
         "leg_action_acceleration": RewardTermCfg(
             func=microduck_mdp.leg_action_acceleration_l2,
-            weight=-0.01,  # Start small - can increase gradually
+            weight=-0.05,  # Start small - can increase gradually
         ),
         "neck_action_acceleration": RewardTermCfg(
             func=microduck_mdp.neck_action_acceleration_l2,
@@ -455,7 +455,8 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
                     # Gradually increase action smoothness penalty
                     {"step": 0, "weight": -0.6},
                     {"step": 250 * 24, "weight": -0.8},
-                    {"step": 500 * 24, "weight": -1.0},  # Smoother actions for sim2real
+                    {"step": 500 * 24, "weight": -1.0},
+                    {"step": 750 * 24, "weight": -1.2},
                 ],
             },
         ),
