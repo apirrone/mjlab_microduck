@@ -131,7 +131,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.4  # was 1.0
+    cfg.rewards["pose"].weight = 2.0  # was 1.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -291,9 +291,6 @@ def make_microduck_velocity_env_cfg(
 
         # In play mode, use shorter interval for better visibility
         interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
-        velocity_range = (
-            (-1.5, 1.5) if play else VELOCITY_PUSH_RANGE
-        )  # Larger pushes in play mode for visibility
 
         cfg.events["push_robot"] = EventTermCfg(
             func=mdp.push_by_setting_velocity,
@@ -301,8 +298,8 @@ def make_microduck_velocity_env_cfg(
             interval_range_s=interval,
             params={
                 "velocity_range": {
-                    "x": velocity_range,
-                    "y": velocity_range,
+                    "x": VELOCITY_PUSH_RANGE,
+                    "y": VELOCITY_PUSH_RANGE,
                 },
                 "asset_cfg": SceneEntityCfg("robot"),
             },
