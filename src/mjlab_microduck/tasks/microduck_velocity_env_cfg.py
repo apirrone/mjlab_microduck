@@ -153,8 +153,8 @@ def make_microduck_velocity_env_cfg(
     # Air time reward
     cfg.rewards["air_time"].weight = 5.0  # Increased to encourage walking
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.055  # was 0.035 (worked at 0.05 too)
-    cfg.rewards["air_time"].params["threshold_max"] = 0.15
+    cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
+    cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
