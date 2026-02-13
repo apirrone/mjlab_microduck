@@ -331,9 +331,13 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
             cfg.observations["policy"].terms["base_ang_vel"]
         )
-        cfg.observations["policy"].terms["raw_accelerometer"] = deepcopy(
-            cfg.observations["policy"].terms["raw_accelerometer"]
+
+        # Determine gravity/accelerometer term name based on flag
+        gravity_term_name = "projected_gravity" if USE_PROJECTED_GRAVITY else "raw_accelerometer"
+        cfg.observations["policy"].terms[gravity_term_name] = deepcopy(
+            cfg.observations["policy"].terms[gravity_term_name]
         )
+
         cfg.observations["policy"].terms["joint_pos"] = deepcopy(
             cfg.observations["policy"].terms["joint_pos"]
         )
@@ -349,10 +353,10 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
         cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
         cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # 2.5x measured
 
-        cfg.observations["policy"].terms["raw_accelerometer"].delay_min_lag = 0
-        cfg.observations["policy"].terms["raw_accelerometer"].delay_max_lag = 3
-        cfg.observations["policy"].terms["raw_accelerometer"].delay_update_period = 64
-        cfg.observations["policy"].terms["raw_accelerometer"].noise = Unoise(n_min=-0.007, n_max=0.007)  # 2.5x measured
+        cfg.observations["policy"].terms[gravity_term_name].delay_min_lag = 0
+        cfg.observations["policy"].terms[gravity_term_name].delay_max_lag = 3
+        cfg.observations["policy"].terms[gravity_term_name].delay_update_period = 64
+        cfg.observations["policy"].terms[gravity_term_name].noise = Unoise(n_min=-0.007, n_max=0.007)  # 2.5x measured
 
         cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # 2.5x measured
         cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # 2.5x measured
