@@ -958,6 +958,23 @@ def standing_envs_curriculum(
     return torch.tensor([cfg.rel_standing_envs])
 
 
+def projected_gravity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Projected gravity vector in body frame.
+
+    Returns the gravity vector projected into the robot's body frame,
+    representing pure orientation without linear acceleration.
+    This is simpler than raw accelerometer and only depends on orientation.
+
+    Returns:
+        torch.Tensor: Projected gravity in body frame (num_envs, 3)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    return asset.data.projected_gravity_b
+
+
 def raw_accelerometer(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,

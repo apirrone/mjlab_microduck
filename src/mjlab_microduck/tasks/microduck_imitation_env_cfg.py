@@ -32,6 +32,9 @@ ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
 
+# Observation configuration
+USE_PROJECTED_GRAVITY = True  # If True, use projected gravity instead of raw accelerometer
+
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
 COM_RANDOMIZATION_RANGE = 0.005  # ±3mm
@@ -104,15 +107,26 @@ def make_microduck_imitation_env_cfg(play: bool = False, ghost_vis: bool = False
             params={"command_name": "imitation"},
         ),
         "base_ang_vel": base_obs["base_ang_vel"],
-        # Use raw accelerometer instead of projected gravity
-        "raw_accelerometer": ObservationTermCfg(
+    }
+
+    # Add gravity/accelerometer observation based on flag
+    if USE_PROJECTED_GRAVITY:
+        policy_terms["projected_gravity"] = ObservationTermCfg(
+            func=microduck_mdp.projected_gravity,
+            scale=1.0,
+        )
+    else:
+        policy_terms["raw_accelerometer"] = ObservationTermCfg(
             func=microduck_mdp.raw_accelerometer,
             scale=1.0,
-        ),
+        )
+
+    # Continue with remaining observations
+    policy_terms.update({
         "joint_pos": base_obs["joint_pos"],
         "joint_vel": base_obs["joint_vel"],
         "actions": base_obs["actions"],
-    }
+    })
 
     # Critic observations (privileged information including reference motion)
     critic_terms = {

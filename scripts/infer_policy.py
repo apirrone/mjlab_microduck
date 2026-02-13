@@ -36,11 +36,13 @@ DEFAULT_POSE = np.array([
 
 class PolicyInference:
     def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None,
-                 delay_min_lag=0, delay_max_lag=0, standing_onnx_path=None, switch_threshold=0.05):
+                 delay_min_lag=0, delay_max_lag=0, standing_onnx_path=None, switch_threshold=0.05,
+                 use_projected_gravity=False):
         self.model = model
         self.data = data
         self.action_scale = action_scale
         self.use_imitation = use_imitation
+        self.use_projected_gravity = use_projected_gravity
         self.delay_min_lag = delay_min_lag
         self.delay_max_lag = delay_max_lag
         self.switch_threshold = switch_threshold
@@ -204,6 +206,16 @@ class PolicyInference:
             world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
             return self.quat_rotate_inverse(quat, world_gravity)
 
+    def get_projected_gravity(self):
+        """Get projected gravity in body frame.
+
+        Returns the gravity vector projected into the robot's body frame,
+        representing pure orientation without linear acceleration.
+        """
+        quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
+        world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        return self.quat_rotate_inverse(quat, world_gravity)
+
     def get_base_ang_vel(self):
         """Get base angular velocity from IMU gyro sensor.
 
@@ -250,7 +262,7 @@ class PolicyInference:
 
         Order for velocity task (no imitation):
         1. base_ang_vel (3D)
-        2. raw_accelerometer (3D)
+        2. raw_accelerometer OR projected_gravity (3D)
         3. joint_pos (14D) - relative to default
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
@@ -261,7 +273,7 @@ class PolicyInference:
         1. command (3D) - velocity command
         2. phase (2D) - [cos(2π*phase), sin(2π*phase)]
         3. base_ang_vel (3D)
-        4. raw_accelerometer (3D)
+        4. raw_accelerometer OR projected_gravity (3D)
         5. joint_pos (14D) - relative to default
         6. joint_vel (14D) - relative to default (zero)
         7. actions (14D) - last action
@@ -282,9 +294,15 @@ class PolicyInference:
         ang_vel = self.get_base_ang_vel()
         obs.append(ang_vel)
 
-        # Raw accelerometer from sensor (NO delay, NO noise) - 3D
-        raw_accel = self.get_raw_accelerometer()
-        obs.append(raw_accel)
+        # Gravity/accelerometer observation - 3D
+        if self.use_projected_gravity:
+            # Use projected gravity (orientation only)
+            gravity = self.get_projected_gravity()
+            obs.append(gravity)
+        else:
+            # Use raw accelerometer (includes linear acceleration)
+            raw_accel = self.get_raw_accelerometer()
+            obs.append(raw_accel)
 
         # Joint positions (relative to default pose, NO noise) - n_joints
         joint_pos_rel = self.get_joint_pos_relative()
@@ -390,6 +408,7 @@ def main():
     parser.add_argument("--action-scale", type=float, default=1.0, help="Action scale (default: 1.0)")
     parser.add_argument("--imitation", action="store_true", help="Enable imitation mode (adds phase observation)")
     parser.add_argument("--reference-motion", type=str, default=None, help="Path to reference motion .pkl file (for imitation)")
+    parser.add_argument("--projected-gravity", action="store_true", help="Use projected gravity instead of raw accelerometer (imitation only)")
     parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
@@ -436,7 +455,8 @@ def main():
         delay_min_lag=delay_min_lag,
         delay_max_lag=delay_max_lag,
         standing_onnx_path=args.standing,
-        switch_threshold=args.switch_threshold
+        switch_threshold=args.switch_threshold,
+        use_projected_gravity=args.projected_gravity
     )
     policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
