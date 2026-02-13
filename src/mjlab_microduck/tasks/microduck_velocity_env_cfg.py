@@ -26,7 +26,7 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.3, 0.3)  # Velocity change range in m/s
-IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.5  # ±2° IMU mounting error
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
 BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
 BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
@@ -507,11 +507,11 @@ def make_microduck_velocity_env_cfg(
                 # Start at current weight (2.0), gradually reduce to encourage more robust walking
                 # 250 iterations × 24 steps/iter = 6000 steps
                 {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 2.1},
-                {"step": 750 * 24, "weight": 2.2},
-                {"step": 1000 * 24, "weight": 2.3},
-                {"step": 1250 * 24, "weight": 2.4},
-                {"step": 1500 * 24, "weight": 2.5},
+                {"step": 500 * 24, "weight": 2.5},
+                {"step": 750 * 24, "weight": 3.0},
+                {"step": 1000 * 24, "weight": 3.5},
+                {"step": 1250 * 24, "weight": 4.0},
+                {"step": 1500 * 24, "weight": 4.5},
             ],
         },
     )
@@ -524,11 +524,11 @@ def make_microduck_velocity_env_cfg(
             "weight_stages": [
                 # Start at current weight (2.0), gradually reduce
                 {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 2.1},
-                {"step": 750 * 24, "weight": 2.2},
-                {"step": 1000 * 24, "weight": 2.3},
-                {"step": 1250 * 24, "weight": 2.4},
-                {"step": 1500 * 24, "weight": 2.5},
+                {"step": 500 * 24, "weight": 2.5},
+                {"step": 750 * 24, "weight": 3.0},
+                {"step": 1000 * 24, "weight": 3.5},
+                {"step": 1250 * 24, "weight": 4.0},
+                {"step": 1500 * 24, "weight": 4.5},
             ],
         },
     )
