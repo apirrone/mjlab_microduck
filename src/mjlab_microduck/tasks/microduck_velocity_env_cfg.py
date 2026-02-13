@@ -10,6 +10,11 @@ ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
 ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
+ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
+ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
+
+# Observation configuration
+USE_PROJECTED_GRAVITY = True  # If True, use projected gravity instead of raw accelerometer
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
@@ -21,6 +26,9 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.5, 0.5)  # Velocity change range in m/s
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
+BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
+BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -376,11 +384,49 @@ def make_microduck_velocity_env_cfg(
             },
         )
 
+    # IMU orientation randomization (simulates mounting errors)
+    if ENABLE_IMU_ORIENTATION_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        cfg.events["randomize_imu_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_imu_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_angle_deg": IMU_ORIENTATION_RANDOMIZATION_ANGLE,
+            },
+        )
+
+    # Base orientation randomization (forces reactive behavior)
+    if ENABLE_BASE_ORIENTATION_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        cfg.events["randomize_base_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_base_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_pitch_deg": BASE_ORIENTATION_MAX_PITCH_DEG,
+                "max_roll_deg": BASE_ORIENTATION_MAX_ROLL_DEG,
+            },
+        )
+
     # Observations
     del cfg.observations["policy"].terms["base_lin_vel"]
 
-    cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
-        cfg.observations["policy"].terms["projected_gravity"]
+    # Determine gravity/accelerometer term name based on flag
+    gravity_term_name = "projected_gravity" if USE_PROJECTED_GRAVITY else "raw_accelerometer"
+
+    # Replace projected_gravity with raw_accelerometer if flag is False
+    if not USE_PROJECTED_GRAVITY:
+        # Remove projected_gravity and add raw_accelerometer
+        del cfg.observations["policy"].terms["projected_gravity"]
+        from mjlab.managers.manager_term_config import ObservationTermCfg
+        cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
+            func=microduck_mdp.raw_accelerometer,
+            scale=1.0,
+        )
+
+    cfg.observations["policy"].terms[gravity_term_name] = deepcopy(
+        cfg.observations["policy"].terms[gravity_term_name]
     )
     cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
         cfg.observations["policy"].terms["base_ang_vel"]
@@ -390,13 +436,13 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3
     cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
-    cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
-    cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+    cfg.observations["policy"].terms[gravity_term_name].delay_min_lag = 0
+    cfg.observations["policy"].terms[gravity_term_name].delay_max_lag = 3
+    cfg.observations["policy"].terms[gravity_term_name].delay_update_period = 64
 
     # Observation noise configuration (edit these values as needed)
     cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.024, n_max=0.024) # was 0.2
-    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
+    cfg.observations["policy"].terms[gravity_term_name].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
