@@ -473,8 +473,8 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02  # Small amount for balance/stability training
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.4, 0.4)
-    command.ranges.lin_vel_y = (-0.4, 0.4)
+    command.ranges.lin_vel_x = (-0.1, 0.15)
+    command.ranges.lin_vel_y = (-0.15, 0.15)
     command.ranges.ang_vel_z = (-1.0, 1.0)
     command.viz.z_offset = 1.0
 
@@ -483,23 +483,23 @@ def make_microduck_velocity_env_cfg(
     cfg.scene.terrain.terrain_generator = None
 
     # Add action rate curriculum
-    # cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-        # func=mdp.reward_weight,
-        # params={
-            # "reward_name": "action_rate_l2",
-            # "weight_stages": [
-                # # 250 iterations × 24 steps/iter = 6000 steps
-                # {"step": 0, "weight": -0.4},
-                # {"step": 250 * 24, "weight": -0.6},
-                # {"step": 500 * 24, "weight": -0.8},
-                # {"step": 750 * 24, "weight": -1.0},
-                # {"step": 1000 * 24, "weight": -1.2},
-                # {"step": 1250 * 24, "weight": -1.4},
-                # {"step": 1500 * 24, "weight": -1.6},
+    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "action_rate_l2",
+            "weight_stages": [
+                # 250 iterations × 24 steps/iter = 6000 steps
+                {"step": 0, "weight": -0.4},
+                {"step": 250 * 24, "weight": -0.8},
+                {"step": 500 * 24, "weight": -1.0},
+                {"step": 750 * 24, "weight": -1.2},
+                {"step": 1000 * 24, "weight": -1.4},
+                {"step": 1250 * 24, "weight": -1.6},
+                {"step": 1500 * 24, "weight": -1.8},
                 # {"step": 1750 * 24, "weight": -1.8},
-            # ],
-        # },
-    # )
+            ],
+        },
+    )
 
     # Add linear velocity tracking curriculum
     cfg.curriculum["linear_velocity_weight"] = CurriculumTermCfg(
