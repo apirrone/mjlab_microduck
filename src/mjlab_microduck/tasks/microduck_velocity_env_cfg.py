@@ -26,7 +26,7 @@ JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - af
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
 VELOCITY_PUSH_RANGE = (-0.3, 0.3)  # Velocity change range in m/s
-IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.5  # ±2° IMU mounting error
 BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
 BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
@@ -195,7 +195,7 @@ def make_microduck_velocity_env_cfg(
         weight=1.2,
         params={
             "target_height_min": 0.08,
-            "target_height_max": 0.10,
+            "target_height_max": 0.11,
         },
     )
 
