@@ -22,12 +22,17 @@
       <joint damping="0.15" frictionloss="0.1" armature="0.001"/>
       <position kp="10.0" kv="0.1" forcerange="-20.0 20.0"/>
     </default>
+    <!-- m1 -->
+    <!-- <default class="chosen_actuator"> -->
+      <!-- <geom contype="0" conaffinity="0"/> -->
+      <!-- <joint damping="0.03" frictionloss="0.0012" armature="0.0015"/> -->
+      <!-- <position kp="0.28" kv="0.0" forcerange="-0.47 0.47" ctrlrange="-10.0 10.0"/> --> 
+    <!-- </default> -->
+    <!-- m6 -->
     <default class="chosen_actuator">
-      <!-- m1 -->
       <geom contype="0" conaffinity="0"/>
-      <joint damping="0.03" frictionloss="0.0012" armature="0.0015"/>
-      <!-- kp 200 -->
-      <position kp="0.28" kv="0.0" forcerange="-0.47 0.47" ctrlrange="-10.0 10.0"/> 
+      <joint damping="0.048" frictionloss="0.006" armature="0.002"/>
+      <position kp="0.52" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/> 
     </default>
   </default>
   <!-- Additional sensors.xml -->
@@ -36,6 +41,7 @@
     <gyro name="angular-velocity" site="imu" noise="0.005"/>
     <gyro name="imu_ang_vel" site="imu"/>
     <velocimeter name="imu_lin_vel" site="imu"/>
+    <accelerometer name="imu_accel" site="imu"/>
     <subtreeangmom name="root_angmom" body="trunk_base"/>
   </sensor>
   <worldbody>

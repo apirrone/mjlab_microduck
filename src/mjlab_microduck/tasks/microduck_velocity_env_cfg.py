@@ -9,7 +9,12 @@ ENABLE_KD_RANDOMIZATION = True
 ENABLE_MASS_INERTIA_RANDOMIZATION = True  # Can enable once walking is stable
 ENABLE_JOINT_FRICTION_RANDOMIZATION = False  # Too disruptive - affects joint movement
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dynamics
-ENABLE_EXTERNAL_FORCE_DISTURBANCES = True
+ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
+ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
+ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
+
+# Observation configuration
+USE_PROJECTED_GRAVITY = True  # If True, use projected gravity instead of raw accelerometer
 
 # Domain randomization ranges (adjust as needed)
 # Conservative ranges proven to be stable - can increase gradually if needed
@@ -19,8 +24,11 @@ KP_RANDOMIZATION_RANGE = (0.85, 1.15)  # ±15%
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)  # ±10% (can increase to 0.8-1.2)
 JOINT_FRICTION_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects walking
 JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)  # ±2% VERY conservative - affects dynamics
-EXTERNAL_FORCE_INTERVAL_S = (3.0, 6.0)  # Apply disturbances every 3-6 seconds
-EXTERNAL_FORCE_MAGNITUDE = (0.1, 0.5)  # Force magnitude range in Newtons
+VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)  # Apply pushes every 3-6 seconds
+VELOCITY_PUSH_RANGE = (-0.3, 0.3)  # Velocity change range in m/s
+IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
+BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
+BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -123,7 +131,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 1.4  # was 1.0
+    cfg.rewards["pose"].weight = 2.0  # was 1.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -145,8 +153,8 @@ def make_microduck_velocity_env_cfg(
     # Air time reward
     cfg.rewards["air_time"].weight = 5.0  # Increased to encourage walking
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["air_time"].params["threshold_min"] = 0.055  # was 0.035 (worked at 0.05 too)
-    cfg.rewards["air_time"].params["threshold_max"] = 0.15
+    cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
+    cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
@@ -156,7 +164,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 2.0
 
     # Action smoothness
-    cfg.rewards["action_rate_l2"].weight = -0.4 # -0.5 doesn't work somehow, stiff left leg
+    cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
 
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
@@ -277,28 +285,25 @@ def make_microduck_velocity_env_cfg(
     ].geom_names = foot_frictions_geom_names
     cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
 
-    # External force disturbances during episode
-    if ENABLE_EXTERNAL_FORCE_DISTURBANCES:
+    # Velocity-based pushes for robustness training
+    if ENABLE_VELOCITY_PUSHES:
         from mjlab.managers.scene_entity_config import SceneEntityCfg
-        # Replace push_robot with apply_external_force_torque for better physical realism
-        # Forces need to be symmetric (positive and negative) for random directions
+
+        # In play mode, use shorter interval for better visibility
+        interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
+
         cfg.events["push_robot"] = EventTermCfg(
-            func=mdp.apply_external_force_torque,
+            func=mdp.push_by_setting_velocity,
             mode="interval",
-            interval_range_s=EXTERNAL_FORCE_INTERVAL_S,
+            interval_range_s=interval,
             params={
-                "force_range": (-EXTERNAL_FORCE_MAGNITUDE[1], EXTERNAL_FORCE_MAGNITUDE[1]),
-                "torque_range": (0.0, 0.0),  # Only linear forces, no torques
-                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "velocity_range": {
+                    "x": VELOCITY_PUSH_RANGE,
+                    "y": VELOCITY_PUSH_RANGE,
+                },
+                "asset_cfg": SceneEntityCfg("robot"),
             },
         )
-    else:
-        # Keep original velocity-based push but with very long interval
-        cfg.events["push_robot"].params["velocity_range"] = {
-            "x": (-0.3, 0.3),
-            "y": (-0.3, 0.3),
-        }
-        cfg.events["push_robot"].interval_range_s = (1e6, 1e6)
 
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
@@ -376,11 +381,49 @@ def make_microduck_velocity_env_cfg(
             },
         )
 
+    # IMU orientation randomization (simulates mounting errors)
+    if ENABLE_IMU_ORIENTATION_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        cfg.events["randomize_imu_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_imu_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_angle_deg": IMU_ORIENTATION_RANDOMIZATION_ANGLE,
+            },
+        )
+
+    # Base orientation randomization (forces reactive behavior)
+    if ENABLE_BASE_ORIENTATION_RANDOMIZATION:
+        from mjlab.managers.scene_entity_config import SceneEntityCfg
+        cfg.events["randomize_base_orientation"] = EventTermCfg(
+            func=microduck_mdp.randomize_base_orientation,
+            mode="reset",
+            params={
+                "asset_cfg": SceneEntityCfg("robot"),
+                "max_pitch_deg": BASE_ORIENTATION_MAX_PITCH_DEG,
+                "max_roll_deg": BASE_ORIENTATION_MAX_ROLL_DEG,
+            },
+        )
+
     # Observations
     del cfg.observations["policy"].terms["base_lin_vel"]
 
-    cfg.observations["policy"].terms["projected_gravity"] = deepcopy(
-        cfg.observations["policy"].terms["projected_gravity"]
+    # Determine gravity/accelerometer term name based on flag
+    gravity_term_name = "projected_gravity" if USE_PROJECTED_GRAVITY else "raw_accelerometer"
+
+    # Replace projected_gravity with raw_accelerometer if flag is False
+    if not USE_PROJECTED_GRAVITY:
+        # Remove projected_gravity and add raw_accelerometer
+        del cfg.observations["policy"].terms["projected_gravity"]
+        from mjlab.managers.manager_term_config import ObservationTermCfg
+        cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
+            func=microduck_mdp.raw_accelerometer,
+            scale=1.0,
+        )
+
+    cfg.observations["policy"].terms[gravity_term_name] = deepcopy(
+        cfg.observations["policy"].terms[gravity_term_name]
     )
     cfg.observations["policy"].terms["base_ang_vel"] = deepcopy(
         cfg.observations["policy"].terms["base_ang_vel"]
@@ -390,15 +433,15 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["base_ang_vel"].delay_max_lag = 3
     cfg.observations["policy"].terms["base_ang_vel"].delay_update_period = 64
 
-    cfg.observations["policy"].terms["projected_gravity"].delay_min_lag = 0
-    cfg.observations["policy"].terms["projected_gravity"].delay_max_lag = 3
-    cfg.observations["policy"].terms["projected_gravity"].delay_update_period = 64
+    cfg.observations["policy"].terms[gravity_term_name].delay_min_lag = 0
+    cfg.observations["policy"].terms[gravity_term_name].delay_max_lag = 3
+    cfg.observations["policy"].terms[gravity_term_name].delay_update_period = 64
 
     # Observation noise configuration (edit these values as needed)
-    cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.4, n_max=0.4) # was 0.2
-    cfg.observations["policy"].terms["projected_gravity"].noise = Unoise(n_min=-0.15, n_max=0.15)  # was 0.15
-    cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.1, n_max=0.1)  # was 0.05
-    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-4.0, n_max=4.0)  # was 2.0
+    cfg.observations["policy"].terms["base_ang_vel"].noise = Unoise(n_min=-0.024, n_max=0.024) # was 0.2
+    cfg.observations["policy"].terms[gravity_term_name].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
+    cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
+    cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
     # Add imitation observations if using imitation
     if use_imitation and reference_motion_path and imitation_state is not None:
@@ -427,8 +470,8 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02  # Small amount for balance/stability training
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.4, 0.4)
-    command.ranges.lin_vel_y = (-0.4, 0.4)
+    command.ranges.lin_vel_x = (-0.1, 0.15)
+    command.ranges.lin_vel_y = (-0.15, 0.15)
     command.ranges.ang_vel_z = (-1.0, 1.0)
     command.viz.z_offset = 1.0
 
@@ -444,13 +487,13 @@ def make_microduck_velocity_env_cfg(
             "weight_stages": [
                 # 250 iterations × 24 steps/iter = 6000 steps
                 {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.6},
-                {"step": 500 * 24, "weight": -0.8},
-                {"step": 750 * 24, "weight": -1.0},
-                {"step": 1000 * 24, "weight": -1.2},
-                {"step": 1250 * 24, "weight": -1.4},
-                {"step": 1500 * 24, "weight": -1.6},
-                {"step": 1750 * 24, "weight": -1.8},
+                {"step": 250 * 24, "weight": -0.8},
+                {"step": 500 * 24, "weight": -1.0},
+                {"step": 750 * 24, "weight": -1.2},
+                {"step": 1000 * 24, "weight": -1.4},
+                {"step": 1250 * 24, "weight": -1.6},
+                {"step": 1500 * 24, "weight": -1.8},
+                # {"step": 1750 * 24, "weight": -1.8},
             ],
         },
     )
@@ -539,7 +582,8 @@ MicroduckRlCfg = RslRlOnPolicyRunnerCfg(
         max_grad_norm=1.0,
     ),
     wandb_project="mjlab_microduck",
-    experiment_name="microduck_velocity",
+    experiment_name="velocity",  # Directory name
+    run_name="velocity",  # Appended to datetime in wandb: <datetime>_velocity
     save_interval=250,
     num_steps_per_env=24,
     max_iterations=50_000,

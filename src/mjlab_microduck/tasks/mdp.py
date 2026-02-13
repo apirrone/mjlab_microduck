@@ -2,6 +2,7 @@
 
 import torch
 from typing import Optional
+import mujoco
 
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 from mjlab.managers.scene_entity_config import SceneEntityCfg
@@ -113,6 +114,12 @@ def reset_action_history(
         if "feet_ground_contact" in env.scene.sensors:
             contacts = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2]
             env._prev_contacts_for_freq[env_ids] = contacts
+
+    # Reset foot force smoothness tracking
+    if hasattr(env, '_prev_foot_forces'):
+        if "feet_ground_contact" in env.scene.sensors:
+            forces = env.scene.sensors["feet_ground_contact"].data.found[env_ids, :2].squeeze(-1)
+            env._prev_foot_forces[env_ids] = forces
 
     # Reset imitation phase tracking
     if imitation_state is not None and imitation_state.phase is not None:
@@ -949,3 +956,298 @@ def standing_envs_curriculum(
             cfg.rel_standing_envs = stage["rel_standing_envs"]
 
     return torch.tensor([cfg.rel_standing_envs])
+
+
+def projected_gravity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Projected gravity vector in body frame.
+
+    Returns the gravity vector projected into the robot's body frame,
+    representing pure orientation without linear acceleration.
+    This is simpler than raw accelerometer and only depends on orientation.
+
+    Returns:
+        torch.Tensor: Projected gravity in body frame (num_envs, 3)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    return asset.data.projected_gravity_b
+
+
+def raw_accelerometer(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Raw accelerometer reading (includes gravity + linear acceleration).
+
+    Returns normalized raw accelerometer which mimics what a real IMU measures.
+    This is different from pure projected_gravity which only reflects orientation.
+    Reads from the MuJoCo accelerometer sensor "imu_accel".
+
+    Returns:
+        torch.Tensor: Normalized raw accelerometer reading (num_envs, 3)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Access the model to find the sensor address
+    # The accelerometer sensor is the 5th sensor (index 4) in robot.xml
+    # Sensors: framequat, gyro, gyro, velocimeter, accelerometer, subtreeangmom
+    mj_model = asset.data.model
+
+    # Get sensor address from model arrays (sensor_adr is torch tensor)
+    sensor_adr_array = mj_model.sensor_adr  # This is a TorchArray/tensor
+    sensor_id = 4  # imu_accel is the 5th sensor (0-indexed)
+    sensor_adr = int(sensor_adr_array[sensor_id].item())  # Convert to Python int
+
+    # Read accelerometer data (specific force measured by sensor)
+    # Shape: (num_envs, 3)
+    accel_raw = asset.data.data.sensordata[:, sensor_adr:sensor_adr+3]
+
+    # MuJoCo accelerometer measures specific force (like real sensor)
+    # Negate to match convention: when at rest upright, should point down
+    accel_negated = -accel_raw
+
+    # Normalize to unit vector
+    accel_norm = torch.norm(accel_negated, dim=-1, keepdim=True)
+    accel_normalized = torch.where(
+        accel_norm > 0.1,
+        accel_negated / accel_norm,
+        asset.data.projected_gravity_b  # Fallback to projected gravity
+    )
+
+    return accel_normalized
+
+def randomize_imu_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_angle_deg: float = 2.0,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize IMU sensor mounting orientation by small angles.
+    
+    Simulates slight mounting errors or calibration offsets in the real robot.
+    The IMU orientation is randomized by rotating around random axes by up to max_angle_deg.
+    
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize
+        max_angle_deg: Maximum rotation angle in degrees (default 2.0°)
+        asset_cfg: Asset configuration
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+    
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # IMU site is the first site (index 0) in robot.xml
+    # Sites: imu (0), left_foot (1), right_foot (2)
+    site_id = 0
+    
+    # Store original orientation on first call
+    if not hasattr(env, '_original_imu_quat'):
+        env._original_imu_quat = env.sim.model.site_quat[0, site_id].clone()
+    
+    # Generate random rotations for each environment
+    num_envs = len(env_ids)
+    max_angle_rad = max_angle_deg * torch.pi / 180.0
+    
+    # Random rotation angles [-max_angle, +max_angle] for each axis
+    angles = (torch.rand(num_envs, 3, device=env.device) * 2 - 1) * max_angle_rad
+    
+    # Convert Euler angles to quaternions (small angle approximation for efficiency)
+    # For small angles: quat ≈ [1, θx/2, θy/2, θz/2]
+    half_angles = angles / 2.0
+    quats_delta = torch.zeros(num_envs, 4, device=env.device)
+    quats_delta[:, 0] = 1.0  # w component
+    quats_delta[:, 1:] = half_angles  # x, y, z components
+    
+    # Normalize the quaternion
+    quats_delta = quats_delta / torch.norm(quats_delta, dim=1, keepdim=True)
+    
+    # Get original quaternion and apply delta rotation
+    original_quat = env._original_imu_quat.unsqueeze(0).expand(num_envs, -1)
+    
+    # Quaternion multiplication: q_new = q_delta * q_original
+    # q1 * q2 = [w1*w2 - dot(v1,v2), w1*v2 + w2*v1 + cross(v1,v2)]
+    w1, x1, y1, z1 = quats_delta[:, 0], quats_delta[:, 1], quats_delta[:, 2], quats_delta[:, 3]
+    w2, x2, y2, z2 = original_quat[:, 0], original_quat[:, 1], original_quat[:, 2], original_quat[:, 3]
+    
+    new_quat = torch.stack([
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,  # w
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,  # x
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,  # y
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,  # z
+    ], dim=1)
+    
+    # Apply to the selected environments
+    env.sim.model.site_quat[env_ids, site_id] = new_quat
+
+
+def standing_phase(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Simple time-based phase for standing task.
+
+    Returns a scalar phase value that cycles from 0 to 1 based on time.
+    This allows the policy to have a sense of time progression even when standing.
+
+    Args:
+        env: The RL environment
+        asset_cfg: Not used, but kept for API consistency
+
+    Returns:
+        Phase value [0, 1] as tensor of shape (num_envs, 1)
+    """
+    # Simple time-based phase that cycles every 2 seconds
+    # This gives the policy a time-varying signal
+    phase_period = 2.0  # seconds
+    time = env.episode_length_buf * env.step_dt
+    phase = (time % phase_period) / phase_period
+
+    return phase.unsqueeze(-1)  # Shape: (num_envs, 1)
+
+
+def recovery_stepping_reward(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    velocity_threshold: float = 0.3,
+    air_time_threshold: float = 0.05,
+) -> torch.Tensor:
+    """Reward foot air time only when robot has high velocity (recovering from push).
+
+    This encourages the robot to take steps to recover balance when pushed,
+    but doesn't reward unnecessary stepping when standing still.
+
+    Args:
+        env: The RL environment
+        asset_cfg: Asset configuration (unused but kept for API consistency)
+        velocity_threshold: Linear velocity threshold to activate stepping reward (m/s)
+        air_time_threshold: Minimum air time to count as a step (seconds)
+
+    Returns:
+        Reward tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get base linear velocity magnitude
+    base_lin_vel = asset.data.root_link_vel_w[:, :3]  # (num_envs, 3)
+    vel_magnitude = torch.norm(base_lin_vel[:, :2], dim=1)  # Only XY plane
+
+    # Only reward stepping when velocity is high (being pushed)
+    should_step = vel_magnitude > velocity_threshold
+
+    # Get foot air time from contact sensor
+    contact_sensor = env.scene.sensors["feet_ground_contact"]
+    air_time = contact_sensor.data.last_air_time[:, :2]  # (num_envs, 2) - left and right foot
+
+    # Reward if either foot has been in air recently
+    foot_in_air = (air_time > air_time_threshold).any(dim=1)  # (num_envs,)
+
+    # Only give reward when both conditions are met
+    reward = should_step.float() * foot_in_air.float()
+
+    return reward
+
+
+def adaptive_pose_weight(
+    env: ManagerBasedRlEnv,
+    base_pose_reward: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    velocity_threshold: float = 0.3,
+    min_weight: float = 0.3,
+) -> torch.Tensor:
+    """Reduce pose tracking weight when robot has high velocity (recovering from push).
+
+    This gives the robot freedom to deviate from the standing pose when taking
+    recovery steps, while maintaining strict pose tracking when standing still.
+
+    Args:
+        env: The RL environment
+        base_pose_reward: The original pose reward (before weighting)
+        asset_cfg: Asset configuration (unused but kept for API consistency)
+        velocity_threshold: Linear velocity threshold to start reducing weight (m/s)
+        min_weight: Minimum weight multiplier (0-1) at high velocities
+
+    Returns:
+        Weighted reward tensor of shape (num_envs,)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get base linear velocity magnitude
+    base_lin_vel = asset.data.root_link_vel_w[:, :3]  # (num_envs, 3)
+    vel_magnitude = torch.norm(base_lin_vel[:, :2], dim=1)  # Only XY plane
+
+    # Compute weight: 1.0 when stationary, min_weight at high velocity
+    # Use smooth transition via sigmoid-like function
+    weight = min_weight + (1.0 - min_weight) * torch.exp(
+        -((vel_magnitude - velocity_threshold) / velocity_threshold).clamp(min=0.0) ** 2
+    )
+
+    return base_pose_reward * weight
+
+
+def randomize_base_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_pitch_deg: float = 10.0,
+    max_roll_deg: float = 5.0,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize base orientation at episode start to force reactive behavior.
+
+    Adds random pitch and roll to the robot's base orientation at the start of
+    each episode. This prevents the policy from memorizing a single initial state
+    and forces it to use feedback to adapt to different orientations.
+
+    Args:
+        env: The environment
+        env_ids: Environment IDs to randomize
+        max_pitch_deg: Maximum pitch angle in degrees (forward/backward tilt)
+        max_roll_deg: Maximum roll angle in degrees (side-to-side tilt)
+        asset_cfg: Asset configuration
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    else:
+        env_ids = env_ids.to(env.device, dtype=torch.int)
+
+    asset: Entity = env.scene[asset_cfg.name]
+    num_envs = len(env_ids)
+
+    # Generate random pitch and roll angles
+    max_pitch_rad = max_pitch_deg * torch.pi / 180.0
+    max_roll_rad = max_roll_deg * torch.pi / 180.0
+
+    pitch = (torch.rand(num_envs, device=env.device) * 2 - 1) * max_pitch_rad
+    roll = (torch.rand(num_envs, device=env.device) * 2 - 1) * max_roll_rad
+    yaw = torch.zeros(num_envs, device=env.device)  # Keep yaw at 0
+
+    # Convert Euler angles (roll, pitch, yaw) to quaternion
+    # Using the standard aerospace sequence (ZYX)
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    cp = torch.cos(pitch * 0.5)
+    sp = torch.sin(pitch * 0.5)
+    cr = torch.cos(roll * 0.5)
+    sr = torch.sin(roll * 0.5)
+
+    quat_w = cr * cp * cy + sr * sp * sy
+    quat_x = sr * cp * cy - cr * sp * sy
+    quat_y = cr * sp * cy + sr * cp * sy
+    quat_z = cr * cp * sy - sr * sp * cy
+
+    new_quat = torch.stack([quat_w, quat_x, quat_y, quat_z], dim=1)
+
+    # Normalize quaternion
+    new_quat = new_quat / torch.norm(new_quat, dim=1, keepdim=True)
+
+    # Get root position index (freejoint starts at qpos index 0)
+    # Freejoint: [x, y, z, qw, qx, qy, qz]
+    root_quat_idx = 3  # Quaternion starts at index 3
+
+    # Apply the randomized orientation to selected environments
+    env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat

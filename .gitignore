@@ -8,6 +8,8 @@ wheels/
 .python-version
 # uv.lock
 
+
+
 # Virtual environments
 .venv
 
@@ -24,4 +26,4 @@ artifacts/
 *.npz
 
 src/mjlab_microduck/robot/microduck.bak/*
-*.pkl
+data/

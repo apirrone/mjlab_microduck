@@ -14,6 +14,6 @@
       <!-- kp 400 -->
       <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
       <!-- kp 200 -->
-      <position kp="0.32" kv="0.0" forcerange="-0.66 0.66"/>
+      <position kp="0.28" kv="0.0" forcerange="-0.66 0.66"/>
     </default>
 </default>

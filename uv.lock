@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13' and sys_platform == 'linux'",
@@ -1903,14 +1903,14 @@ wheels = [
 
 [[package]]
 name = "trimesh"
-version = "4.11.0"
+version = "4.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/47/f618103c076b06ac79f1ba71e26ca7df0292c3e2b83535d4873e7f127f95/trimesh-4.11.0.tar.gz", hash = "sha256:0b4acdcf28f21013385ccf81619a9dce703af348f69b198180a2212b1bc67821", size = 834847, upload-time = "2026-01-07T19:51:53.043Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/6e/e905f84b31e6f3a7957f26a91c6d2c6337def5a888e55ac89fe2b790241b/trimesh-4.11.1.tar.gz", hash = "sha256:9a10040ca5d1c4438e0b7af94433edf6b043f5204393fc97bb85c9159a8bf21e", size = 835062, upload-time = "2026-01-17T16:38:02.67Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/cc/5056718bf473be51712ecf74800093a13d69c576f1ca0e0f3cf4684567cf/trimesh-4.11.0-py3-none-any.whl", hash = "sha256:6237019fed3bdc8d68acc45a47a4ea62db1483c3fab5c87d587a48a0e69bbff3", size = 740342, upload-time = "2026-01-07T19:51:50.993Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/be/69fffc97b78f52a5d1372e5d56a0599291e96996a47089fb6312bc023d88/trimesh-4.11.1-py3-none-any.whl", hash = "sha256:bcc082ced94610ecd2c09b031431d0f3ad74352525e23a41b5688a2897b3e3e0", size = 740352, upload-time = "2026-01-17T16:38:00.716Z" },
 ]
 
 [package.optional-dependencies]
@@ -2027,7 +2027,7 @@ wheels = [
 
 [[package]]
 name = "viser"
-version = "1.0.17"
+version = "1.0.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "imageio" },
@@ -2043,9 +2043,9 @@ dependencies = [
     { name = "yourdfpy" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/ca/2e99ddbc527c37bfa2a8b0150430eab3cf6c5e0d970e6b2b272ca0d24b17/viser-1.0.17.tar.gz", hash = "sha256:24ff85c1856fedb303ae5ad459746629f880b8c65ed67c614b4b398d9b95ed9d", size = 4770258, upload-time = "2026-01-12T10:25:08.275Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/24/2cbdc6978e15f4bf6d67ca1370d269460d11e51a488d1ef4a17638367bb8/viser-1.0.19.tar.gz", hash = "sha256:39c3c7ec4974c96b0a33ee9e7fb2ff2eed682bccf00ba29f539d7b40b10ffc99", size = 4774435, upload-time = "2026-01-17T06:35:53.278Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/e2/c4675be54b1dece6f15bb3ebb091438739e6095cf79f021b065ca7af4550/viser-1.0.17-py3-none-any.whl", hash = "sha256:44e3804689b5db2183349c67ebe44049d1423565dccc1b44f933aeb1d8755e36", size = 4851446, upload-time = "2026-01-12T10:25:10.172Z" },
+    { url = "https://files.pythonhosted.org/packages/46/1e/2c25d1a3afd2db5b0731ca15479a0bad728ac341a23ab07f7cbf3eecef55/viser-1.0.19-py3-none-any.whl", hash = "sha256:5756c85aca9ab5cccb3fb0f3b6fe39e0a27ff3a00060c4e780785adf600ce925", size = 4856386, upload-time = "2026-01-17T06:35:51.032Z" },
 ]
 
 [[package]]
