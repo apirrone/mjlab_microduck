@@ -985,8 +985,9 @@ def velocity_tracking_std_curriculum(
     """
     del env_ids  # Unused
 
-    reward_term = env.reward_manager.get_term(reward_name)
-    assert reward_term is not None, f"Reward term '{reward_name}' not found"
+    # Access reward term from manager's internal dictionary
+    assert reward_name in env.reward_manager._terms, f"Reward term '{reward_name}' not found"
+    reward_term = env.reward_manager._terms[reward_name]
 
     # Update std based on current step (iterations, not env steps)
     current_iteration = env.common_step_counter // env.num_steps_per_env
