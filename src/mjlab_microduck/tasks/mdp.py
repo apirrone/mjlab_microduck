@@ -1001,6 +1001,51 @@ def velocity_tracking_std_curriculum(
     return torch.tensor([current_std])
 
 
+def push_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    push_stages: list[dict],
+) -> torch.Tensor:
+    """Update push velocity range based on training progress.
+
+    Starts with no/small pushes to learn clean walking, then gradually increases
+    to build robustness without disrupting early learning.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        event_name: Name of the push event term (e.g., "push_robot")
+        push_stages: List of dicts with 'step' and 'velocity_range' keys
+            Example: [
+                {"step": 0, "velocity_range": {"x": (0.0, 0.0), "y": (0.0, 0.0)}},
+                {"step": 250, "velocity_range": {"x": (-0.15, 0.15), "y": (-0.15, 0.15)}},
+                {"step": 500, "velocity_range": {"x": (-0.3, 0.3), "y": (-0.3, 0.3)}},
+            ]
+
+    Returns:
+        Current max push magnitude as a tensor
+    """
+    del env_ids  # Unused
+
+    event_term = env.event_manager.get_term(event_name)
+    assert event_term is not None, f"Event term '{event_name}' not found"
+
+    # Update velocity_range based on current step
+    current_range = push_stages[0]["velocity_range"]  # Default to first stage
+
+    for stage in push_stages:
+        if env.common_step_counter > stage["step"]:
+            current_range = stage["velocity_range"]
+
+    # Update the event term's velocity_range parameter
+    event_term.cfg.params["velocity_range"] = current_range
+
+    # Return max magnitude for logging
+    max_push = max(abs(current_range["x"][0]), abs(current_range["x"][1]))
+    return torch.tensor([max_push])
+
+
 def projected_gravity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
