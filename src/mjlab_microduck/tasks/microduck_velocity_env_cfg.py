@@ -161,10 +161,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 4.0  # Increased from 2.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.0134)  # ~0.116 - adjusted to keep baseline reward similar
-    cfg.rewards["track_angular_velocity"].weight = 4.0  # Increased from 2.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.027)  # ~0.164 - adjusted proportionally
+    cfg.rewards["track_linear_velocity"].weight = 2.0 
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25) # Default is 0.25
+    cfg.rewards["track_angular_velocity"].weight = 2.0
+    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.5) # Default is 0.5
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
