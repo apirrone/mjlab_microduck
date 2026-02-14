@@ -161,8 +161,8 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 2.0
-    cfg.rewards["track_angular_velocity"].weight = 2.0
+    cfg.rewards["track_linear_velocity"].weight = 10.0
+    cfg.rewards["track_angular_velocity"].weight = 10.0
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
@@ -552,17 +552,17 @@ def make_microduck_velocity_env_cfg(
 
     # Push curriculum - start with no pushes (learn clean gait), gradually increase (build robustness)
     # Steps are in env steps (iteration * 24)
-    cfg.curriculum["push_magnitude"] = CurriculumTermCfg(
-        func=microduck_mdp.push_curriculum,
-        params={
-            "event_name": "push_robot",
-            "push_stages": [
-                {"step": 0, "velocity_range": {"x": (0.0, 0.0), "y": (0.0, 0.0)}},                   # No pushes - learn basic walking
-                {"step": 250 * 24, "velocity_range": {"x": (-0.15, 0.15), "y": (-0.15, 0.15)}},     # Small pushes - build initial robustness
-                {"step": 500 * 24, "velocity_range": {"x": (-0.3, 0.3), "y": (-0.3, 0.3)}},         # Full pushes - final robustness
-            ],
-        },
-    )
+    # cfg.curriculum["push_magnitude"] = CurriculumTermCfg(
+        # func=microduck_mdp.push_curriculum,
+        # params={
+            # "event_name": "push_robot",
+            # "push_stages": [
+                # {"step": 0, "velocity_range": {"x": (0.0, 0.0), "y": (0.0, 0.0)}},                   # No pushes - learn basic walking
+                # {"step": 250 * 24, "velocity_range": {"x": (-0.15, 0.15), "y": (-0.15, 0.15)}},     # Small pushes - build initial robustness
+                # {"step": 500 * 24, "velocity_range": {"x": (-0.3, 0.3), "y": (-0.3, 0.3)}},         # Full pushes - final robustness
+            # ],
+        # },
+    # )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
