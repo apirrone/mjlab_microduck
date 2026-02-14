@@ -1028,8 +1028,9 @@ def push_curriculum(
     """
     del env_ids  # Unused
 
-    event_term = env.event_manager.get_term(event_name)
-    assert event_term is not None, f"Event term '{event_name}' not found"
+    # Access event term from manager's internal dictionary
+    assert event_name in env.event_manager._terms, f"Event term '{event_name}' not found"
+    event_term = env.event_manager._terms[event_name]
 
     # Update velocity_range based on current step
     current_range = push_stages[0]["velocity_range"]  # Default to first stage
