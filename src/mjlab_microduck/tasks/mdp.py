@@ -958,6 +958,50 @@ def standing_envs_curriculum(
     return torch.tensor([cfg.rel_standing_envs])
 
 
+def velocity_tracking_std_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    reward_name: str,
+    std_stages: list[dict],
+) -> torch.Tensor:
+    """Update velocity tracking std parameter based on training progress.
+
+    Starts with loose std (easy rewards) to learn basic walking, then gradually
+    tightens to improve velocity tracking accuracy.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        reward_name: Name of the reward term (e.g., "track_linear_velocity")
+        std_stages: List of dicts with 'step' and 'std' keys
+            Example: [
+                {"step": 0, "std": 0.5},      # Start loose - learn to walk
+                {"step": 250, "std": 0.3},     # Moderate - refine gait
+                {"step": 500, "std": 0.2},     # Strict - accurate tracking
+            ]
+
+    Returns:
+        Current std value as a tensor
+    """
+    del env_ids  # Unused
+
+    reward_term = env.reward_manager.get_term(reward_name)
+    assert reward_term is not None, f"Reward term '{reward_name}' not found"
+
+    # Update std based on current step (iterations, not env steps)
+    current_iteration = env.common_step_counter // env.num_steps_per_env
+    current_std = std_stages[0]["std"]  # Default to first stage
+
+    for stage in std_stages:
+        if current_iteration >= stage["step"]:
+            current_std = stage["std"]
+
+    # Update the reward term's std parameter
+    reward_term.cfg.params["std"] = current_std
+
+    return torch.tensor([current_std])
+
+
 def projected_gravity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,

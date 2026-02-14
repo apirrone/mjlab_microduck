@@ -161,10 +161,9 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
+    # std will be adjusted via curriculum - start loose, get stricter over time
     cfg.rewards["track_linear_velocity"].weight = 2.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.04)  # 0.2 - moderate strictness for small robot (default 0.5, tried 0.1 too strict)
     cfg.rewards["track_angular_velocity"].weight = 2.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.1)  # ~0.32 - moderate strictness (default ~0.71, tried ~0.22 too strict)
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
@@ -553,6 +552,31 @@ def make_microduck_velocity_env_cfg(
             # ],
         # },
     # )
+
+    # Velocity tracking std curriculum - start loose, get stricter over time
+    cfg.curriculum["linear_velocity_std"] = CurriculumTermCfg(
+        func=microduck_mdp.velocity_tracking_std_curriculum,
+        params={
+            "reward_name": "track_linear_velocity",
+            "std_stages": [
+                {"step": 0, "std": math.sqrt(0.25)},     # 0.5 - default, learn to walk
+                {"step": 250, "std": math.sqrt(0.09)},   # 0.3 - moderate
+                {"step": 500, "std": math.sqrt(0.04)},   # 0.2 - strict for small robot
+            ],
+        },
+    )
+
+    cfg.curriculum["angular_velocity_std"] = CurriculumTermCfg(
+        func=microduck_mdp.velocity_tracking_std_curriculum,
+        params={
+            "reward_name": "track_angular_velocity",
+            "std_stages": [
+                {"step": 0, "std": math.sqrt(0.5)},      # ~0.71 - default
+                {"step": 250, "std": math.sqrt(0.2)},    # ~0.45 - moderate
+                {"step": 500, "std": math.sqrt(0.1)},    # ~0.32 - strict
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
