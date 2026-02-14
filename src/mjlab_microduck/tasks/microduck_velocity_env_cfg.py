@@ -506,12 +506,12 @@ def make_microduck_velocity_env_cfg(
             "weight_stages": [
                 # Start at current weight (2.0), gradually reduce to encourage more robust walking
                 # 250 iterations × 24 steps/iter = 6000 steps
-                {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 2.5},
-                {"step": 750 * 24, "weight": 3.0},
-                {"step": 1000 * 24, "weight": 3.5},
-                {"step": 1250 * 24, "weight": 4.0},
-                {"step": 1500 * 24, "weight": 4.5},
+                {"step": 0, "weight": 4.0},
+                {"step": 500 * 24, "weight": 5},
+                {"step": 750 * 24, "weight": 6},
+                # {"step": 1000 * 24, "weight": 3.5},
+                # {"step": 1250 * 24, "weight": 4.0},
+                # {"step": 1500 * 24, "weight": 4.5},
             ],
         },
     )
@@ -523,12 +523,9 @@ def make_microduck_velocity_env_cfg(
             "reward_name": "track_angular_velocity",
             "weight_stages": [
                 # Start at current weight (2.0), gradually reduce
-                {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 2.5},
-                {"step": 750 * 24, "weight": 3.0},
-                {"step": 1000 * 24, "weight": 3.5},
-                {"step": 1250 * 24, "weight": 4.0},
-                {"step": 1500 * 24, "weight": 4.5},
+                {"step": 0, "weight": 4.0},
+                {"step": 500 * 24, "weight": 5},
+                {"step": 750 * 24, "weight": 6},
             ],
         },
     )
