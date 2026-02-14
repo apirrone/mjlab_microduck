@@ -475,7 +475,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands - matched to reference motion coverage!
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.02  # Small amount for balance/stability training
+    command.rel_standing_envs = 0.25 # Was 0.02
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.1, 0.15)
     command.ranges.lin_vel_y = (-0.15, 0.15)
@@ -506,36 +506,30 @@ def make_microduck_velocity_env_cfg(
     )
 
     # Add linear velocity tracking curriculum
-    cfg.curriculum["linear_velocity_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "track_linear_velocity",
-            "weight_stages": [
-                # Start at current weight (2.0), gradually reduce to encourage more robust walking
-                # 250 iterations × 24 steps/iter = 6000 steps
-                {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 3.0},
-                {"step": 750 * 24, "weight": 4.0},
-                # {"step": 1000 * 24, "weight": 3.5},
-                # {"step": 1250 * 24, "weight": 4.0},
-                # {"step": 1500 * 24, "weight": 4.5},
-            ],
-        },
-    )
+    # cfg.curriculum["linear_velocity_weight"] = CurriculumTermCfg(
+        # func=mdp.reward_weight,
+        # params={
+            # "reward_name": "track_linear_velocity",
+            # "weight_stages": [
+                # {"step": 0, "weight": 2.0},
+                # {"step": 500 * 24, "weight": 3.0},
+                # {"step": 750 * 24, "weight": 4.0},
+            # ],
+        # },
+    # )
 
     # Add angular velocity tracking curriculum
-    cfg.curriculum["angular_velocity_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "track_angular_velocity",
-            "weight_stages": [
-                # Start at current weight (2.0), gradually reduce
-                {"step": 0, "weight": 2.0},
-                {"step": 500 * 24, "weight": 3.0},
-                {"step": 750 * 24, "weight": 4.0},
-            ],
-        },
-    )
+    # cfg.curriculum["angular_velocity_weight"] = CurriculumTermCfg(
+        # func=mdp.reward_weight,
+        # params={
+            # "reward_name": "track_angular_velocity",
+            # "weight_stages": [
+                # {"step": 0, "weight": 2.0},
+                # {"step": 500 * 24, "weight": 3.0},
+                # {"step": 750 * 24, "weight": 4.0},
+            # ],
+        # },
+    # )
 
     # # Add standing envs curriculum - gradually increase fraction of standing envs
     # cfg.curriculum["standing_envs"] = CurriculumTermCfg(
