@@ -985,9 +985,8 @@ def velocity_tracking_std_curriculum(
     """
     del env_ids  # Unused
 
-    # Access reward term from manager's internal dictionary
-    assert reward_name in env.reward_manager._terms, f"Reward term '{reward_name}' not found"
-    reward_term = env.reward_manager._terms[reward_name]
+    # Get reward term configuration
+    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
 
     # Update std based on current step (iterations, not env steps)
     current_iteration = env.common_step_counter // env.num_steps_per_env
@@ -998,7 +997,7 @@ def velocity_tracking_std_curriculum(
             current_std = stage["std"]
 
     # Update the reward term's std parameter
-    reward_term.cfg.params["std"] = current_std
+    reward_term_cfg.params["std"] = current_std
 
     return torch.tensor([current_std])
 
