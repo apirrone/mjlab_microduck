@@ -554,14 +554,15 @@ def make_microduck_velocity_env_cfg(
     # )
 
     # Velocity tracking std curriculum - start loose, get stricter over time
+    # Steps are in env steps (iteration * 24). Robot learns basic walk by iteration 250.
     cfg.curriculum["linear_velocity_std"] = CurriculumTermCfg(
         func=microduck_mdp.velocity_tracking_std_curriculum,
         params={
             "reward_name": "track_linear_velocity",
             "std_stages": [
-                {"step": 0, "std": math.sqrt(0.25)},     # 0.5 - default, learn to walk
-                {"step": 250, "std": math.sqrt(0.09)},   # 0.3 - moderate
-                {"step": 500, "std": math.sqrt(0.04)},   # 0.2 - strict for small robot
+                {"step": 0, "std": math.sqrt(0.25)},        # 0.5 - default, learn to walk
+                {"step": 250 * 24, "std": math.sqrt(0.09)}, # 0.3 - moderate (after walk learned)
+                {"step": 500 * 24, "std": math.sqrt(0.04)}, # 0.2 - strict for small robot
             ],
         },
     )
@@ -571,9 +572,9 @@ def make_microduck_velocity_env_cfg(
         params={
             "reward_name": "track_angular_velocity",
             "std_stages": [
-                {"step": 0, "std": math.sqrt(0.5)},      # ~0.71 - default
-                {"step": 250, "std": math.sqrt(0.2)},    # ~0.45 - moderate
-                {"step": 500, "std": math.sqrt(0.1)},    # ~0.32 - strict
+                {"step": 0, "std": math.sqrt(0.5)},         # ~0.71 - default
+                {"step": 250 * 24, "std": math.sqrt(0.2)},  # ~0.45 - moderate
+                {"step": 500 * 24, "std": math.sqrt(0.1)},  # ~0.32 - strict
             ],
         },
     )

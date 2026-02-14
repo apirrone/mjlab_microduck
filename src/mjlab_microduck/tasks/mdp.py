@@ -988,12 +988,11 @@ def velocity_tracking_std_curriculum(
     # Get reward term configuration
     reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
 
-    # Update std based on current step (iterations, not env steps)
-    current_iteration = env.common_step_counter // env.num_steps_per_env
+    # Update std based on current step
     current_std = std_stages[0]["std"]  # Default to first stage
 
     for stage in std_stages:
-        if current_iteration >= stage["step"]:
+        if env.common_step_counter > stage["step"]:
             current_std = stage["std"]
 
     # Update the reward term's std parameter
