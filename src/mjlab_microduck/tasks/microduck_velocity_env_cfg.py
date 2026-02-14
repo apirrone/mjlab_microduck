@@ -162,9 +162,9 @@ def make_microduck_velocity_env_cfg(
 
     # Velocity tracking rewards (will be disabled when using imitation)
     cfg.rewards["track_linear_velocity"].weight = 2.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.01)  # 0.1 - scaled for small robot (default is 0.5)
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.04)  # 0.2 - moderate strictness for small robot (default 0.5, tried 0.1 too strict)
     cfg.rewards["track_angular_velocity"].weight = 2.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.05)  # ~0.22 - scaled for small robot (default is ~0.71)
+    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.1)  # ~0.32 - moderate strictness (default ~0.71, tried ~0.22 too strict)
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
@@ -247,9 +247,9 @@ def make_microduck_velocity_env_cfg(
         # Keep velocity tracking rewards active (helps with command following)
         # Reduced weight to not compete too much with imitation
         cfg.rewards["track_linear_velocity"].weight = 2.0
-        cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.01)  # Scaled for small robot
+        cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.04)  # Moderate strictness for small robot
         cfg.rewards["track_angular_velocity"].weight = 1.0
-        cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.05)  # Scaled for small robot
+        cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.1)  # Moderate strictness for small robot
 
         # Disable rewards not in the paper's imitation table
         cfg.rewards["air_time"].weight = 0.0
