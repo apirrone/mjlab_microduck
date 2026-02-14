@@ -128,11 +128,10 @@ def make_microduck_velocity_env_cfg(
 
     # === REWARDS ===
     # Pose reward configuration
-    # Key insight from K1: strict pose when standing, permissive when walking
-    cfg.rewards["pose"].params["std_standing"] = {".*": 0.1}  # Strict - discourages stepping on spot
-    cfg.rewards["pose"].params["std_walking"] = std_walking  # Permissive - allows gait variation
+    cfg.rewards["pose"].params["std_standing"] = std_walking
+    cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
-    cfg.rewards["pose"].params["walking_threshold"] = 0.05  # Default value (was 0.01 - too sensitive)
+    cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].weight = 2.0  # was 1.0
 
     # Body-specific reward configurations
@@ -147,14 +146,14 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
     cfg.rewards["foot_slip"].weight = -0.1  # was -1.0
-    cfg.rewards["foot_slip"].params["command_threshold"] = 0.05  # Match walking_threshold
+    cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
 
     # Body dynamics rewards
     cfg.rewards["soft_landing"].weight = -1e-05
 
-    # Air time reward - reduced to balance with velocity tracking
-    cfg.rewards["air_time"].weight = 2.5  # Reduced from 5.0 to not dominate velocity tracking
-    cfg.rewards["air_time"].params["command_threshold"] = 0.05  # Match walking_threshold
+    # Air time reward
+    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
@@ -170,10 +169,10 @@ def make_microduck_velocity_env_cfg(
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
 
-    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.05  # Match walking_threshold
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
 
-    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.05  # Match walking_threshold
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
     cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
@@ -262,7 +261,7 @@ def make_microduck_velocity_env_cfg(
             weight=1.0,
             params={
                 "imitation_state": imitation_state,
-                "command_threshold": 0.05,  # Match walking_threshold
+                "command_threshold": 0.01,
                 "weight_torso_pos_xy": 1.0,
                 "weight_torso_orient": 1.0,
                 "weight_lin_vel_xy": 1.0,
