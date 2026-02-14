@@ -480,7 +480,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands - matched to reference motion coverage!
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.05 # Was 0.02
+    command.rel_standing_envs = 0.02
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.1, 0.15)
     command.ranges.lin_vel_y = (-0.15, 0.15)
