@@ -151,8 +151,8 @@ def make_microduck_velocity_env_cfg(
     # Body dynamics rewards
     cfg.rewards["soft_landing"].weight = -1e-05
 
-    # Air time reward
-    cfg.rewards["air_time"].weight = 5.0
+    # Air time reward - reduced to not dominate velocity tracking
+    cfg.rewards["air_time"].weight = 2.0  # Reduced from 5.0 to balance with velocity tracking (weight 2.0)
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
@@ -552,32 +552,6 @@ def make_microduck_velocity_env_cfg(
             # ],
         # },
     # )
-
-    # Velocity tracking std curriculum - start loose, get stricter over time
-    # Steps are in env steps (iteration * 24). Robot learns basic walk by iteration 250.
-    cfg.curriculum["linear_velocity_std"] = CurriculumTermCfg(
-        func=microduck_mdp.velocity_tracking_std_curriculum,
-        params={
-            "reward_name": "track_linear_velocity",
-            "std_stages": [
-                {"step": 0, "std": math.sqrt(0.25)},        # 0.5 - default, learn to walk
-                {"step": 250 * 24, "std": math.sqrt(0.09)}, # 0.3 - moderate (after walk learned)
-                {"step": 500 * 24, "std": math.sqrt(0.04)}, # 0.2 - strict for small robot
-            ],
-        },
-    )
-
-    cfg.curriculum["angular_velocity_std"] = CurriculumTermCfg(
-        func=microduck_mdp.velocity_tracking_std_curriculum,
-        params={
-            "reward_name": "track_angular_velocity",
-            "std_stages": [
-                {"step": 0, "std": math.sqrt(0.5)},         # ~0.71 - default
-                {"step": 250 * 24, "std": math.sqrt(0.2)},  # ~0.45 - moderate
-                {"step": 500 * 24, "std": math.sqrt(0.1)},  # ~0.32 - strict
-            ],
-        },
-    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
