@@ -151,8 +151,9 @@ def make_microduck_velocity_env_cfg(
     # Body dynamics rewards
     cfg.rewards["soft_landing"].weight = -1e-05
 
-    # Air time reward - reduced to not dominate velocity tracking
-    cfg.rewards["air_time"].weight = 2.0  # Reduced from 5.0 to balance with velocity tracking (weight 2.0)
+    # Air time reward - will be reduced via curriculum
+    # Start high to learn walking, then reduce to let velocity tracking dominate
+    cfg.rewards["air_time"].weight = 5.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
@@ -552,6 +553,19 @@ def make_microduck_velocity_env_cfg(
             # ],
         # },
     # )
+
+    # Air time weight curriculum - start high (learn to walk), reduce over time (focus on velocity)
+    cfg.curriculum["air_time_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "air_time",
+            "weight_stages": [
+                {"step": 0, "weight": 5.0},           # High - learn to walk
+                {"step": 250 * 24, "weight": 3.0},    # Moderate - after walk learned
+                {"step": 500 * 24, "weight": 2.0},    # Low - velocity tracking priority
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
