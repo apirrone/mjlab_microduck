@@ -1028,9 +1028,9 @@ def push_curriculum(
     """
     del env_ids  # Unused
 
-    # Access event term from manager's internal dictionary
-    assert event_name in env.event_manager._terms, f"Event term '{event_name}' not found"
-    event_term = env.event_manager._terms[event_name]
+    # Access event configuration directly from environment config
+    assert event_name in env.cfg.events, f"Event '{event_name}' not found"
+    event_cfg = env.cfg.events[event_name]
 
     # Update velocity_range based on current step
     current_range = push_stages[0]["velocity_range"]  # Default to first stage
@@ -1039,8 +1039,8 @@ def push_curriculum(
         if env.common_step_counter > stage["step"]:
             current_range = stage["velocity_range"]
 
-    # Update the event term's velocity_range parameter
-    event_term.cfg.params["velocity_range"] = current_range
+    # Update the event configuration's velocity_range parameter
+    event_cfg.params["velocity_range"] = current_range
 
     # Return max magnitude for logging
     max_push = max(abs(current_range["x"][0]), abs(current_range["x"][1]))
