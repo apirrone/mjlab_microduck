@@ -409,6 +409,13 @@ def make_microduck_velocity_env_cfg(
     # Observations
     del cfg.observations["policy"].terms["base_lin_vel"]
 
+    # Add base_lin_vel to critic only (privileged information)
+    from mjlab.managers.manager_term_config import ObservationTermCfg
+    cfg.observations["critic"].terms["base_lin_vel"] = ObservationTermCfg(
+        func=mdp.base_lin_vel,
+        scale=1.0,
+    )
+
     # Determine gravity/accelerometer term name based on flag
     gravity_term_name = "projected_gravity" if USE_PROJECTED_GRAVITY else "raw_accelerometer"
 

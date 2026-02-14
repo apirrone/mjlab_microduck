@@ -408,7 +408,7 @@ def main():
     parser.add_argument("--action-scale", type=float, default=1.0, help="Action scale (default: 1.0)")
     parser.add_argument("--imitation", action="store_true", help="Enable imitation mode (adds phase observation)")
     parser.add_argument("--reference-motion", type=str, default=None, help="Path to reference motion .pkl file (for imitation)")
-    parser.add_argument("--projected-gravity", action="store_true", help="Use projected gravity instead of raw accelerometer (imitation only)")
+    parser.add_argument("--raw-accelerometer", action="store_true", help="Use raw accelerometer instead of projected gravity (default: projected gravity)")
     parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
@@ -456,7 +456,7 @@ def main():
         delay_max_lag=delay_max_lag,
         standing_onnx_path=args.standing,
         switch_threshold=args.switch_threshold,
-        use_projected_gravity=args.projected_gravity
+        use_projected_gravity=not args.raw_accelerometer
     )
     policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
