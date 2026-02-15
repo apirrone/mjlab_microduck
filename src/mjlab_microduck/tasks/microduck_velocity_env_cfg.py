@@ -152,7 +152,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["soft_landing"].weight = -1e-05
 
     # Air time reward
-    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].weight = 0.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
@@ -161,10 +161,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 2.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25) # Default is 0.25
-    cfg.rewards["track_angular_velocity"].weight = 2.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.5) # Default is 0.5
+    cfg.rewards["track_linear_velocity"].weight = 3.0
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.125) # Default is 0.25
+    cfg.rewards["track_angular_velocity"].weight = 3.0
+    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25) # Default is 0.5
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
@@ -478,7 +478,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands - matched to reference motion coverage!
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.02
+    command.rel_standing_envs = 0.25
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.1, 0.15)
     command.ranges.lin_vel_y = (-0.15, 0.15)
