@@ -153,7 +153,7 @@ def make_microduck_velocity_env_cfg(
 
     # Air time reward
     cfg.rewards["air_time"].weight = 5.0
-    cfg.rewards["air_time"].params["command_threshold"] = 0.01
+    cfg.rewards["air_time"].params["command_threshold"] = 0.1  # Only reward air time when actually commanded to move
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
@@ -504,39 +504,6 @@ def make_microduck_velocity_env_cfg(
                 # {"step": 1250 * 24, "weight": -1.6},
                 # {"step": 1500 * 24, "weight": -1.8},
                 # {"step": 1750 * 24, "weight": -1.8},
-            ],
-        },
-    )
-
-    # Add velocity tracking std curriculum - VERY gentle tightening
-    # Gradually reduces std to make velocity tracking more strict
-    # Start: std=0.5 (current), End: std=0.4 (-20% over 3000 iterations)
-    cfg.curriculum["linear_velocity_std"] = CurriculumTermCfg(
-        func=microduck_mdp.velocity_tracking_std_curriculum,
-        params={
-            "reward_name": "track_linear_velocity",
-            "std_stages": [
-                {"step": 0, "std": 0.5},              # Current value - no change
-                {"step": 250 * 24, "std": 0.475},     # -5% at iter 250
-                {"step": 500 * 24, "std": 0.45},     # -10% at iter 500
-                {"step": 750 * 24, "std": 0.435},    # -13% at iter 750
-                {"step": 1000 * 24, "std": 0.42},     # -16% at iter 1000
-                {"step": 1250 * 24, "std": 0.4},      # -20% at iter 1250 (final)
-            ],
-        },
-    )
-
-    cfg.curriculum["angular_velocity_std"] = CurriculumTermCfg(
-        func=microduck_mdp.velocity_tracking_std_curriculum,
-        params={
-            "reward_name": "track_angular_velocity",
-            "std_stages": [
-                {"step": 0, "std": 0.707},            # Current value (sqrt(0.5))
-                {"step": 250 * 24, "std": 0.672},     # -5% at iter 250
-                {"step": 500 * 24, "std": 0.636},    # -10% at iter 500
-                {"step": 750 * 24, "std": 0.615},    # -13% at iter 750
-                {"step": 1000 * 24, "std": 0.594},    # -16% at iter 1000
-                {"step": 1250 * 24, "std": 0.566},    # -20% at iter 1250 (final, sqrt(0.32))
             ],
         },
     )
