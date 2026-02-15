@@ -132,7 +132,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].weight = 2.0  # was 1.0
+    cfg.rewards["pose"].weight = 1.0  # was 2.0
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -146,14 +146,14 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
     cfg.rewards["foot_slip"].weight = -0.1  # was -1.0
-    cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_slip"].params["command_threshold"] = 0.05
 
     # Body dynamics rewards
     cfg.rewards["soft_landing"].weight = -1e-05
 
     # Air time reward
-    cfg.rewards["air_time"].weight = 0.0
-    cfg.rewards["air_time"].params["command_threshold"] = 0.01
+    cfg.rewards["air_time"].weight = 1.0 # Was 5
+    cfg.rewards["air_time"].params["command_threshold"] = 0.05
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
@@ -161,18 +161,18 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 3.0
+    cfg.rewards["track_linear_velocity"].weight = 2.0
     cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.05) # Default is 0.25
-    cfg.rewards["track_angular_velocity"].weight = 3.0
+    cfg.rewards["track_angular_velocity"].weight = 2.0
     cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.1) # Default is 0.5
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
 
-    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.05
     cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
 
-    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.05
     cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
