@@ -128,7 +128,7 @@ def make_microduck_velocity_env_cfg(
 
     # === REWARDS ===
     # Pose reward configuration
-    cfg.rewards["pose"].params["std_standing"] = std_walking
+    cfg.rewards["pose"].params["std_standing"] = {".*": 0.1}
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
