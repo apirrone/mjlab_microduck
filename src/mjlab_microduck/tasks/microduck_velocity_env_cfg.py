@@ -162,7 +162,7 @@ def make_microduck_velocity_env_cfg(
 
     # Velocity tracking rewards (will be disabled when using imitation)
     cfg.rewards["track_linear_velocity"].weight = 2.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.5) # Default is 0.25
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25) # Default is 0.25
     cfg.rewards["track_angular_velocity"].weight = 2.0
     cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.5) # Default is 0.5
 
@@ -504,6 +504,39 @@ def make_microduck_velocity_env_cfg(
                 # {"step": 1250 * 24, "weight": -1.6},
                 # {"step": 1500 * 24, "weight": -1.8},
                 # {"step": 1750 * 24, "weight": -1.8},
+            ],
+        },
+    )
+
+    # Add velocity tracking std curriculum - VERY gentle tightening
+    # Gradually reduces std to make velocity tracking more strict
+    # Start: std=0.5 (current), End: std=0.4 (-20% over 3000 iterations)
+    cfg.curriculum["linear_velocity_std"] = CurriculumTermCfg(
+        func=microduck_mdp.velocity_tracking_std_curriculum,
+        params={
+            "reward_name": "track_linear_velocity",
+            "std_stages": [
+                {"step": 0, "std": 0.5},              # Current value - no change
+                {"step": 250 * 24, "std": 0.475},     # -5% at iter 250
+                {"step": 500 * 24, "std": 0.45},     # -10% at iter 500
+                {"step": 750 * 24, "std": 0.435},    # -13% at iter 750
+                {"step": 1000 * 24, "std": 0.42},     # -16% at iter 1000
+                {"step": 1250 * 24, "std": 0.4},      # -20% at iter 1250 (final)
+            ],
+        },
+    )
+
+    cfg.curriculum["angular_velocity_std"] = CurriculumTermCfg(
+        func=microduck_mdp.velocity_tracking_std_curriculum,
+        params={
+            "reward_name": "track_angular_velocity",
+            "std_stages": [
+                {"step": 0, "std": 0.707},            # Current value (sqrt(0.5))
+                {"step": 250 * 24, "std": 0.672},     # -5% at iter 250
+                {"step": 500 * 24, "std": 0.636},    # -10% at iter 500
+                {"step": 750 * 24, "std": 0.615},    # -13% at iter 750
+                {"step": 1000 * 24, "std": 0.594},    # -16% at iter 1000
+                {"step": 1250 * 24, "std": 0.566},    # -20% at iter 1250 (final, sqrt(0.32))
             ],
         },
     )
