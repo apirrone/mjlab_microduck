@@ -188,6 +188,16 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.1
     )
+
+    # Head position tracking reward
+    cfg.rewards["track_head_position"] = RewardTermCfg(
+        func=microduck_mdp.track_head_position,
+        weight=2.0,
+        params={
+            "command_name": "head",
+            "std": math.sqrt(0.3),
+        },
+    )
     # cfg.rewards["neck_joint_vel_l2"] = RewardTermCfg(
     # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
@@ -453,10 +463,15 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
+    # Add head command observation to policy
+    from mjlab.managers.manager_term_config import ObservationTermCfg
+    cfg.observations["policy"].terms["head_command"] = ObservationTermCfg(
+        func=microduck_mdp.head_command_observation,
+        params={"command_name": "head"},
+    )
+
     # Add imitation observations if using imitation
     if use_imitation and reference_motion_path and imitation_state is not None:
-        from mjlab.managers.manager_term_config import ObservationTermCfg
-
         # Add phase observation to policy (for both training and play)
         cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(
             func=microduck_mdp.imitation_phase_observation,
@@ -484,6 +499,19 @@ def make_microduck_velocity_env_cfg(
     command.ranges.lin_vel_y = (-0.3, 0.3)
     command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
+
+    # Head position commands
+    from mjlab_microduck.tasks.head_command import UniformHeadCommandCfg
+    cfg.commands["head"] = UniformHeadCommandCfg(
+        asset_name="robot",
+        resampling_time_range=(10.0, 10.0),  # Resample every 10 seconds
+        ranges=UniformHeadCommandCfg.Ranges(
+            neck_pitch=(-0.5, 0.5),
+            head_pitch=(-0.5, 0.5),
+            head_yaw=(-0.5, 0.5),
+            head_roll=(-0.5, 0.5),
+        ),
+    )
 
     # Terrain
     cfg.scene.terrain.terrain_type = "plane"

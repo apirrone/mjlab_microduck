@@ -1340,3 +1340,70 @@ def randomize_base_orientation(
 
     # Apply the randomized orientation to selected environments
     env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat
+
+
+# ==============================================================================
+# Head Command Functions
+# ==============================================================================
+
+
+def head_command_observation(
+    env: ManagerBasedRlEnv,
+    command_name: str = "head",
+) -> torch.Tensor:
+    """Returns the current head command.
+
+    Args:
+        env: The environment
+        command_name: Name of the head command term
+
+    Returns:
+        Head command tensor of shape (num_envs, 4) containing:
+        - neck_pitch, head_pitch, head_yaw, head_roll
+    """
+    if command_name not in env.command_manager._terms:
+        return torch.zeros((env.num_envs, 4), device=env.device)
+
+    head_cmd = env.command_manager.get_command(command_name)
+    return head_cmd
+
+
+def track_head_position(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "head",
+    std: float = 0.3,
+) -> torch.Tensor:
+    """Reward for tracking head position commands.
+
+    Uses exponential reward based on tracking error for each head joint.
+
+    Args:
+        env: The environment
+        asset_cfg: Asset configuration
+        command_name: Name of the head command term
+        std: Standard deviation for gaussian reward kernel
+
+    Returns:
+        Reward tensor of shape (num_envs,)
+    """
+    if command_name not in env.command_manager._terms:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Get head command (num_envs, 4)
+    head_cmd = env.command_manager.get_command(command_name)
+
+    # Get current head joint positions
+    # Head joints are at indices 5-8: neck_pitch, head_pitch, head_yaw, head_roll
+    head_joint_indices = list(range(5, 9))
+    current_head_pos = asset.data.joint_pos[:, head_joint_indices]
+
+    # Compute squared error for each joint
+    error_sq = torch.sum(torch.square(current_head_pos - head_cmd), dim=-1)
+
+    # Exponential reward: exp(-error^2 / (2 * std^2))
+    reward = torch.exp(-error_sq / (2.0 * std * std))
+
+    return reward
