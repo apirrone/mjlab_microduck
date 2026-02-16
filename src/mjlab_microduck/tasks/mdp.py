@@ -1047,6 +1047,59 @@ def push_curriculum(
     return torch.tensor([max_push])
 
 
+def velocity_command_ranges_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    command_name: str,
+    velocity_stages: list[dict],
+) -> torch.Tensor:
+    """Update velocity command ranges based on training progress.
+
+    Gradually increases the commanded velocity ranges to allow the robot to learn
+    higher speeds progressively. Starts with smaller ranges for stable learning,
+    then expands to more challenging velocities.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        command_name: Name of the velocity command term (e.g., "twist")
+        velocity_stages: List of dicts with 'step', 'lin_vel_range', and 'ang_vel_range' keys
+            Example: [
+                {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},
+                {"step": 500 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.75},
+                {"step": 1000 * 24, "lin_vel_range": 0.5, "ang_vel_range": 2.0},
+            ]
+
+    Returns:
+        Current max linear velocity as a tensor
+    """
+    del env_ids  # Unused
+
+    from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+    from typing import cast
+
+    command_term = env.command_manager.get_term(command_name)
+    assert command_term is not None, f"Command term '{command_name}' not found"
+
+    cfg = cast(UniformVelocityCommandCfg, command_term.cfg)
+
+    # Update velocity ranges based on current step
+    current_lin_vel = velocity_stages[0]["lin_vel_range"]
+    current_ang_vel = velocity_stages[0]["ang_vel_range"]
+
+    for stage in velocity_stages:
+        if env.common_step_counter > stage["step"]:
+            current_lin_vel = stage["lin_vel_range"]
+            current_ang_vel = stage["ang_vel_range"]
+
+    # Update command ranges (symmetric around zero)
+    cfg.ranges.lin_vel_x = (-current_lin_vel, current_lin_vel)
+    cfg.ranges.lin_vel_y = (-current_lin_vel, current_lin_vel)
+    cfg.ranges.ang_vel_z = (-current_ang_vel, current_ang_vel)
+
+    return torch.tensor([current_lin_vel])
+
+
 def projected_gravity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,

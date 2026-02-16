@@ -480,9 +480,9 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.5, 0.5)
-    command.ranges.lin_vel_y = (-0.5, 0.5)
-    command.ranges.ang_vel_z = (-2.0, 2.0)
+    command.ranges.lin_vel_x = (-0.3, 0.3)
+    command.ranges.lin_vel_y = (-0.3, 0.3)
+    command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
 
     # Terrain
@@ -565,6 +565,20 @@ def make_microduck_velocity_env_cfg(
             # ],
         # },
     # )
+
+    # Velocity command ranges curriculum - gradually increase target velocities
+    # Steps are in env steps (iteration * 24)
+    cfg.curriculum["velocity_command_ranges"] = CurriculumTermCfg(
+        func=microduck_mdp.velocity_command_ranges_curriculum,
+        params={
+            "command_name": "twist",
+            "velocity_stages": [
+                {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
+                {"step": 500 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.75},   # Intermediate step
+                {"step": 1000 * 24, "lin_vel_range": 0.5, "ang_vel_range": 2.0},   # Target values
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
