@@ -500,16 +500,16 @@ def make_microduck_velocity_env_cfg(
     command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
 
-    # Head position commands
+    # Head position commands (start with zero range, curriculum will increase)
     from mjlab_microduck.tasks.head_command import UniformHeadCommandCfg
     cfg.commands["head"] = UniformHeadCommandCfg(
         asset_name="robot",
         resampling_time_range=(10.0, 10.0),  # Resample every 10 seconds
         ranges=UniformHeadCommandCfg.Ranges(
-            neck_pitch=(-0.5, 0.5),
-            head_pitch=(-0.5, 0.5),
-            head_yaw=(-0.5, 0.5),
-            head_roll=(-0.5, 0.5),
+            neck_pitch=(0.0, 0.0),  # Start at zero, curriculum will increase
+            head_pitch=(0.0, 0.0),
+            head_yaw=(0.0, 0.0),
+            head_roll=(0.0, 0.0),
         ),
     )
 
@@ -593,6 +593,37 @@ def make_microduck_velocity_env_cfg(
             # ],
         # },
     # )
+
+    # Head command range curriculum - start with no head movement, gradually increase
+    cfg.curriculum["head_command_ranges"] = CurriculumTermCfg(
+        func=microduck_mdp.head_command_curriculum,
+        params={
+            "command_name": "head",
+            "range_stages": [
+                # Start with zero range - learn basic walking without head movement
+                {"step": 0, "ranges": {
+                    "neck_pitch": (0.0, 0.0),
+                    "head_pitch": (0.0, 0.0),
+                    "head_yaw": (0.0, 0.0),
+                    "head_roll": (0.0, 0.0),
+                }},
+                # Small range - introduce head control gradually
+                {"step": 250 * 24, "ranges": {
+                    "neck_pitch": (-0.25, 0.25),
+                    "head_pitch": (-0.25, 0.25),
+                    "head_yaw": (-0.25, 0.25),
+                    "head_roll": (-0.25, 0.25),
+                }},
+                # Full range - complete head control
+                {"step": 500 * 24, "ranges": {
+                    "neck_pitch": (-0.5, 0.5),
+                    "head_pitch": (-0.5, 0.5),
+                    "head_yaw": (-0.5, 0.5),
+                    "head_roll": (-0.5, 0.5),
+                }},
+            ],
+        },
+    )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]

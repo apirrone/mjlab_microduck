@@ -1047,6 +1047,64 @@ def push_curriculum(
     return torch.tensor([max_push])
 
 
+def head_command_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    command_name: str,
+    range_stages: list[dict],
+) -> torch.Tensor:
+    """Update head command ranges based on training progress.
+
+    Starts with zero range (no head movement) to learn basic walking, then gradually
+    increases range to add head control without disrupting early learning.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        command_name: Name of the head command term (e.g., "head")
+        range_stages: List of dicts with 'step' and 'ranges' keys
+            Example: [
+                {"step": 0, "ranges": {"neck_pitch": (0.0, 0.0), "head_pitch": (0.0, 0.0), ...}},
+                {"step": 250, "ranges": {"neck_pitch": (-0.25, 0.25), ...}},
+                {"step": 500, "ranges": {"neck_pitch": (-0.5, 0.5), ...}},
+            ]
+
+    Returns:
+        Current max range value as a tensor
+    """
+    del env_ids  # Unused
+
+    from mjlab_microduck.tasks.head_command import UniformHeadCommandCfg
+    from typing import cast
+
+    # Get command term
+    command_term = env.command_manager.get_term(command_name)
+    assert command_term is not None, f"Command term '{command_name}' not found"
+
+    cfg = cast(UniformHeadCommandCfg, command_term.cfg)
+
+    # Update ranges based on current step
+    current_ranges = range_stages[0]["ranges"]  # Default to first stage
+
+    for stage in range_stages:
+        if env.common_step_counter > stage["step"]:
+            current_ranges = stage["ranges"]
+
+    # Update all head joint ranges
+    if "neck_pitch" in current_ranges:
+        cfg.ranges.neck_pitch = current_ranges["neck_pitch"]
+    if "head_pitch" in current_ranges:
+        cfg.ranges.head_pitch = current_ranges["head_pitch"]
+    if "head_yaw" in current_ranges:
+        cfg.ranges.head_yaw = current_ranges["head_yaw"]
+    if "head_roll" in current_ranges:
+        cfg.ranges.head_roll = current_ranges["head_roll"]
+
+    # Return max range for logging (use neck_pitch as representative)
+    max_range = abs(cfg.ranges.neck_pitch[1])
+    return torch.tensor([max_range])
+
+
 def projected_gravity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
