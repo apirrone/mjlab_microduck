@@ -1105,6 +1105,54 @@ def head_command_curriculum(
     return torch.tensor([max_range])
 
 
+def pose_head_std_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    reward_name: str,
+    std_stages: list[dict],
+) -> torch.Tensor:
+    """Update head joint std in pose reward based on training progress.
+
+    Starts with tight std (head stabilized) to learn basic walking, then gradually
+    increases std to allow free head movement for tracking commands.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        reward_name: Name of the pose reward term (e.g., "pose")
+        std_stages: List of dicts with 'step' and 'head_std' keys
+            Example: [
+                {"step": 0, "head_std": 0.1},    # Tight - stabilize head
+                {"step": 250, "head_std": 2.0},  # Loose - allow head tracking
+            ]
+
+    Returns:
+        Current head std value as a tensor
+    """
+    del env_ids  # Unused
+
+    # Get reward term configuration
+    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
+
+    # Update std based on current step
+    current_head_std = std_stages[0]["head_std"]  # Default to first stage
+
+    for stage in std_stages:
+        if env.common_step_counter > stage["step"]:
+            current_head_std = stage["head_std"]
+
+    # Update head joint std in all pose configurations
+    for std_dict_name in ["std_standing", "std_walking", "std_running"]:
+        if std_dict_name in reward_term_cfg.params:
+            std_dict = reward_term_cfg.params[std_dict_name]
+            # Update all head-related patterns
+            for pattern in std_dict.keys():
+                if "neck" in pattern or "head" in pattern:
+                    std_dict[pattern] = current_head_std
+
+    return torch.tensor([current_head_std])
+
+
 def projected_gravity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,

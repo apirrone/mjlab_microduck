@@ -65,9 +65,9 @@ def make_microduck_velocity_env_cfg(
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
         r".*ankle.*": 0.25, # was 0.15
-        # Head
-        r".*neck.*": 0.1,
-        r".*head.*": 0.1,
+        # Head - starts tight for initial walking, curriculum will increase
+        r".*neck.*": 0.1,  # Curriculum will increase to 2.0
+        r".*head.*": 0.1,  # Curriculum will increase to 2.0
     }
 
     site_names = ["left_foot", "right_foot"]
@@ -189,10 +189,10 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.1
     )
 
-    # Head position tracking reward
+    # Head position tracking reward (weight starts at 0, curriculum will increase)
     cfg.rewards["track_head_position"] = RewardTermCfg(
         func=microduck_mdp.track_head_position,
-        weight=2.0,
+        weight=0.0,  # Start at zero, curriculum will increase
         params={
             "command_name": "head",
             "std": math.sqrt(0.3),
@@ -594,6 +594,18 @@ def make_microduck_velocity_env_cfg(
         # },
     # )
 
+    # Pose head std curriculum - keep head stable initially, then free it up
+    cfg.curriculum["pose_head_std"] = CurriculumTermCfg(
+        func=microduck_mdp.pose_head_std_curriculum,
+        params={
+            "reward_name": "pose",
+            "std_stages": [
+                {"step": 0, "head_std": 0.1},         # Tight - head stabilized for walking
+                {"step": 250 * 24, "head_std": 2.0},  # Loose - allow head tracking
+            ],
+        },
+    )
+
     # Head command range curriculum - start with no head movement, gradually increase
     cfg.curriculum["head_command_ranges"] = CurriculumTermCfg(
         func=microduck_mdp.head_command_curriculum,
@@ -621,6 +633,19 @@ def make_microduck_velocity_env_cfg(
                     "head_yaw": (-0.5, 0.5),
                     "head_roll": (-0.5, 0.5),
                 }},
+            ],
+        },
+    )
+
+    # Head tracking reward weight curriculum - matches the command range stages
+    cfg.curriculum["head_tracking_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "track_head_position",
+            "weight_stages": [
+                {"step": 0, "weight": 0.0},           # No reward when commands are zero
+                {"step": 250 * 24, "weight": 1.0},    # Start rewarding at half range
+                {"step": 500 * 24, "weight": 2.0},    # Full reward at full range
             ],
         },
     )
