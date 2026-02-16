@@ -480,9 +480,9 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.3, 0.3)
-    command.ranges.lin_vel_y = (-0.3, 0.3)
-    command.ranges.ang_vel_z = (-1.5, 1.5)
+    command.ranges.lin_vel_x = (-0.5, 0.5)
+    command.ranges.lin_vel_y = (-0.5, 0.5)
+    command.ranges.ang_vel_z = (-2.0, 2.0)
     command.viz.z_offset = 0.5
 
     # Terrain
