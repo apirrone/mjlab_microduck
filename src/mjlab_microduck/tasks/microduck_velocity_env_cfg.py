@@ -54,7 +54,7 @@ from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
 def make_microduck_velocity_env_cfg(
-    play: bool = False, use_imitation: bool = False, reference_motion_path: str = ""
+    play: bool = False
 ) -> ManagerBasedRlEnvCfg:
     """Create Microduck velocity tracking environment configuration."""
 
@@ -160,7 +160,7 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
 
-    # Velocity tracking rewards (will be disabled when using imitation)
+    # Velocity tracking rewards
     cfg.rewards["track_linear_velocity"].weight = 3.0 # Checkpoint : 3
     cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.15) # Checkpoint 0.15
     cfg.rewards["track_angular_velocity"].weight = 3.0 # Checkpoint : 3
@@ -229,58 +229,10 @@ def make_microduck_velocity_env_cfg(
     # func=microduck_mdp.neck_action_acceleration_l2, weight=-5.0
     # )
 
-    # Imitation learning setup (optional, lightweight guidance)
-    imitation_state = None
-    if use_imitation and reference_motion_path:
-        from mjlab_microduck.reference_motion import ReferenceMotionLoader
-        import os
-
-        if not os.path.exists(reference_motion_path):
-            raise FileNotFoundError(
-                f"Reference motion file not found: {reference_motion_path}"
-            )
-
-        # Create reference motion loader and imitation state
-        ref_motion_loader = ReferenceMotionLoader(reference_motion_path)
-        imitation_state = microduck_mdp.ImitationRewardState(ref_motion_loader)
-
-        # Keep velocity tracking rewards active (helps with command following)
-        # Reduced weight to not compete too much with imitation
-        cfg.rewards["track_linear_velocity"].weight = 2.0
-        cfg.rewards["track_angular_velocity"].weight = 1.0
-
-        # Disable rewards not in the paper's imitation table
-        cfg.rewards["air_time"].weight = 0.0
-        cfg.rewards["soft_landing"].weight = 0.0
-
-        # Add imitation reward (rebalanced for better command following)
-        cfg.rewards["imitation"] = RewardTermCfg(
-            func=microduck_mdp.imitation_reward,
-            weight=1.0,
-            params={
-                "imitation_state": imitation_state,
-                "command_threshold": 0.01,
-                "weight_torso_pos_xy": 1.0,
-                "weight_torso_orient": 1.0,
-                "weight_lin_vel_xy": 1.0,
-                "weight_lin_vel_z": 1.0,
-                "weight_ang_vel_xy": 0.5,
-                "weight_ang_vel_z": 0.5,
-                "weight_leg_joint_pos": 10.0,
-                "weight_neck_joint_pos": 30.0,
-                "weight_leg_joint_vel": 1e-3,
-                "weight_neck_joint_vel": 0.5,
-                "weight_contact": 5.0,
-            },
-        )
-
     # Events
     cfg.events["reset_action_history"] = EventTermCfg(
         func=microduck_mdp.reset_action_history,
         mode="reset",
-        params={"imitation_state": imitation_state}
-        if imitation_state is not None
-        else {},
     )
 
     cfg.events["foot_friction"].params[
@@ -453,30 +405,7 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
-    # Add imitation observations if using imitation
-    if use_imitation and reference_motion_path and imitation_state is not None:
-        from mjlab.managers.manager_term_config import ObservationTermCfg
-
-        # Add phase observation to policy (for both training and play)
-        cfg.observations["policy"].terms["imitation_phase"] = ObservationTermCfg(
-            func=microduck_mdp.imitation_phase_observation,
-            params={"imitation_state": imitation_state},
-        )
-
-        # Add phase observation to critic as well
-        cfg.observations["critic"].terms["imitation_phase"] = ObservationTermCfg(
-            func=microduck_mdp.imitation_phase_observation,
-            params={"imitation_state": imitation_state},
-        )
-
-        # Add reference motion to critic privileged observations
-        # Include in both training and play to keep model architecture consistent
-        cfg.observations["critic"].terms["reference_motion"] = ObservationTermCfg(
-            func=microduck_mdp.reference_motion_observation,
-            params={"imitation_state": imitation_state},
-        )
-
-    # Commands - matched to reference motion coverage!
+    # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02
     command.rel_heading_envs = 0.0
