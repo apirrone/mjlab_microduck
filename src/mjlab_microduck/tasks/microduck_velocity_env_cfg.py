@@ -161,10 +161,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
 
     # Velocity tracking rewards (will be disabled when using imitation)
-    cfg.rewards["track_linear_velocity"].weight = 3.0 # Checkpoint : 2
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.15) # Default is 0.25
-    cfg.rewards["track_angular_velocity"].weight = 3.0 # Checkpoint : 2
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.40) # Default is 0.5
+    cfg.rewards["track_linear_velocity"].weight = 3.0 # Checkpoint : 3
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.15) # Checkpoint 0.15
+    cfg.rewards["track_angular_velocity"].weight = 4.0 # Checkpoint : 3
+    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.40) # Checkpoint 0.4
 
     # Action smoothness
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
@@ -480,7 +480,7 @@ def make_microduck_velocity_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.02
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.2, 0.3)
+    command.ranges.lin_vel_x = (-0.3, 0.3)
     command.ranges.lin_vel_y = (-0.3, 0.3)
     command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
