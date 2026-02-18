@@ -15,6 +15,10 @@ from .microduck_standing_env_cfg import (
     make_microduck_standing_env_cfg,
     MicroduckStandingRlCfg,
 )
+from .microduck_standup_env_cfg import (
+    make_microduck_standup_env_cfg,
+    MicroduckStandupRlCfg,
+)
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -34,6 +38,16 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 print("✓ Standing task registered: Mjlab-Standing-Flat-MicroDuck")
+
+# Standup task - start fallen, learn to stand up
+register_mjlab_task(
+    task_id="Mjlab-Standup-Flat-MicroDuck",
+    env_cfg=make_microduck_standup_env_cfg(),
+    play_env_cfg=make_microduck_standup_env_cfg(play=True),
+    rl_cfg=MicroduckStandupRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ Standup task registered: Mjlab-Standup-Flat-MicroDuck")
 
 # Imitation motion tracking task
 # Uses frame-based reference motions (reference_motion.pkl)

@@ -1393,3 +1393,127 @@ def randomize_base_orientation(
 
     # Apply the randomized orientation to selected environments
     env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat
+
+
+# ==============================================================================
+# Standup task helpers
+# ==============================================================================
+
+def randomize_fallen_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomize root orientation so the robot is lying on its front or back.
+
+    Samples yaw uniformly in [0, 2π] and pitch from {+[45°,135°], -[45°,135°]}
+    (50% chance each side) with a small roll jitter, so the robot is always
+    substantially off-vertical when the episode starts.
+    The x, y, z position is left unchanged (set by the reset_base event).
+    """
+    num_envs = len(env_ids)
+    if num_envs == 0:
+        return
+
+    # Random yaw – full rotation
+    yaw = torch.rand(num_envs, device=env.device) * 2 * torch.pi
+
+    # Pitch: 50% on front (~+90° ± 45°), 50% on back (~-90° ± 45°)
+    pitch_center = torch.where(
+        torch.rand(num_envs, device=env.device) > 0.5,
+        torch.full((num_envs,), torch.pi / 2, device=env.device),
+        torch.full((num_envs,), -torch.pi / 2, device=env.device),
+    )
+    pitch = pitch_center + (torch.rand(num_envs, device=env.device) - 0.5) * torch.pi / 2
+
+    # Small roll jitter ±30°
+    roll = (torch.rand(num_envs, device=env.device) - 0.5) * torch.pi / 3
+
+    # ZYX Euler → quaternion
+    cy, sy = torch.cos(yaw * 0.5), torch.sin(yaw * 0.5)
+    cp, sp = torch.cos(pitch * 0.5), torch.sin(pitch * 0.5)
+    cr, sr = torch.cos(roll * 0.5), torch.sin(roll * 0.5)
+
+    quat = torch.stack([
+        cr * cp * cy + sr * sp * sy,
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+    ], dim=1)
+    quat = quat / torch.norm(quat, dim=1, keepdim=True)
+
+    env.sim.data.qpos[env_ids, 3:7] = quat
+    # Zero all velocities so the robot starts from rest
+    env.sim.data.qvel[env_ids, :] = 0.0
+
+
+def non_foot_ground_contact(
+    env: ManagerBasedRlEnv,
+    sensor_name: str = "non_foot_ground_contact",
+) -> torch.Tensor:
+    """Penalize contacts between non-foot robot bodies and the ground."""
+    if sensor_name not in env.scene.sensors:
+        return torch.zeros(env.num_envs, device=env.device)
+    found = env.scene.sensors[sensor_name].data.found  # (num_envs, num_bodies)
+    return (found > 0).any(dim=-1).float()
+
+
+def standup_upright(
+    env: ManagerBasedRlEnv,
+    settle_time: float = 2.0,
+    std: float = 0.4,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Reward for being upright, active only after the settling phase.
+
+    Returns exp(-tilt²/std²) once episode_length_buf ≥ settle_time/step_dt.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    projected_gravity = asset.data.projected_gravity_b
+    tilt_sq = torch.sum(torch.square(projected_gravity[:, :2]), dim=1)
+    reward = torch.exp(-tilt_sq / std ** 2)
+
+    delay_steps = int(settle_time / env.step_dt)
+    mask = (env.episode_length_buf >= delay_steps).float()
+    return reward * mask
+
+
+def standup_joint_pos(
+    env: ManagerBasedRlEnv,
+    settle_time: float = 2.0,
+    std: float = 0.5,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Reward for joint positions matching the default (HOME_FRAME) pose.
+
+    Active only after the settling phase.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    joint_pos = asset.data.joint_pos[:, asset_cfg.joint_ids]
+    default_pos = asset.data.default_joint_pos[:, asset_cfg.joint_ids]
+    error_sq = torch.sum(torch.square(joint_pos - default_pos), dim=1)
+    reward = torch.exp(-error_sq / std ** 2)
+
+    delay_steps = int(settle_time / env.step_dt)
+    mask = (env.episode_length_buf >= delay_steps).float()
+    return reward * mask
+
+
+def standup_height(
+    env: ManagerBasedRlEnv,
+    settle_time: float = 2.0,
+    target_height_min: float = 0.08,
+    target_height_max: float = 0.11,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Reward for CoM being at standing height, active only after the settling phase.
+
+    Returns 1 when in range, 0 otherwise (no penalty for being below).
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    com_height = asset.data.root_link_pos_w[:, 2]
+    in_range = ((com_height >= target_height_min) & (com_height <= target_height_max)).float()
+
+    delay_steps = int(settle_time / env.step_dt)
+    mask = (env.episode_length_buf >= delay_steps).float()
+    return in_range * mask
