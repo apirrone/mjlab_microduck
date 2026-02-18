@@ -1332,50 +1332,6 @@ def adaptive_pose_weight(
     return base_pose_reward * weight
 
 
-def non_foot_ground_contact(
-    env: ManagerBasedRlEnv,
-    sensor_name: str = "non_foot_ground_contact",
-) -> torch.Tensor:
-    """Penalize contacts between non-foot robot bodies and the ground.
-
-    Returns 1.0 per step that any non-foot body is touching the ground, 0 otherwise.
-    Apply with a negative weight.
-    """
-    if sensor_name not in env.scene.sensors:
-        return torch.zeros(env.num_envs, device=env.device)
-    found = env.scene.sensors[sensor_name].data.found  # (num_envs, num_bodies)
-    return (found > 0).any(dim=-1).float()
-
-
-def bad_orientation_sustained(
-    env: ManagerBasedRlEnv,
-    limit_angle: float,
-    duration: float,
-    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
-) -> torch.Tensor:
-    """Terminate when the asset's orientation exceeds limit_angle for longer than duration seconds.
-
-    Unlike the instant bad_orientation termination, this gives the robot time to recover
-    from transient tilts (e.g. after a push) before resetting.
-
-    The per-environment timer resets to 0 whenever the orientation is within bounds,
-    which also handles episode resets naturally (robot starts upright).
-    """
-    asset: Entity = env.scene[asset_cfg.name]
-    projected_gravity = asset.data.projected_gravity_b
-    bad = torch.acos(-projected_gravity[:, 2]).abs() > limit_angle
-
-    if not hasattr(env, "_bad_orientation_timer"):
-        env._bad_orientation_timer = torch.zeros(env.num_envs, device=env.device)
-
-    env._bad_orientation_timer = torch.where(
-        bad,
-        env._bad_orientation_timer + env.step_dt,
-        torch.zeros_like(env._bad_orientation_timer),
-    )
-    return env._bad_orientation_timer >= duration
-
-
 def randomize_base_orientation(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,

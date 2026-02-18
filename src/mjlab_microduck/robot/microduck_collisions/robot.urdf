@@ -1,0 +1,1178 @@
+<?xml version="1.0" ?>
+<!-- Generated using onshape-to-robot -->
+<!-- Onshape https://cad.onshape.com/documents/804927696f06d877f3f1803e/w/3df6f6a8dcea50fb5658e3c0/e/eee1ab796d84f4ff324d3a02 -->
+<robot name="microduck">
+  <!-- Link trunk_base -->
+  <link name="trunk_base">
+    <inertial>
+      <origin xyz="-0.010876 -0.000476206 0.0189092" rpy="0 0 0"/>
+      <mass value="0.307054"/>
+      <inertia ixx="0.000306438" ixy="-1.68276e-06" ixz="-1.79498e-05" iyy="0.000406337" iyz="-1.57212e-07" izz="0.000265753"/>
+    </inertial>
+    <!-- Part ubec_8v_5v_dc_dc -->
+    <visual>
+      <origin xyz="-0.0418856 -0.0130219 0.00180235" rpy="-4.44089e-16 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/ubec_8v_5v_dc_dc.stl"/>
+      </geometry>
+      <material name="ubec_8v_5v_dc_dc_material">
+        <color rgba="0.615686 0.811765 0.929412 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0418856 -0.0130219 0.00180235" rpy="-4.44089e-16 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/ubec_8v_5v_dc_dc.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part cell -->
+    <visual>
+      <origin xyz="-0.0263856 0.008 -0.0211976" rpy="5.44703e-16 2.34088e-16 -8.88178e-16"/>
+      <geometry>
+        <mesh filename="package://assets/cell.stl"/>
+      </geometry>
+      <material name="cell_material">
+        <color rgba="0.615686 0.811765 0.929412 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0263856 0.008 -0.0211976" rpy="5.44703e-16 2.34088e-16 -8.88178e-16"/>
+      <geometry>
+        <mesh filename="package://assets/cell.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330 -->
+    <visual>
+      <origin xyz="0.0125644 -0.02 0.0368" rpy="-3.14159 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 -0.02 0.0368" rpy="-3.14159 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part bms -->
+    <visual>
+      <origin xyz="-0.0388856 0.0610972 -0.0168297" rpy="-4.44089e-16 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/bms.stl"/>
+      </geometry>
+      <material name="bms_material">
+        <color rgba="0.231373 0.380392 0.705882 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0388856 0.0610972 -0.0168297" rpy="-4.44089e-16 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/bms.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part usb_c_charger -->
+    <visual>
+      <origin xyz="-0.0288856 0.0185 -0.00945" rpy="-1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/usb_c_charger.stl"/>
+      </geometry>
+      <material name="usb_c_charger_material">
+        <color rgba="0.615686 0.811765 0.929412 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0288856 0.0185 -0.00945" rpy="-1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/usb_c_charger.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part bearing -->
+    <visual>
+      <origin xyz="0.0125644 -0.04 0.0367" rpy="0 -0 4.15816e-112"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+      <material name="bearing_material">
+        <color rgba="0.701961 0.701961 0.701961 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 -0.04 0.0367" rpy="0 -0 4.15816e-112"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part trunk_yaw -->
+    <visual>
+      <origin xyz="0.0125644 4.61201e-19 0.0367" rpy="-1.13753e-89 1.99394e-16 5.70496e-74"/>
+      <geometry>
+        <mesh filename="package://assets/trunk_yaw.stl"/>
+      </geometry>
+      <material name="trunk_yaw_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 4.61201e-19 0.0367" rpy="-1.13753e-89 1.99394e-16 5.70496e-74"/>
+      <geometry>
+        <mesh filename="package://assets/trunk_yaw.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part jumper -->
+    <visual>
+      <origin xyz="0.205953 0.0299255 0.0593" rpy="4.10208e-28 -1.35419e-55 6.0762e-28"/>
+      <geometry>
+        <mesh filename="package://assets/jumper.stl"/>
+      </geometry>
+      <material name="jumper_material">
+        <color rgba="0.498039 0.498039 0.498039 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.205953 0.0299255 0.0593" rpy="4.10208e-28 -1.35419e-55 6.0762e-28"/>
+      <geometry>
+        <mesh filename="package://assets/jumper.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part holder -->
+    <visual>
+      <origin xyz="-0.0388856 -0.0655245 0.0107439" rpy="1.92552e-26 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/holder.stl"/>
+      </geometry>
+      <material name="holder_material">
+        <color rgba="0.647059 0.647059 0.647059 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0388856 -0.0655245 0.0107439" rpy="1.92552e-26 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/holder.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part bno055 -->
+    <visual>
+      <origin xyz="-0.0486356 -0.0135 0.0607" rpy="-3.14159 2.80964e-17 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/bno055.stl"/>
+      </geometry>
+      <material name="bno055_material">
+        <color rgba="0.615686 0.811765 0.929412 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0486356 -0.0135 0.0607" rpy="-3.14159 2.80964e-17 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/bno055.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_2 -->
+    <visual>
+      <origin xyz="0.0125644 0.02 0.0368" rpy="3.14159 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_2_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 0.02 0.0368" rpy="3.14159 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_3 -->
+    <visual>
+      <origin xyz="0.0375644 0.0001 0.0537" rpy="1.21169e-27 -5.02818e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_3_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0375644 0.0001 0.0537" rpy="1.21169e-27 -5.02818e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part raspberrypizerow -->
+    <visual>
+      <origin xyz="-0.0261106 0.017975 0.0577" rpy="1.5708 -3.46945e-17 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/raspberrypizerow.stl"/>
+      </geometry>
+      <material name="raspberrypizerow_material">
+        <color rgba="0.231373 0.380392 0.705882 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0261106 0.017975 0.0577" rpy="1.5708 -3.46945e-17 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/raspberrypizerow.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part bearing_2 -->
+    <visual>
+      <origin xyz="0.0125644 -1.56125e-17 0.0367" rpy="0 -0 4.15816e-112"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+      <material name="bearing_2_material">
+        <color rgba="0.701961 0.701961 0.701961 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 -1.56125e-17 0.0367" rpy="0 -0 4.15816e-112"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part board -->
+    <visual>
+      <origin xyz="-0.0356476 -0.033 0.0593" rpy="0 -0 -4.61649e-128"/>
+      <geometry>
+        <mesh filename="package://assets/board.stl"/>
+      </geometry>
+      <material name="board_material">
+        <color rgba="0 0.501961 0 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0356476 -0.033 0.0593" rpy="0 -0 -4.61649e-128"/>
+      <geometry>
+        <mesh filename="package://assets/board.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part uc_boards -->
+    <visual>
+      <origin xyz="0.0125644 -4.31763e-18 0.0367" rpy="-7.63775e-17 1.52081e-17 -5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://assets/uc_boards.stl"/>
+      </geometry>
+      <material name="uc_boards_material">
+        <color rgba="0.972549 0.529412 0.00392157 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 -4.31763e-18 0.0367" rpy="-7.63775e-17 1.52081e-17 -5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://assets/uc_boards.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part trunk_base -->
+    <visual>
+      <origin xyz="0.0125644 6.78041e-19 0.0367" rpy="0 1.99394e-16 -3.45852e-85"/>
+      <geometry>
+        <mesh filename="package://assets/trunk_base.stl"/>
+      </geometry>
+      <material name="trunk_base_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 6.78041e-19 0.0367" rpy="0 1.99394e-16 -3.45852e-85"/>
+      <geometry>
+        <mesh filename="package://assets/trunk_base.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part power_switch -->
+    <visual>
+      <origin xyz="-0.0423556 0.0318 0.016765" rpy="1.48663e-28 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/power_switch.stl"/>
+      </geometry>
+      <material name="power_switch_material">
+        <color rgba="0.901961 0.901961 0.901961 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0423556 0.0318 0.016765" rpy="1.48663e-28 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/power_switch.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part cell_2 -->
+    <visual>
+      <origin xyz="-0.0263856 -0.012 -0.0211976" rpy="1.5335e-15 -2.86329e-16 -8.88178e-16"/>
+      <geometry>
+        <mesh filename="package://assets/cell.stl"/>
+      </geometry>
+      <material name="cell_2_material">
+        <color rgba="0.615686 0.811765 0.929412 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0263856 -0.012 -0.0211976" rpy="1.5335e-15 -2.86329e-16 -8.88178e-16"/>
+      <geometry>
+        <mesh filename="package://assets/cell.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part power_switch_2 -->
+    <visual>
+      <origin xyz="-0.0423556 -0.0318 0.016765" rpy="4.4599e-28 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/power_switch.stl"/>
+      </geometry>
+      <material name="power_switch_2_material">
+        <color rgba="0.901961 0.901961 0.901961 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0423556 -0.0318 0.016765" rpy="4.4599e-28 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/power_switch.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part uc -->
+    <visual>
+      <origin xyz="0.0125644 1.2446e-60 0.0367" rpy="7.96546e-59 1.99394e-16 -8.12568e-60"/>
+      <geometry>
+        <mesh filename="package://assets/uc.stl"/>
+      </geometry>
+      <material name="uc_material">
+        <color rgba="0.768627 0.886275 0.952941 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0125644 1.2446e-60 0.0367" rpy="7.96546e-59 1.99394e-16 -8.12568e-60"/>
+      <geometry>
+        <mesh filename="package://assets/uc.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Frame imu (dummy link + fixed joint) -->
+  <link name="imu">
+    <origin xyz="0 0 0" rpy="0 -0 0"/>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint name="imu_frame" type="fixed">
+    <origin xyz="-0.0488583 -0.0135 0.0607" rpy="-1.16509e-17 -2.80964e-17 -1.66533e-16"/>
+    <parent link="trunk_base"/>
+    <child link="imu"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <!-- Link roll_motor_bottom -->
+  <link name="roll_motor_bottom">
+    <inertial>
+      <origin xyz="1.62605e-18 -0.000237525 0.0207938" rpy="0 0 0"/>
+      <mass value="0.0252944"/>
+      <inertia ixx="5.67885e-06" ixy="2.32015e-21" ixz="-1.19687e-21" iyy="5.1295e-06" iyz="-2.1555e-08" izz="2.4759e-06"/>
+    </inertial>
+    <!-- Part roll_motor_bottom -->
+    <visual>
+      <origin xyz="0.02 -5e-05 -0.0146" rpy="-3.14159 5.55001e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_bottom.stl"/>
+      </geometry>
+      <material name="roll_motor_bottom_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.02 -5e-05 -0.0146" rpy="-3.14159 5.55001e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_bottom.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part roll_motor_top -->
+    <visual>
+      <origin xyz="0.02 3.46945e-18 -0.0146" rpy="-3.14159 5.36931e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_top.stl"/>
+      </geometry>
+      <material name="roll_motor_top_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.02 3.46945e-18 -0.0146" rpy="-3.14159 5.36931e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_top.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_4 -->
+    <visual>
+      <origin xyz="1.04083e-17 -5e-05 0.0286" rpy="-4.75925e-17 -5.55001e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_4_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="1.04083e-17 -5e-05 0.0286" rpy="-4.75925e-17 -5.55001e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link left_roll_to_pitch -->
+  <link name="left_roll_to_pitch">
+    <inertial>
+      <origin xyz="0.034947 0.00019824 -0.0134625" rpy="0 0 0"/>
+      <mass value="0.0304845"/>
+      <inertia ixx="5.39431e-06" ixy="9.64608e-08" ixz="-4.86513e-08" iyy="9.58888e-06" iyz="2.08504e-08" izz="6.71172e-06"/>
+    </inertial>
+    <!-- Part left_roll_to_pitch -->
+    <visual>
+      <origin xyz="-0.02 0.0432 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/left_roll_to_pitch.stl"/>
+      </geometry>
+      <material name="left_roll_to_pitch_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.02 0.0432 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/left_roll_to_pitch.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_5 -->
+    <visual>
+      <origin xyz="0.0399 5.9848e-17 -0.0245" rpy="-3.14159 2.05391e-15 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_5_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0399 5.9848e-17 -0.0245" rpy="-3.14159 2.05391e-15 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link leg_plate -->
+  <link name="leg_plate">
+    <inertial>
+      <origin xyz="-0.0295379 1.19013e-17 -0.0142534" rpy="0 0 0"/>
+      <mass value="0.0249189"/>
+      <inertia ixx="3.47009e-06" ixy="-5.59182e-21" ixz="2.12715e-08" iyy="6.80444e-06" iyz="-1.3183e-13" izz="5.2994e-06"/>
+    </inertial>
+    <!-- Part leg_plate -->
+    <visual>
+      <origin xyz="0.0432 -0.01 0.0455" rpy="-1.5708 6.38378e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0432 -0.01 0.0455" rpy="-1.5708 6.38378e-15 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_2 -->
+    <visual>
+      <origin xyz="0.0432 0.01 -0.0745" rpy="1.5708 -2.05391e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_2_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0432 0.01 -0.0745" rpy="1.5708 -2.05391e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_6 -->
+    <visual>
+      <origin xyz="-0.042 -1.38778e-17 -0.0145" rpy="3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_6_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.042 -1.38778e-17 -0.0145" rpy="3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link leg_plate_2 -->
+  <link name="leg_plate_2">
+    <inertial>
+      <origin xyz="2.12723e-17 -0.0295379 -0.0142534" rpy="0 0 0"/>
+      <mass value="0.0249189"/>
+      <inertia ixx="6.80444e-06" ixy="-6.48399e-22" ixz="1.3183e-13" iyy="3.47009e-06" iyz="2.12715e-08" izz="5.2994e-06"/>
+    </inertial>
+    <!-- Part leg_plate_3 -->
+    <visual>
+      <origin xyz="-0.01 0.0432 -0.0745" rpy="1.5708 3.94299e-16 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_3_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.01 0.0432 -0.0745" rpy="1.5708 3.94299e-16 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_4 -->
+    <visual>
+      <origin xyz="0.01 0.0432 0.0455" rpy="-1.5708 1.40981e-15 -2.01228e-16"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_4_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 0.0432 0.0455" rpy="-1.5708 1.40981e-15 -2.01228e-16"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_7 -->
+    <visual>
+      <origin xyz="2.51535e-17 -0.042 -0.0145" rpy="1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_7_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="2.51535e-17 -0.042 -0.0145" rpy="1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link foot_tpu_bottom -->
+  <link name="foot_tpu_bottom">
+    <inertial>
+      <origin xyz="0.00475212 0.0143399 -0.0145" rpy="0 0 0"/>
+      <mass value="0.0190505"/>
+      <inertia ixx="3.25184e-06" ixy="-9.55165e-08" ixz="-2.23326e-11" iyy="6.82459e-06" iyz="-8.15886e-12" izz="4.90623e-06"/>
+    </inertial>
+    <!-- Part foot -->
+    <visual>
+      <origin xyz="0.01 -0.1272 -0.0745" rpy="1.5708 1.47525e-31 0"/>
+      <geometry>
+        <mesh filename="package://assets/foot.stl"/>
+      </geometry>
+      <material name="foot_material">
+        <color rgba="1 0.756863 0.054902 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 -0.1272 -0.0745" rpy="1.5708 1.47525e-31 0"/>
+      <geometry>
+        <mesh filename="package://assets/foot.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part foot_tpu_bottom -->
+    <visual>
+      <origin xyz="0.01 -0.1272 -0.0745" rpy="1.5708 -2.77556e-17 5.31692e-28"/>
+      <geometry>
+        <mesh filename="package://assets/foot_tpu_bottom.stl"/>
+      </geometry>
+      <material name="foot_tpu_bottom_material">
+        <color rgba="0.262745 0.262745 0.262745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 -0.1272 -0.0745" rpy="1.5708 -2.77556e-17 5.31692e-28"/>
+      <geometry>
+        <mesh filename="package://assets/foot_tpu_bottom.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Frame left_foot (dummy link + fixed joint) -->
+  <link name="left_foot">
+    <origin xyz="0 0 0" rpy="0 -0 0"/>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint name="left_foot_frame" type="fixed">
+    <origin xyz="0.0048 0.021 -0.0145" rpy="1.5708 -2.77556e-17 5.31692e-28"/>
+    <parent link="foot_tpu_bottom"/>
+    <child link="left_foot"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <!-- Joint from leg_plate_2 to foot_tpu_bottom -->
+  <joint name="left_ankle" type="revolute">
+    <origin xyz="2.1684e-17 -0.042 -1.38778e-17" rpy="1.17374e-16 3.59356e-16 3.14159"/>
+    <parent link="leg_plate_2"/>
+    <child link="foot_tpu_bottom"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+  <!-- Joint from leg_plate to leg_plate_2 -->
+  <joint name="left_knee" type="revolute">
+    <origin xyz="-0.042 -6.46184e-17 -2.77556e-17" rpy="-1.02696e-15 2.05391e-15 -1.5708"/>
+    <parent link="leg_plate"/>
+    <child link="leg_plate_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.91986" upper="-0"/>
+  </joint>
+  <!-- Joint from left_roll_to_pitch to leg_plate -->
+  <joint name="left_hip_pitch" type="revolute">
+    <origin xyz="0.0544 6.245e-17 -0.0245" rpy="1.5708 9.7947e-16 1.5708"/>
+    <parent link="left_roll_to_pitch"/>
+    <child link="leg_plate"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-2.66454e-15" upper="1.5708"/>
+  </joint>
+  <!-- Joint from roll_motor_bottom to left_roll_to_pitch -->
+  <joint name="left_hip_roll" type="revolute">
+    <origin xyz="-1.04083e-17 -0.01455 0.0286" rpy="-1.5708 4.75925e-17 3.14159"/>
+    <parent link="roll_motor_bottom"/>
+    <child link="left_roll_to_pitch"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.698132" upper="0.698132"/>
+  </joint>
+  <!-- Joint from trunk_base to roll_motor_bottom -->
+  <joint name="left_hip_yaw" type="revolute">
+    <origin xyz="0.0125644 0.02 0.0223" rpy="3.14159 -2.25318e-29 -1.5708"/>
+    <parent link="trunk_base"/>
+    <child link="roll_motor_bottom"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.523599" upper="0.523599"/>
+  </joint>
+  <!-- Link leg_plate_3 -->
+  <link name="leg_plate_3">
+    <inertial>
+      <origin xyz="-4.24283e-18 0.0295379 -0.0147466" rpy="0 0 0"/>
+      <mass value="0.0249189"/>
+      <inertia ixx="6.80444e-06" ixy="4.27153e-22" ixz="-1.3183e-13" iyy="3.47009e-06" iyz="2.12715e-08" izz="5.2994e-06"/>
+    </inertial>
+    <!-- Part leg_plate_5 -->
+    <visual>
+      <origin xyz="0.01 -0.0432 -0.0745" rpy="1.5708 -2.75014e-16 5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_5_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 -0.0432 -0.0745" rpy="1.5708 -2.75014e-16 5.55112e-17"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_6 -->
+    <visual>
+      <origin xyz="-0.01 -0.0432 0.0455" rpy="-1.5708 -2.75014e-16 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_6_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.01 -0.0432 0.0455" rpy="-1.5708 -2.75014e-16 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_8 -->
+    <visual>
+      <origin xyz="-6.93889e-18 0.042 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_8_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-6.93889e-18 0.042 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link head_pitch_to_yaw -->
+  <link name="head_pitch_to_yaw">
+    <inertial>
+      <origin xyz="0.00612022 0.0212216 -0.0145" rpy="0 0 0"/>
+      <mass value="0.00847041"/>
+      <inertia ixx="3.01296e-06" ixy="-4.42309e-07" ixz="-1.0103e-12" iyy="1.50757e-06" iyz="2.76775e-13" izz="2.61412e-06"/>
+    </inertial>
+    <!-- Part head_pitch_to_yaw -->
+    <visual>
+      <origin xyz="0.025 -0.06 -0.0145" rpy="1.5708 2.88058e-25 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/head_pitch_to_yaw.stl"/>
+      </geometry>
+      <material name="head_pitch_to_yaw_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.025 -0.06 -0.0145" rpy="1.5708 2.88058e-25 3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/head_pitch_to_yaw.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link head_yaw_to_roll -->
+  <link name="head_yaw_to_roll">
+    <inertial>
+      <origin xyz="0.00569587 -9.67341e-18 0.0184874" rpy="0 0 0"/>
+      <mass value="0.0379676"/>
+      <inertia ixx="7.59409e-06" ixy="-7.63712e-21" ixz="1.16448e-06" iyy="1.62671e-05" iyz="6.66667e-22" izz="1.68278e-05"/>
+    </inertial>
+    <!-- Part head_yaw_to_roll -->
+    <visual>
+      <origin xyz="-0.025 -3.10353e-18 0.1065" rpy="-3.14159 4.15385e-30 -3.88578e-16"/>
+      <geometry>
+        <mesh filename="package://assets/head_yaw_to_roll.stl"/>
+      </geometry>
+      <material name="head_yaw_to_roll_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.025 -3.10353e-18 0.1065" rpy="-3.14159 4.15385e-30 -3.88578e-16"/>
+      <geometry>
+        <mesh filename="package://assets/head_yaw_to_roll.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_9 -->
+    <visual>
+      <origin xyz="0 2.43945e-19 0.0145" rpy="3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_9_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 2.43945e-19 0.0145" rpy="3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link head_base_plate -->
+  <link name="head_base_plate">
+    <inertial>
+      <origin xyz="0.00266528 -0.00786002 -0.0193897" rpy="0 0 0"/>
+      <mass value="0.0728463"/>
+      <inertia ixx="0.000144141" ixy="-1.31809e-06" ixz="-7.23983e-06" iyy="0.000159883" iyz="-4.80384e-06" izz="3.02801e-05"/>
+    </inertial>
+    <!-- Part xl330_10 -->
+    <visual>
+      <origin xyz="-3.00053e-17 -1.11022e-16 0.0145" rpy="-3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_10_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-3.00053e-17 -1.11022e-16 0.0145" rpy="-3.14159 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part bearing_3 -->
+    <visual>
+      <origin xyz="-0.02 -1.22125e-15 -0.1215" rpy="-3.14159 2.31296e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+      <material name="bearing_3_material">
+        <color rgba="0.701961 0.701961 0.701961 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.02 -1.22125e-15 -0.1215" rpy="-3.14159 2.31296e-16 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/bearing.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part head_base_plate -->
+    <visual>
+      <origin xyz="2.2522e-15 -0.092 -0.0556" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/head_base_plate.stl"/>
+      </geometry>
+      <material name="head_base_plate_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="2.2522e-15 -0.092 -0.0556" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/head_base_plate.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from head_yaw_to_roll to head_base_plate -->
+  <joint name="head_roll" type="revolute">
+    <origin xyz="0.0305 -2.46656e-17 0.0145" rpy="-1.5708 1.79466e-29 -1.5708"/>
+    <parent link="head_yaw_to_roll"/>
+    <child link="head_base_plate"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.523599" upper="0.523599"/>
+  </joint>
+  <!-- Joint from head_pitch_to_yaw to head_yaw_to_roll -->
+  <joint name="head_yaw" type="revolute">
+    <origin xyz="0 0.0465 -0.0145" rpy="-1.5708 2.88058e-25 3.14159"/>
+    <parent link="head_pitch_to_yaw"/>
+    <child link="head_yaw_to_roll"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-2.61799" upper="2.61799"/>
+  </joint>
+  <!-- Joint from leg_plate_3 to head_pitch_to_yaw -->
+  <joint name="head_pitch" type="revolute">
+    <origin xyz="-6.93889e-18 0.042 -1.38778e-17" rpy="5.02818e-16 2.87763e-25 -1.21169e-27"/>
+    <parent link="leg_plate_3"/>
+    <child link="head_pitch_to_yaw"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.22173" upper="1.22173"/>
+  </joint>
+  <!-- Joint from trunk_base to leg_plate_3 -->
+  <joint name="neck_pitch" type="revolute">
+    <origin xyz="0.0375644 0.0146 0.0537" rpy="1.5708 -1.21169e-27 -3.14159"/>
+    <parent link="trunk_base"/>
+    <child link="leg_plate_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.22173" upper="1.22173"/>
+  </joint>
+  <!-- Link xl330 -->
+  <link name="xl330">
+    <inertial>
+      <origin xyz="0.000237525 5.91763e-18 0.0207938" rpy="0 0 0"/>
+      <mass value="0.0252944"/>
+      <inertia ixx="5.1295e-06" ixy="-1.02183e-20" ixz="2.1555e-08" iyy="5.67885e-06" iyz="-6.12146e-21" izz="2.4759e-06"/>
+    </inertial>
+    <!-- Part roll_motor_top_2 -->
+    <visual>
+      <origin xyz="0 0.02 -0.0146" rpy="3.14159 1.06934e-30 5.91646e-31"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_top.stl"/>
+      </geometry>
+      <material name="roll_motor_top_2_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0.02 -0.0146" rpy="3.14159 1.06934e-30 5.91646e-31"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_top.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part roll_motor_bottom_2 -->
+    <visual>
+      <origin xyz="5e-05 0.02 -0.0146" rpy="3.14159 1.807e-16 1.97215e-31"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_bottom.stl"/>
+      </geometry>
+      <material name="roll_motor_bottom_2_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="5e-05 0.02 -0.0146" rpy="3.14159 1.807e-16 1.97215e-31"/>
+      <geometry>
+        <mesh filename="package://assets/roll_motor_bottom.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_11 -->
+    <visual>
+      <origin xyz="5e-05 1.73472e-17 0.0286" rpy="1.60623e-16 -1.807e-16 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_11_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="5e-05 1.73472e-17 0.0286" rpy="1.60623e-16 -1.807e-16 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link right_roll_to_pitch -->
+  <link name="right_roll_to_pitch">
+    <inertial>
+      <origin xyz="-0.034947 0.00019824 -0.0134625" rpy="0 0 0"/>
+      <mass value="0.0304845"/>
+      <inertia ixx="5.39431e-06" ixy="-9.64608e-08" ixz="4.86513e-08" iyy="9.58888e-06" iyz="2.08504e-08" izz="6.71172e-06"/>
+    </inertial>
+    <!-- Part right_roll_to_pitch -->
+    <visual>
+      <origin xyz="0.02 0.0432 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/right_roll_to_pitch.stl"/>
+      </geometry>
+      <material name="right_roll_to_pitch_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.02 0.0432 -0.0145" rpy="-1.5708 -1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/right_roll_to_pitch.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part xl330_12 -->
+    <visual>
+      <origin xyz="-0.0399 -6.76542e-17 -0.0245" rpy="-3.14159 -1.3606e-14 -2.27956e-16"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_12_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0399 -6.76542e-17 -0.0245" rpy="-3.14159 -1.3606e-14 -2.27956e-16"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link xl330_2 -->
+  <link name="xl330_2">
+    <inertial>
+      <origin xyz="0.0295379 -5.44861e-16 -0.0142534" rpy="0 0 0"/>
+      <mass value="0.0249189"/>
+      <inertia ixx="3.47009e-06" ixy="7.61961e-20" ixz="-2.12715e-08" iyy="6.80444e-06" iyz="1.3183e-13" izz="5.2994e-06"/>
+    </inertial>
+    <!-- Part xl330_13 -->
+    <visual>
+      <origin xyz="0.042 -8.07947e-16 -0.0145" rpy="2.10711e-14 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_13_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.042 -8.07947e-16 -0.0145" rpy="2.10711e-14 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_7 -->
+    <visual>
+      <origin xyz="-0.0432 0.01 0.0455" rpy="-1.5708 2.48209e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_7_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0432 0.01 0.0455" rpy="-1.5708 2.48209e-15 1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_8 -->
+    <visual>
+      <origin xyz="-0.0432 -0.01 -0.0745" rpy="1.5708 -4.2067e-17 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_8_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.0432 -0.01 -0.0745" rpy="1.5708 -4.2067e-17 -1.5708"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link xl330_3 -->
+  <link name="xl330_3">
+    <inertial>
+      <origin xyz="-6.75629e-17 -0.0295379 -0.0142534" rpy="0 0 0"/>
+      <mass value="0.0249189"/>
+      <inertia ixx="6.80444e-06" ixy="1.29489e-20" ixz="1.3183e-13" iyy="3.47009e-06" iyz="2.12715e-08" izz="5.2994e-06"/>
+    </inertial>
+    <!-- Part xl330_14 -->
+    <visual>
+      <origin xyz="-6.15827e-17 -0.042 -0.0145" rpy="1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+      <material name="xl330_14_material">
+        <color rgba="0.286275 0.286275 0.286275 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-6.15827e-17 -0.042 -0.0145" rpy="1.5708 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://assets/xl330.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_9 -->
+    <visual>
+      <origin xyz="0.01 0.0432 0.0455" rpy="-1.5708 -2.35203e-14 1.50574e-15"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_9_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 0.0432 0.0455" rpy="-1.5708 -2.35203e-14 1.50574e-15"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part leg_plate_10 -->
+    <visual>
+      <origin xyz="-0.01 0.0432 -0.0745" rpy="1.5708 2.12965e-14 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+      <material name="leg_plate_10_material">
+        <color rgba="0.235294 0.235294 0.235294 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="-0.01 0.0432 -0.0745" rpy="1.5708 2.12965e-14 -3.14159"/>
+      <geometry>
+        <mesh filename="package://assets/leg_plate.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link foot -->
+  <link name="foot">
+    <inertial>
+      <origin xyz="0.00475212 -0.0143399 -0.0145" rpy="0 0 0"/>
+      <mass value="0.0190505"/>
+      <inertia ixx="3.25184e-06" ixy="9.55165e-08" ixz="2.23326e-11" iyy="6.82459e-06" iyz="-8.15886e-12" izz="4.90623e-06"/>
+    </inertial>
+    <!-- Part foot_2 -->
+    <visual>
+      <origin xyz="0.01 0.1272 0.0455" rpy="-1.5708 4.38216e-31 4.93038e-31"/>
+      <geometry>
+        <mesh filename="package://assets/foot.stl"/>
+      </geometry>
+      <material name="foot_2_material">
+        <color rgba="1 0.756863 0.054902 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 0.1272 0.0455" rpy="-1.5708 4.38216e-31 4.93038e-31"/>
+      <geometry>
+        <mesh filename="package://assets/foot.stl"/>
+      </geometry>
+    </collision>
+    <!-- Part foot_tpu_bottom_2 -->
+    <visual>
+      <origin xyz="0.01 0.1272 0.0455" rpy="-1.5708 4.39506e-31 -3.46945e-18"/>
+      <geometry>
+        <mesh filename="package://assets/foot_tpu_bottom.stl"/>
+      </geometry>
+      <material name="foot_tpu_bottom_2_material">
+        <color rgba="0.262745 0.262745 0.262745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.01 0.1272 0.0455" rpy="-1.5708 4.39506e-31 -3.46945e-18"/>
+      <geometry>
+        <mesh filename="package://assets/foot_tpu_bottom.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Frame right_foot (dummy link + fixed joint) -->
+  <link name="right_foot">
+    <origin xyz="0 0 0" rpy="0 -0 0"/>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-9"/>
+      <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
+    </inertial>
+  </link>
+  <joint name="right_foot_frame" type="fixed">
+    <origin xyz="0.0048 -0.021 -0.0145" rpy="-1.5708 4.39506e-31 -3.46945e-18"/>
+    <parent link="foot"/>
+    <child link="right_foot"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+  <!-- Joint from xl330_3 to foot -->
+  <joint name="right_ankle" type="revolute">
+    <origin xyz="-5.11743e-17 -0.042 -1.38778e-17" rpy="-2.26102e-16 2.84176e-15 1.19002e-15"/>
+    <parent link="xl330_3"/>
+    <child link="foot"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+  <!-- Joint from xl330_2 to xl330_3 -->
+  <joint name="right_knee" type="revolute">
+    <origin xyz="0.042 -8.22693e-16 -8.32667e-17" rpy="3.53884e-16 3.41914e-15 1.5708"/>
+    <parent link="xl330_2"/>
+    <child link="xl330_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-2.13163e-14" upper="1.91986"/>
+  </joint>
+  <!-- Joint from right_roll_to_pitch to xl330_2 -->
+  <joint name="right_hip_pitch" type="revolute">
+    <origin xyz="-0.0544 -6.50521e-17 -0.0245" rpy="1.5708 1.13777e-15 -1.5708"/>
+    <parent link="right_roll_to_pitch"/>
+    <child link="xl330_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.77636e-14"/>
+  </joint>
+  <!-- Joint from xl330 to right_roll_to_pitch -->
+  <joint name="right_hip_roll" type="revolute">
+    <origin xyz="0.01455 1.38778e-17 0.0286" rpy="-1.5708 -1.60623e-16 -1.5708"/>
+    <parent link="xl330"/>
+    <child link="right_roll_to_pitch"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.698132" upper="0.698132"/>
+  </joint>
+  <!-- Joint from trunk_base to xl330 -->
+  <joint name="right_hip_yaw" type="revolute">
+    <origin xyz="0.0125644 -0.02 0.0223" rpy="-3.14159 -2.82835e-14 -1.9984e-15"/>
+    <parent link="trunk_base"/>
+    <child link="xl330"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.349066" upper="0.349066"/>
+  </joint>
+</robot>

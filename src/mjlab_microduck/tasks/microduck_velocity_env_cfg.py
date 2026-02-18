@@ -37,7 +37,6 @@ from mjlab.managers.manager_term_config import (
     CurriculumTermCfg,
     EventTermCfg,
     RewardTermCfg,
-    TerminationTermCfg,
 )
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
@@ -97,22 +96,6 @@ def make_microduck_velocity_env_cfg(
         num_slots=1,
     )
 
-    # mode="body" (not subtree) so only geoms directly on these bodies are checked,
-    # avoiding false positives from foot geoms in the subtree of parent bodies.
-    # trunk_base has the uc collision mesh, head_base_plate has its own collision mesh.
-    non_foot_ground_cfg = ContactSensorCfg(
-        name="non_foot_ground_contact",
-        primary=ContactMatch(
-            mode="body",
-            pattern=r"^(trunk_base|head_base_plate)$",
-            entity="robot",
-        ),
-        secondary=ContactMatch(mode="body", pattern="terrain"),
-        fields=("found",),
-        reduce="none",
-        num_slots=1,
-    )
-
     foot_frictions_geom_names = (
         "left_foot_collision",
         "right_foot_collision",
@@ -120,14 +103,6 @@ def make_microduck_velocity_env_cfg(
 
     # Base configuration
     cfg = make_velocity_env_cfg()
-    # Replace instant tilt termination with a sustained one: reset only after 3s at >80°
-    # cfg.terminations["fell_over"] = TerminationTermCfg(
-        # func=microduck_mdp.bad_orientation_sustained,
-        # params={
-            # "limit_angle": math.radians(70.0),
-            # "duration": 0.0,
-        # },
-    # )
 
     # for to_remove in [
     #     # "foot_clearance",
@@ -143,7 +118,7 @@ def make_microduck_velocity_env_cfg(
 
     # Robot setup
     cfg.scene.entities = {"robot": MICRODUCK_ROBOT_CFG}
-    cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg, non_foot_ground_cfg)
+    cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg)
     cfg.viewer.body_name = "trunk_base"
 
     # Action configuration
@@ -232,11 +207,6 @@ def make_microduck_velocity_env_cfg(
     # cfg.rewards["survival"] = RewardTermCfg(
     #     func=microduck_mdp.is_alive, weight=2.0
     # )
-
-    # Non-foot ground contact penalty (discourages sitting/kneeling)
-    cfg.rewards["non_foot_ground_contact"] = RewardTermCfg(
-        func=microduck_mdp.non_foot_ground_contact, weight=-2.0
-    )
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty

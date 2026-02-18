@@ -1,0 +1,14 @@
+{
+    "configuration": "default",
+    "documentId": "a18ff8cc622a533762a3a6f5",
+    "documentMicroversion": "4137fd686f8d7852bd4ce788",
+    "documentVersion": "d4858750ac4721addf169365",
+    "elementId": "9f45233997c8070932aec904",
+    "fullConfiguration": "default",
+    "id": "MiT2hjlS5Hzsh+P5N",
+    "isStandardContent": false,
+    "name": "RaspberryPiZeroW <1>",
+    "partId": "JFH",
+    "suppressed": false,
+    "type": "Part"
+}

@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "804927696f06d877f3f1803e",
-    "documentMicroversion": "7676ac308d85e365db4a2c16",
+    "documentMicroversion": "7b6553d444bac2a4c02fe833",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
-    "id": "MCSTW/DioVVSKcs1Z",
+    "id": "Mofq/+Z4N7zbbZ4wc",
     "isStandardContent": false,
-    "name": "uc_boards <1>",
-    "partId": "RSJD",
+    "name": "Uc_Boards <1>",
+    "partId": "R8HD",
     "suppressed": false,
     "type": "Part"
 }
