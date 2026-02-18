@@ -108,7 +108,7 @@ def make_microduck_velocity_env_cfg(
     cfg.terminations["fell_over"] = TerminationTermCfg(
         func=microduck_mdp.bad_orientation_sustained,
         params={
-            "limit_angle": math.radians(70.0),
+            "limit_angle": math.radians(50.0),
             "duration": 3.0,
         },
     )
