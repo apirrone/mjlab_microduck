@@ -142,7 +142,7 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # Reach default joint positions (active after SETTLE_TIME)
         "joint_pos": RewardTermCfg(
             func=microduck_mdp.standup_joint_pos,
-            weight=2.0,
+            weight=5.0,
             params={
                 "settle_time": SETTLE_TIME,
                 "std": 0.5,
