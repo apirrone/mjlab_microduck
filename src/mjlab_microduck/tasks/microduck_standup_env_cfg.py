@@ -136,7 +136,7 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # Stand upright (active after SETTLE_TIME)
         "upright": RewardTermCfg(
             func=microduck_mdp.standup_upright,
-            weight=10.0,
+            weight=5.0,
             params={"settle_time": SETTLE_TIME, "std": 0.4},
         ),
         # Reach default joint positions (active after SETTLE_TIME)
@@ -152,7 +152,7 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # Stand at the right height (active after SETTLE_TIME)
         "height": RewardTermCfg(
             func=microduck_mdp.standup_height,
-            weight=3.0,
+            weight=5.0,
             params={
                 "settle_time": SETTLE_TIME,
                 "target_height_min": 0.08,
