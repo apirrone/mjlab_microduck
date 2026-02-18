@@ -97,13 +97,15 @@ def make_microduck_velocity_env_cfg(
         num_slots=1,
     )
 
+    # mode="body" (not subtree) so only geoms directly on these bodies are checked,
+    # avoiding false positives from foot geoms in the subtree of parent bodies.
+    # trunk_base has the uc collision mesh, head_base_plate has its own collision mesh.
     non_foot_ground_cfg = ContactSensorCfg(
         name="non_foot_ground_contact",
         primary=ContactMatch(
-            mode="subtree",
-            pattern=r".*",
+            mode="body",
+            pattern=r"^(trunk_base|head_base_plate)$",
             entity="robot",
-            exclude=("foot_tpu_bottom", "foot"),
         ),
         secondary=ContactMatch(mode="body", pattern="terrain"),
         fields=("found",),
