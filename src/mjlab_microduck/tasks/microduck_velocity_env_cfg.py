@@ -109,7 +109,7 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.bad_orientation_sustained,
         params={
             "limit_angle": math.radians(70.0),
-            "duration": 0.5,
+            "duration": 0.0,
         },
     )
 
