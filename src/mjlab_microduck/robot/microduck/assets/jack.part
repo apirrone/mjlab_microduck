@@ -4,10 +4,10 @@
     "documentMicroversion": "7676ac308d85e365db4a2c16",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
-    "id": "MBAOk9g7UWUwzVrNF",
+    "id": "Ml9w3ufyhDSvUUC73",
     "isStandardContent": false,
-    "name": "head_yaw_to_roll <1>",
-    "partId": "RZGD",
+    "name": "jack <1>",
+    "partId": "RgKD",
     "suppressed": false,
     "type": "Part"
 }
