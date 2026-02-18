@@ -1332,6 +1332,21 @@ def adaptive_pose_weight(
     return base_pose_reward * weight
 
 
+def non_foot_ground_contact(
+    env: ManagerBasedRlEnv,
+    sensor_name: str = "non_foot_ground_contact",
+) -> torch.Tensor:
+    """Penalize contacts between non-foot robot bodies and the ground.
+
+    Returns 1.0 per step that any non-foot body is touching the ground, 0 otherwise.
+    Apply with a negative weight.
+    """
+    if sensor_name not in env.scene.sensors:
+        return torch.zeros(env.num_envs, device=env.device)
+    found = env.scene.sensors[sensor_name].data.found  # (num_envs, num_bodies)
+    return (found > 0).any(dim=-1).float()
+
+
 def bad_orientation_sustained(
     env: ManagerBasedRlEnv,
     limit_angle: float,

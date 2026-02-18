@@ -97,6 +97,20 @@ def make_microduck_velocity_env_cfg(
         num_slots=1,
     )
 
+    non_foot_ground_cfg = ContactSensorCfg(
+        name="non_foot_ground_contact",
+        primary=ContactMatch(
+            mode="subtree",
+            pattern=r".*",
+            entity="robot",
+            exclude=("foot_tpu_bottom", "foot"),
+        ),
+        secondary=ContactMatch(mode="body", pattern="terrain"),
+        fields=("found",),
+        reduce="none",
+        num_slots=1,
+    )
+
     foot_frictions_geom_names = (
         "left_foot_collision",
         "right_foot_collision",
@@ -127,7 +141,7 @@ def make_microduck_velocity_env_cfg(
 
     # Robot setup
     cfg.scene.entities = {"robot": MICRODUCK_ROBOT_CFG}
-    cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg)
+    cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg, non_foot_ground_cfg)
     cfg.viewer.body_name = "trunk_base"
 
     # Action configuration
@@ -216,6 +230,11 @@ def make_microduck_velocity_env_cfg(
     # cfg.rewards["survival"] = RewardTermCfg(
     #     func=microduck_mdp.is_alive, weight=2.0
     # )
+
+    # Non-foot ground contact penalty (discourages sitting/kneeling)
+    cfg.rewards["non_foot_ground_contact"] = RewardTermCfg(
+        func=microduck_mdp.non_foot_ground_contact, weight=-2.0
+    )
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
     # Joint torques penalty
