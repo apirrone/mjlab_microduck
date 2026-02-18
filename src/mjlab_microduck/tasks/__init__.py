@@ -18,6 +18,7 @@ from .microduck_standing_env_cfg import (
 from .microduck_standup_env_cfg import (
     make_microduck_standup_env_cfg,
     MicroduckStandupRlCfg,
+    StandupOnPolicyRunner,
 )
 
 # Standard velocity task (no imitation)
@@ -45,7 +46,7 @@ register_mjlab_task(
     env_cfg=make_microduck_standup_env_cfg(),
     play_env_cfg=make_microduck_standup_env_cfg(play=True),
     rl_cfg=MicroduckStandupRlCfg,
-    runner_cls=VelocityOnPolicyRunner,
+    runner_cls=StandupOnPolicyRunner,
 )
 print("✓ Standup task registered: Mjlab-Standup-Flat-MicroDuck")
 

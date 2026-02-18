@@ -8,6 +8,7 @@ activate to train the robot to reach and hold the default standing pose.
 import math
 from copy import deepcopy
 
+import torch
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.managers.manager_term_config import (
     EventTermCfg,
@@ -23,11 +24,53 @@ from mjlab.rl import (
     RslRlPpoAlgorithmCfg,
 )
 from mjlab.tasks.velocity import mdp as velocity_mdp
+from mjlab.tasks.velocity.rl import VelocityOnPolicyRunner
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.robot.microduck_collisions_constants import MICRODUCK_COLLISIONS_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
+
+
+class SettleActionsWrapper:
+    """Zeros policy actions for the first ``settle_steps`` env-steps after each reset.
+
+    Prevents the policy from fighting the physics during the initial fall so the
+    robot settles into a stable ground pose before training begins.
+    """
+
+    def __init__(self, env, settle_steps: int) -> None:
+        object.__setattr__(self, "_env", env)
+        object.__setattr__(self, "settle_steps", settle_steps)
+
+    def step(self, actions: torch.Tensor):
+        # episode_length_buf is 0 at the very first step after a reset.
+        mask = (self._env.episode_length_buf < self.settle_steps).float().unsqueeze(-1)
+        actions = actions * (1.0 - mask)
+        return self._env.step(actions)
+
+    def __getattr__(self, name: str):
+        return getattr(object.__getattribute__(self, "_env"), name)
+
+    def __setattr__(self, name: str, value) -> None:
+        if name in ("_env", "settle_steps"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(object.__getattribute__(self, "_env"), name, value)
+
+
+class StandupOnPolicyRunner(VelocityOnPolicyRunner):
+    """VelocityOnPolicyRunner that freezes policy actions for the first second after each reset."""
+
+    SETTLE_TIME_S: float = 1.0
+
+    def __init__(self, env, train_cfg, log_dir=None, device="cpu") -> None:
+        super().__init__(env, train_cfg, log_dir, device)
+        settle_steps = int(
+            self.env.max_episode_length / self.env.cfg.episode_length_s * self.SETTLE_TIME_S
+        )
+        self.env = SettleActionsWrapper(self.env, settle_steps)
+
 
 # How long to let the robot fall and settle before rewards activate (seconds).
 SETTLE_TIME = 2.0
