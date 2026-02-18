@@ -233,7 +233,7 @@ def make_microduck_velocity_env_cfg(
 
     # Non-foot ground contact penalty (discourages sitting/kneeling)
     cfg.rewards["non_foot_ground_contact"] = RewardTermCfg(
-        func=microduck_mdp.non_foot_ground_contact, weight=-2.0
+        func=microduck_mdp.non_foot_ground_contact, weight=-10.0
     )
 
     # === REGULARIZATION REWARDS (applies to all tasks) ===
