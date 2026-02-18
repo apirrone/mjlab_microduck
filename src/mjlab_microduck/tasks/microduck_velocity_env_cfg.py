@@ -105,13 +105,13 @@ def make_microduck_velocity_env_cfg(
     # Base configuration
     cfg = make_velocity_env_cfg()
     # Replace instant tilt termination with a sustained one: reset only after 3s at >80°
-    cfg.terminations["fell_over"] = TerminationTermCfg(
-        func=microduck_mdp.bad_orientation_sustained,
-        params={
-            "limit_angle": math.radians(70.0),
-            "duration": 0.0,
-        },
-    )
+    # cfg.terminations["fell_over"] = TerminationTermCfg(
+        # func=microduck_mdp.bad_orientation_sustained,
+        # params={
+            # "limit_angle": math.radians(70.0),
+            # "duration": 0.0,
+        # },
+    # )
 
     # for to_remove in [
     #     # "foot_clearance",
