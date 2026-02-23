@@ -1,13 +1,19 @@
 """MDP functions for microduck tasks"""
 
+import numpy as np
 import torch
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import mujoco
 
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.entity import Entity
 from mjlab_microduck.reference_motion import ReferenceMotionLoader
+from mjlab.tasks.velocity.mdp.velocity_command import UniformVelocityCommand
+from mjlab.utils.lab_api.math import matrix_from_quat
+
+if TYPE_CHECKING:
+    from mjlab.viewer.debug_visualizer import DebugVisualizer
 
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
@@ -1393,3 +1399,37 @@ def randomize_base_orientation(
 
     # Apply the randomized orientation to selected environments
     env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat
+
+
+class VelocityCommandCommandOnly(UniformVelocityCommand):
+    """Like UniformVelocityCommand but only draws the command arrows (no actual velocity arrows)."""
+
+    def _debug_vis_impl(self, visualizer: "DebugVisualizer") -> None:
+        batch = visualizer.env_idx
+        if batch >= self.num_envs:
+            return
+
+        cmds = self.command.cpu().numpy()
+        base_pos_ws = self.robot.data.root_link_pos_w.cpu().numpy()
+        base_quat_w = self.robot.data.root_link_quat_w
+        base_mat_ws = matrix_from_quat(base_quat_w).cpu().numpy()
+
+        base_pos_w = base_pos_ws[batch]
+        base_mat_w = base_mat_ws[batch]
+        cmd = cmds[batch]
+
+        if np.linalg.norm(base_pos_w) < 1e-6:
+            return
+
+        def local_to_world(vec: np.ndarray) -> np.ndarray:
+            return base_pos_w + base_mat_w @ vec
+
+        scale = self.cfg.viz.scale * 2.0
+        z_offset = self.cfg.viz.z_offset
+
+        # Command linear velocity arrow (blue).
+        cmd_lin_from = local_to_world(np.array([0, 0, z_offset]) * scale)
+        cmd_lin_to = local_to_world(
+            (np.array([0, 0, z_offset]) + np.array([cmd[0], cmd[1], 0])) * scale
+        )
+        visualizer.add_arrow(cmd_lin_from, cmd_lin_to, color=(0.2, 0.2, 0.6, 0.6), width=0.015)

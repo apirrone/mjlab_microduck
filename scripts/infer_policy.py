@@ -542,21 +542,21 @@ def main():
             try:
                 # Handle special keys (arrows and space)
                 if key == pynput_keyboard.Key.up:
-                    policy.set_command(0.3, 0.0, 0.0)
+                    policy.set_command(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
-                    policy.set_command(-0.3, 0.0, 0.0)
+                    policy.set_command(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
-                    policy.set_command(0.0, 0.3, 0.0)
+                    policy.set_command(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
-                    policy.set_command(0.0, -0.3, 0.0)
+                    policy.set_command(0.0, 0.5, 0.0)
                 elif key == pynput_keyboard.Key.space:
                     policy.set_command(0.0, 0.0, 0.0)
                 # Handle character keys
                 elif hasattr(key, 'char'):
                     if key.char == 'a' or key.char == 'A':
-                        policy.set_command(0.0, 0.0, 2.0)
+                        policy.set_command(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
-                        policy.set_command(0.0, 0.0, -2.0)
+                        policy.set_command(0.0, 0.0, -4.0)
             except Exception as e:
                 print(f"Key press error: {e}")
 

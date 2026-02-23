@@ -413,6 +413,7 @@ def make_microduck_velocity_env_cfg(
     command.ranges.lin_vel_y = (-0.3, 0.3)
     command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
+    command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
     # Terrain
     cfg.scene.terrain.terrain_type = "plane"
