@@ -27,3 +27,4 @@ artifacts/
 
 src/mjlab_microduck/robot/microduck.bak/*
 data/
+*.pt

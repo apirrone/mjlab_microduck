@@ -4,10 +4,10 @@
     "documentMicroversion": "d30a884b2d1b4fb8052ebc92",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
-    "id": "MCSTW/DioVVSKcs1Z",
+    "id": "MnW4/A8ZNVozUKJ+D",
     "isStandardContent": false,
-    "name": "uc_boards <1>",
-    "partId": "RkJD",
+    "name": "front_shell <1>",
+    "partId": "RjLD",
     "suppressed": false,
     "type": "Part"
 }
