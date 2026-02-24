@@ -13,6 +13,11 @@ ENABLE_JOINT_DAMPING_RANDOMIZATION = False  # Too disruptive - affects joint dyn
 ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
+ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion robustness
+
+# Neck offset randomization parameters
+NECK_OFFSET_MAX_ANGLE = 0.3  # Max offset per joint (radians, ~17°)
+NECK_OFFSET_INTERVAL_S = (2.0, 5.0)  # Sample new random target every 2–5 seconds
 
 # Observation configuration
 USE_PROJECTED_GRAVITY = True  # If True, use projected gravity instead of raw accelerometer
@@ -65,9 +70,9 @@ def make_microduck_velocity_env_cfg(
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
         r".*ankle.*": 0.25, # was 0.15
-        # Head
-        r".*neck.*": 0.1,
-        r".*head.*": 0.1,
+        # Head — relaxed because random offsets are applied during training
+        r".*neck.*": 0.5,
+        r".*head.*": 0.5,
     }
 
     site_names = ["left_foot", "right_foot"]
@@ -125,6 +130,8 @@ def make_microduck_velocity_env_cfg(
     joint_pos_action = cfg.actions["joint_pos"]
     assert isinstance(joint_pos_action, JointPositionActionCfg)
     joint_pos_action.scale = 1.0
+    if ENABLE_NECK_OFFSET_RANDOMIZATION:
+        joint_pos_action.class_type = microduck_mdp.NeckOffsetJointPositionAction
 
     # === REWARDS ===
     # Pose reward configuration
@@ -234,6 +241,19 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.reset_action_history,
         mode="reset",
     )
+
+    # Neck offset randomization: randomly offset head joints to train robustness
+    if ENABLE_NECK_OFFSET_RANDOMIZATION:
+        cfg.events["reset_neck_offset"] = EventTermCfg(
+            func=microduck_mdp.reset_neck_offset,
+            mode="reset",
+        )
+        cfg.events["randomize_neck_offset_target"] = EventTermCfg(
+            func=microduck_mdp.randomize_neck_offset_target,
+            mode="interval",
+            interval_range_s=NECK_OFFSET_INTERVAL_S,
+            params={"max_offset": NECK_OFFSET_MAX_ANGLE},
+        )
 
     cfg.events["foot_friction"].params[
         "asset_cfg"
@@ -509,6 +529,21 @@ def make_microduck_velocity_env_cfg(
             ],
         },
     )
+
+    # Neck offset magnitude curriculum - start at 0, ramp up gradually
+    if ENABLE_NECK_OFFSET_RANDOMIZATION:
+        cfg.curriculum["neck_offset_magnitude"] = CurriculumTermCfg(
+            func=microduck_mdp.neck_offset_curriculum,
+            params={
+                "event_name": "randomize_neck_offset_target",
+                "offset_stages": [
+                    {"step": 0,          "max_offset": 0.0},
+                    {"step": 250 * 24,   "max_offset": 0.1},
+                    {"step": 500 * 24,  "max_offset": 0.2},
+                    {"step": 750 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
+                ],
+            },
+        )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]

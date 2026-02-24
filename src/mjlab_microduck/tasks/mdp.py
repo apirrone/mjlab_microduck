@@ -11,12 +11,83 @@ from mjlab.entity import Entity
 from mjlab_microduck.reference_motion import ReferenceMotionLoader
 from mjlab.tasks.velocity.mdp.velocity_command import UniformVelocityCommand
 from mjlab.utils.lab_api.math import matrix_from_quat
+from mjlab.envs.mdp.actions import JointPositionActionCfg as _JointPositionActionCfg
 
 if TYPE_CHECKING:
     from mjlab.viewer.debug_visualizer import DebugVisualizer
 
 
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
+
+# Neck/head joint indices (neck_pitch=5, head_pitch=6, head_yaw=7, head_roll=8)
+_NECK_JOINT_INDICES = list(range(5, 9))
+# Time constant (seconds) for smooth offset interpolation toward target
+_NECK_OFFSET_SMOOTHING_TAU = 0.5
+
+
+class NeckOffsetJointPositionAction(_JointPositionActionCfg.class_type):
+    """JointPositionAction that adds a random offset to neck/head joint targets.
+
+    After the policy output is applied as joint position targets, adds
+    env._neck_offset to the ctrl values for neck joints (indices 5–8).
+    This trains robustness to external head movement and enables independent
+    head control at deployment (add any offset on top of policy output).
+
+    The offset smoothly follows env._neck_offset_target, which is updated by
+    randomize_neck_offset_target() interval events.
+    """
+
+    def apply_actions(self) -> None:
+        # Apply standard joint position control from policy output
+        super().apply_actions()
+
+        env = self._env
+
+        # Initialize offset tensors on first call
+        if not hasattr(env, "_neck_offset"):
+            env._neck_offset = torch.zeros(env.num_envs, 4, device=env.device)
+            env._neck_offset_target = torch.zeros(env.num_envs, 4, device=env.device)
+
+        # Exponential smoothing: offset tracks target with time constant tau
+        alpha = min(1.0, env.step_dt / _NECK_OFFSET_SMOOTHING_TAU)
+        env._neck_offset.lerp_(env._neck_offset_target, alpha)
+
+        # Add offset on top of the ctrl values already set by the action manager
+        env.sim.data.ctrl[:, _NECK_JOINT_INDICES] += env._neck_offset
+
+
+def reset_neck_offset(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+):
+    """Reset neck joint offsets to zero at episode start."""
+    if not hasattr(env, "_neck_offset"):
+        env._neck_offset = torch.zeros(env.num_envs, 4, device=env.device)
+        env._neck_offset_target = torch.zeros(env.num_envs, 4, device=env.device)
+
+    if len(env_ids) > 0:
+        env._neck_offset[env_ids] = 0.0
+        env._neck_offset_target[env_ids] = 0.0
+
+
+def randomize_neck_offset_target(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_offset: float = 0.3,
+):
+    """Sample new random neck offset targets (called at intervals).
+
+    Draws uniform random targets in [-max_offset, max_offset] for each of the
+    4 neck/head joints. The offset smoothly interpolates toward the new target.
+    """
+    if not hasattr(env, "_neck_offset_target"):
+        env._neck_offset = torch.zeros(env.num_envs, 4, device=env.device)
+        env._neck_offset_target = torch.zeros(env.num_envs, 4, device=env.device)
+
+    if len(env_ids) > 0:
+        env._neck_offset_target[env_ids] = (
+            torch.rand(len(env_ids), 4, device=env.device) * 2 - 1
+        ) * max_offset
 
 
 class ImitationRewardState:
@@ -1051,6 +1122,46 @@ def push_curriculum(
     # Return max magnitude for logging
     max_push = max(abs(current_range["x"][0]), abs(current_range["x"][1]))
     return torch.tensor([max_push])
+
+
+def neck_offset_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    offset_stages: list[dict],
+) -> torch.Tensor:
+    """Update neck offset magnitude based on training progress.
+
+    Gradually increases the max random neck offset so the robot first learns
+    to walk with no head disturbance, then progressively harder ones.
+
+    Args:
+        env: The RL environment
+        env_ids: Environment IDs (unused, but required by curriculum interface)
+        event_name: Name of the neck offset event (e.g., "randomize_neck_offset_target")
+        offset_stages: List of dicts with 'step' and 'max_offset' keys
+            Example: [
+                {"step": 0,         "max_offset": 0.0},
+                {"step": 500 * 24,  "max_offset": 0.1},
+                {"step": 1000 * 24, "max_offset": 0.2},
+                {"step": 1500 * 24, "max_offset": 0.3},
+            ]
+
+    Returns:
+        Current max_offset value as a tensor (for logging)
+    """
+    del env_ids  # Unused
+
+    assert event_name in env.cfg.events, f"Event '{event_name}' not found"
+    event_cfg = env.cfg.events[event_name]
+
+    current_offset = offset_stages[0]["max_offset"]
+    for stage in offset_stages:
+        if env.common_step_counter > stage["step"]:
+            current_offset = stage["max_offset"]
+
+    event_cfg.params["max_offset"] = current_offset
+    return torch.tensor([current_offset])
 
 
 def velocity_command_ranges_curriculum(
