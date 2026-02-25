@@ -16,7 +16,7 @@ ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force
 ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion robustness
 
 # Neck offset randomization parameters
-NECK_OFFSET_MAX_ANGLE = 1.0
+NECK_OFFSET_MAX_ANGLE = 0.3
 NECK_OFFSET_INTERVAL_S = (2.0, 5.0)  # Sample new random target every 2–5 seconds
 
 # Observation configuration
@@ -438,7 +438,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.0  # starts at 0, ramped up by curriculum
+    command.rel_standing_envs = 0.02  # small but non-zero from the start, ramped up by curriculum
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.3, 0.3)
     command.ranges.lin_vel_y = (-0.3, 0.3)
@@ -503,7 +503,7 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "standing_stages": [
-                {"step": 0,           "rel_standing_envs": 0.0},
+                {"step": 0,           "rel_standing_envs": 0.02},
                 {"step": 500 * 24,    "rel_standing_envs": 0.05},
                 {"step": 750 * 24,    "rel_standing_envs": 0.1},
                 {"step": 1000 * 24,   "rel_standing_envs": 0.15},
