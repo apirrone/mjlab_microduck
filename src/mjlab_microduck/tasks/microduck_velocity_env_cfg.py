@@ -63,6 +63,17 @@ def make_microduck_velocity_env_cfg(
 ) -> ManagerBasedRlEnvCfg:
     """Create Microduck velocity tracking environment configuration."""
 
+    std_standing = {
+        # Lower body — tighter to keep the robot in home pose when standing
+        r".*hip_yaw.*": 0.1,
+        r".*hip_roll.*": 0.1,
+        r".*hip_pitch.*": 0.15,
+        r".*knee.*": 0.15,
+        r".*ankle.*": 0.1,
+        r".*neck.*": 0.1,
+        r".*head.*": 0.1,
+    }
+
     std_walking = {
         # Lower body
         r".*hip_yaw.*": 0.3,
@@ -135,7 +146,7 @@ def make_microduck_velocity_env_cfg(
 
     # === REWARDS ===
     # Pose reward configuration
-    cfg.rewards["pose"].params["std_standing"] = std_walking
+    cfg.rewards["pose"].params["std_standing"] = std_standing  # tight when command=0
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_walking
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
@@ -427,7 +438,7 @@ def make_microduck_velocity_env_cfg(
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.02
+    command.rel_standing_envs = 0.0  # starts at 0, ramped up by curriculum
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.3, 0.3)
     command.ranges.lin_vel_y = (-0.3, 0.3)
@@ -486,23 +497,21 @@ def make_microduck_velocity_env_cfg(
         # },
     # )
 
-    # # Add standing envs curriculum - gradually increase fraction of standing envs
-    # cfg.curriculum["standing_envs"] = CurriculumTermCfg(
-        # func=microduck_mdp.standing_envs_curriculum,
-        # params={
-            # "command_name": "twist",
-            # "standing_stages": [
-                # # Start with very few standing envs, gradually increase
-                # # 250 iterations × 24 steps/iter = 6000 steps
-                # {"step": 0, "rel_standing_envs": 0.02},
-                # {"step": 250 * 24, "rel_standing_envs": 0.05},
-                # {"step": 500 * 24, "rel_standing_envs": 0.1},
-                # {"step": 750 * 24, "rel_standing_envs": 0.15},
-                # {"step": 1000 * 24, "rel_standing_envs": 0.2},
-                # {"step": 1250 * 24, "rel_standing_envs": 0.25},
-            # ],
-        # },
-    # )
+    # Gradually increase standing env fraction after walking is established
+    cfg.curriculum["standing_envs"] = CurriculumTermCfg(
+        func=microduck_mdp.standing_envs_curriculum,
+        params={
+            "command_name": "twist",
+            "standing_stages": [
+                {"step": 0,           "rel_standing_envs": 0.0},
+                {"step": 500 * 24,    "rel_standing_envs": 0.05},
+                {"step": 750 * 24,    "rel_standing_envs": 0.1},
+                {"step": 1000 * 24,   "rel_standing_envs": 0.15},
+                {"step": 1500 * 24,   "rel_standing_envs": 0.2},
+                {"step": 2000 * 24,   "rel_standing_envs": 0.25},
+            ],
+        },
+    )
 
     # Push curriculum - start with no pushes (learn clean gait), gradually increase (build robustness)
     # Steps are in env steps (iteration * 24)
