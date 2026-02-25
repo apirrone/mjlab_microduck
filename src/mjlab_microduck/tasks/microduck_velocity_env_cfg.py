@@ -71,8 +71,8 @@ def make_microduck_velocity_env_cfg(
         r".*knee.*": 0.4,
         r".*ankle.*": 0.25, # was 0.15
         # Head — relaxed because random offsets are applied during training
-        r".*neck.*": 0.5,
-        r".*head.*": 0.5,
+        r".*neck.*": 0.1, # Was 0.1
+        r".*head.*": 0.1, # Was 0.1
     }
 
     site_names = ["left_foot", "right_foot"]
@@ -538,9 +538,9 @@ def make_microduck_velocity_env_cfg(
                 "event_name": "randomize_neck_offset_target",
                 "offset_stages": [
                     {"step": 0,          "max_offset": 0.0},
-                    {"step": 250 * 24,   "max_offset": 0.1},
-                    {"step": 500 * 24,  "max_offset": 0.2},
-                    {"step": 750 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
+                    {"step": 500 * 24,   "max_offset": 0.1},
+                    {"step": 750 * 24,  "max_offset": 0.2},
+                    {"step": 1000 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
                 ],
             },
         )

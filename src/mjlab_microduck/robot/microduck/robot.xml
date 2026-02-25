@@ -23,15 +23,9 @@
       <position kp="10.0" kv="0.1" forcerange="-20.0 20.0"/>
     </default>
     <default class="chosen_actuator">
-      <!-- m1 -->
       <geom contype="0" conaffinity="0"/>
-      <joint damping="0.035" frictionloss="0.021" armature="0.0017"/>
-      <!-- kp 600 -->
-      <!-- <position kp="0.97" kv="0.0" forcerange="-0.66 0.66"/> -->
-      <!-- kp 400 -->
-      <!-- <position kp="0.65" kv="0.0" forcerange="-0.66 0.66"/> -->
-      <!-- kp 200 -->
-      <position kp="0.28" kv="0.0" forcerange="-0.66 0.66"/>
+      <joint damping="0.048" frictionloss="0.006" armature="0.002"/>
+      <position kp="0.52" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->
@@ -102,7 +96,7 @@
       <body name="roll_motor_bottom" pos="0.0125202 0.02 0.0208" quat="4.73682e-17 -0.707107 0.707107 1.53414e-16">
         <!-- Joint from trunk_base to roll_motor_bottom -->
         <joint axis="0 0 1" name="left_hip_yaw" type="hinge" range="-0.5235987755982988 0.5235987755982988" class="chosen_actuator"/>
-        <inertial pos="2.80612e-16 -0.000237525 0.0207938" mass="0.0252944" fullinertia="5.67885e-06 5.1295e-06 2.4759e-06 2.82765e-22 -4.30676e-20 -2.1555e-08"/>
+        <inertial pos="2.80662e-16 -0.000237525 0.0207938" mass="0.0252944" fullinertia="5.67885e-06 5.1295e-06 2.4759e-06 2.82957e-22 -4.30688e-20 -2.1555e-08"/>
         <!-- Part roll_motor_bottom -->
         <geom type="mesh" class="visual" pos="0.02 -5e-05 -0.0146" quat="2.25917e-17 -0.707107 0.707107 1.32169e-16" mesh="roll_motor_bottom" material="roll_motor_bottom_material"/>
         <!-- Part roll_motor_top -->
@@ -122,7 +116,7 @@
           <body name="leg_plate" pos="0.0544 7.80626e-17 -0.0245" quat="0.5 0.5 0.5 0.5">
             <!-- Joint from left_roll_to_pitch to leg_plate -->
             <joint axis="0 0 1" name="left_hip_pitch" type="hinge" range="-6.217248937900877e-15 1.5707963267948903" class="chosen_actuator"/>
-            <inertial pos="-0.0297714 -6.44533e-17 -0.0142481" mass="0.0243882" fullinertia="3.34584e-06 6.61117e-06 5.2143e-06 1.02772e-20 1.98369e-08 -3.42328e-14"/>
+            <inertial pos="-0.0297714 -6.44022e-17 -0.0142481" mass="0.0243882" fullinertia="3.34584e-06 6.61117e-06 5.2143e-06 1.02838e-20 1.98369e-08 -3.42328e-14"/>
             <!-- Part leg_plate -->
             <geom type="mesh" class="visual" pos="0.0432 -0.01 0.0455" quat="0.5 -0.5 0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
             <!-- Part leg_plate_2 -->
@@ -133,7 +127,7 @@
             <body name="leg_plate_2" pos="-0.042 -9.67108e-17 2.22045e-16" quat="0.707107 3.43443e-16 2.22738e-15 -0.707107">
               <!-- Joint from leg_plate to leg_plate_2 -->
               <joint axis="0 0 1" name="left_knee" type="hinge" range="-1.9198621771937625 -0.0" class="chosen_actuator"/>
-              <inertial pos="-4.01535e-17 -0.0297714 -0.0142481" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 5.68786e-21 3.42328e-14 1.98369e-08"/>
+              <inertial pos="-4.02046e-17 -0.0297714 -0.0142481" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 5.68121e-21 3.42328e-14 1.98369e-08"/>
               <!-- Part leg_plate_3 -->
               <geom type="mesh" class="visual" pos="-0.01 0.0432 -0.0745" quat="1.34688e-15 -2.52376e-16 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
               <!-- Part leg_plate_4 -->
@@ -161,7 +155,7 @@
       <body name="leg_plate_3" pos="0.0375202 0.0146 0.0552" quat="0 0 -0.707107 -0.707107">
         <!-- Joint from trunk_base to leg_plate_3 -->
         <joint axis="0 0 1" name="neck_pitch" type="hinge" range="-1.2217304763960306 2.6179938779914944" class="chosen_actuator"/>
-        <inertial pos="-1.05616e-17 0.0297714 -0.0147519" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 -9.50533e-22 -3.42328e-14 1.98369e-08"/>
+        <inertial pos="-1.06127e-17 0.0297714 -0.0147519" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 -9.43885e-22 -3.42328e-14 1.98369e-08"/>
         <!-- Part leg_plate_5 -->
         <geom type="mesh" class="visual" pos="0.01 -0.0432 -0.0745" quat="0.707107 0.707107 -1.11022e-16 9.7232e-17" mesh="leg_plate" material="leg_plate_material"/>
         <!-- Part leg_plate_6 -->
@@ -179,7 +173,7 @@
           <body name="head_yaw_to_roll" pos="1.38778e-17 0.0465 -0.0145" quat="1.20772e-16 3.11619e-18 -0.707107 0.707107">
             <!-- Joint from head_pitch_to_yaw to head_yaw_to_roll -->
             <joint axis="0 0 1" name="head_yaw" type="hinge" range="-2.6179938779915006 2.617993877991488" class="chosen_actuator"/>
-            <inertial pos="0.00569587 -4.89644e-17 0.0184874" mass="0.0379676" fullinertia="7.59409e-06 1.62671e-05 1.68278e-05 5.48866e-20 1.16448e-06 -5.97468e-21"/>
+            <inertial pos="0.00569587 -4.85078e-17 0.0184874" mass="0.0379676" fullinertia="7.59409e-06 1.62671e-05 1.68278e-05 5.49025e-20 1.16448e-06 -6.02302e-21"/>
             <!-- Part head_yaw_to_roll -->
             <geom type="mesh" class="visual" pos="-0.025 1.40025e-16 0.1065" quat="-0 -1 3.19189e-15 -3.06162e-17" mesh="head_yaw_to_roll" material="head_yaw_to_roll_material"/>
             <!-- Part xl330_9 -->
@@ -207,7 +201,7 @@
       <body name="xl330" pos="0.0125202 -0.02 0.0208" quat="0 1 0 0">
         <!-- Joint from trunk_base to xl330 -->
         <joint axis="0 0 1" name="right_hip_yaw" type="hinge" range="-0.5235987755982988 0.5235987755982988" class="chosen_actuator"/>
-        <inertial pos="0.000237525 2.77702e-18 0.0207938" mass="0.0252944" fullinertia="5.1295e-06 5.67885e-06 2.4759e-06 -3.6875e-23 2.1555e-08 -5.6732e-21"/>
+        <inertial pos="0.000237525 2.8263e-18 0.0207938" mass="0.0252944" fullinertia="5.1295e-06 5.67885e-06 2.4759e-06 -3.70667e-23 2.1555e-08 -5.67434e-21"/>
         <!-- Part roll_motor_top_2 -->
         <geom type="mesh" class="visual" pos="-1.73472e-18 0.02 -0.0146" quat="8.03113e-17 1 -0 -3.77504e-34" mesh="roll_motor_top" material="roll_motor_top_material"/>
         <!-- Part roll_motor_bottom_2 -->
@@ -227,7 +221,7 @@
           <body name="xl330_2" pos="-0.0544 3.98986e-17 -0.0245" quat="0.5 0.5 -0.5 -0.5">
             <!-- Joint from right_roll_to_pitch to xl330_2 -->
             <joint axis="0 0 1" name="right_hip_pitch" type="hinge" range="-1.5707963267948912 5.329070518200751e-15" class="chosen_actuator"/>
-            <inertial pos="0.0297714 -1.49318e-17 -0.0142481" mass="0.0243882" fullinertia="3.34584e-06 6.61117e-06 5.2143e-06 1.78488e-20 -1.98369e-08 3.42328e-14"/>
+            <inertial pos="0.0297714 -1.49829e-17 -0.0142481" mass="0.0243882" fullinertia="3.34584e-06 6.61117e-06 5.2143e-06 1.78555e-20 -1.98369e-08 3.42328e-14"/>
             <!-- Part xl330_13 -->
             <geom type="mesh" class="visual" pos="0.042 -2.73219e-17 -0.0145" quat="0.707107 1.3297e-15 0.707107 -1.11926e-15" mesh="xl330" material="xl330_material"/>
             <!-- Part leg_plate_7 -->
@@ -238,7 +232,7 @@
             <body name="xl330_3" pos="0.042 -3.38271e-17 -2.08167e-16" quat="0.707107 9.87879e-16 8.04912e-16 0.707107">
               <!-- Joint from xl330_2 to xl330_3 -->
               <joint axis="0 0 1" name="right_knee" type="hinge" range="-1.7763568394002505e-15 1.9198621771937607" class="chosen_actuator"/>
-              <inertial pos="8.40194e-18 -0.0297714 -0.0142481" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 -6.82456e-22 3.42328e-14 1.98369e-08"/>
+              <inertial pos="8.35083e-18 -0.0297714 -0.0142481" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 -6.89104e-22 3.42328e-14 1.98369e-08"/>
               <!-- Part xl330_14 -->
               <geom type="mesh" class="visual" pos="1.43115e-17 -0.042 -0.0145" quat="0.5 0.5 0.5 -0.5" mesh="xl330" material="xl330_material"/>
               <!-- Part leg_plate_9 -->
@@ -265,37 +259,37 @@
     </body>
   </worldbody>
   <asset>
-    <mesh file="trunk_base.stl"/>
-    <mesh file="raspberrypizerow.stl"/>
-    <mesh file="holder.stl"/>
     <mesh file="bno055.stl"/>
-    <mesh file="roll_motor_bottom.stl"/>
+    <mesh file="right_roll_to_pitch.stl"/>
+    <mesh file="bms.stl"/>
+    <mesh file="jumper.stl"/>
+    <mesh file="cell.stl"/>
+    <mesh file="trunk_yaw.stl"/>
+    <mesh file="trunk_base.stl"/>
+    <mesh file="holder.stl"/>
+    <mesh file="head_yaw_to_roll.stl"/>
+    <mesh file="leg_plate.stl"/>
+    <mesh file="raspberrypizerow.stl"/>
+    <mesh file="power_switch.stl"/>
+    <mesh file="uc_boards.stl"/>
+    <mesh file="board.stl"/>
+    <mesh file="jack.stl"/>
+    <mesh file="uc.stl"/>
     <mesh file="foot.stl"/>
     <mesh file="roll_motor_top.stl"/>
-    <mesh file="head_base_plate.stl"/>
-    <mesh file="cell.stl"/>
-    <mesh file="head_pitch_to_yaw.stl"/>
-    <mesh file="camera_spacer.stl"/>
-    <mesh file="bearing.stl"/>
-    <mesh file="uc_inside_holder.stl"/>
     <mesh file="left_roll_to_pitch.stl"/>
-    <mesh file="uc_boards.stl"/>
-    <mesh file="jack.stl"/>
-    <mesh file="leg_plate.stl"/>
     <mesh file="foot_tpu_bottom.stl"/>
-    <mesh file="trunk_yaw.stl"/>
-    <mesh file="xl330.stl"/>
-    <mesh file="uc.stl"/>
-    <mesh file="bms.stl"/>
+    <mesh file="camera_spacer.stl"/>
+    <mesh file="uc_inside_holder.stl"/>
     <mesh file="usb_c_charger.stl"/>
-    <mesh file="jumper.stl"/>
-    <mesh file="right_roll_to_pitch.stl"/>
-    <mesh file="board.stl"/>
-    <mesh file="power_switch.stl"/>
-    <mesh file="back_shell.stl"/>
     <mesh file="head_top.stl"/>
-    <mesh file="head_yaw_to_roll.stl"/>
     <mesh file="front_shell.stl"/>
+    <mesh file="xl330.stl"/>
+    <mesh file="head_pitch_to_yaw.stl"/>
+    <mesh file="bearing.stl"/>
+    <mesh file="roll_motor_bottom.stl"/>
+    <mesh file="back_shell.stl"/>
+    <mesh file="head_base_plate.stl"/>
     <material name="cell_material" rgba="0.615686 0.811765 0.929412 1"/>
     <material name="xl330_material" rgba="0.286275 0.286275 0.286275 1"/>
     <material name="bms_material" rgba="0.231373 0.380392 0.705882 1"/>
@@ -329,20 +323,20 @@
     <material name="right_roll_to_pitch_material" rgba="0.235294 0.235294 0.235294 1"/>
   </asset>
   <actuator>
-    <position class="chosen_actuator" name="left_hip_yaw" joint="left_hip_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_hip_roll" joint="left_hip_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_hip_pitch" joint="left_hip_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_knee" joint="left_knee" inheritrange="1"/>
-    <position class="chosen_actuator" name="left_ankle" joint="left_ankle" inheritrange="1"/>
-    <position class="chosen_actuator" name="neck_pitch" joint="neck_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_pitch" joint="head_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_yaw" joint="head_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="head_roll" joint="head_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_yaw" joint="right_hip_yaw" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_roll" joint="right_hip_roll" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_hip_pitch" joint="right_hip_pitch" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_knee" joint="right_knee" inheritrange="1"/>
-    <position class="chosen_actuator" name="right_ankle" joint="right_ankle" inheritrange="1"/>
+    <position class="chosen_actuator" name="left_hip_yaw" joint="left_hip_yaw"/>
+    <position class="chosen_actuator" name="left_hip_roll" joint="left_hip_roll"/>
+    <position class="chosen_actuator" name="left_hip_pitch" joint="left_hip_pitch"/>
+    <position class="chosen_actuator" name="left_knee" joint="left_knee"/>
+    <position class="chosen_actuator" name="left_ankle" joint="left_ankle"/>
+    <position class="chosen_actuator" name="neck_pitch" joint="neck_pitch"/>
+    <position class="chosen_actuator" name="head_pitch" joint="head_pitch"/>
+    <position class="chosen_actuator" name="head_yaw" joint="head_yaw"/>
+    <position class="chosen_actuator" name="head_roll" joint="head_roll"/>
+    <position class="chosen_actuator" name="right_hip_yaw" joint="right_hip_yaw"/>
+    <position class="chosen_actuator" name="right_hip_roll" joint="right_hip_roll"/>
+    <position class="chosen_actuator" name="right_hip_pitch" joint="right_hip_pitch"/>
+    <position class="chosen_actuator" name="right_knee" joint="right_knee"/>
+    <position class="chosen_actuator" name="right_ankle" joint="right_ankle"/>
   </actuator>
   <equality/>
 </mujoco>

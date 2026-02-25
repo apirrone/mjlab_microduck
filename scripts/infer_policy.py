@@ -111,6 +111,12 @@ class PolicyInference:
         # Command (lin_vel_x, lin_vel_y, ang_vel_z)
         self.command = np.zeros(3, dtype=np.float32)
 
+        # Head control mode
+        self.head_mode = False
+        # Offsets added on top of policy output for neck joints [neck_pitch, head_pitch, head_yaw, head_roll]
+        self.head_offset = np.zeros(4, dtype=np.float32)
+        self.head_max = 1.0  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
+
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
         self.gait_period = 0.5  # Fallback default
@@ -323,6 +329,15 @@ class PolicyInference:
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
 
+    def toggle_head_mode(self):
+        """Toggle head control mode on/off."""
+        self.head_mode = not self.head_mode
+        if self.head_mode:
+            print("Head mode: ON")
+            print(f"  UP/DOWN: head_pitch  |  LEFT/RIGHT: head_yaw  |  A/E: head_roll  |  SPACE: reset  (max ±{self.head_max:.2f} rad)")
+        else:
+            print("Head mode: OFF  (arrows and A/E back to velocity control)")
+
     def set_command(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
         """Set velocity command and switch policy if needed."""
         self.command = np.array([lin_vel_x, lin_vel_y, ang_vel_z], dtype=np.float32)
@@ -396,6 +411,9 @@ class PolicyInference:
 
         # Set control targets
         self.data.ctrl[:] = target_positions
+
+        # Add head offset on top of policy output (neck/head joints 5–8)
+        self.data.ctrl[5:9] += self.head_offset
 
 
 def main():
@@ -540,23 +558,51 @@ def main():
 
         def on_press(key):
             try:
-                # Handle special keys (arrows and space)
                 if key == pynput_keyboard.Key.up:
-                    policy.set_command(0.5, 0.0, 0.0)
+                    if policy.head_mode:
+                        policy.head_offset[1] = policy.head_max   # head_pitch up
+                        print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    else:
+                        policy.set_command(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
-                    policy.set_command(-0.5, 0.0, 0.0)
+                    if policy.head_mode:
+                        policy.head_offset[1] = -policy.head_max  # head_pitch down
+                        print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    else:
+                        policy.set_command(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
-                    policy.set_command(0.0, -0.5, 0.0)
+                    if policy.head_mode:
+                        policy.head_offset[2] = -policy.head_max  # head_yaw right
+                        print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    else:
+                        policy.set_command(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
-                    policy.set_command(0.0, 0.5, 0.0)
+                    if policy.head_mode:
+                        policy.head_offset[2] = policy.head_max   # head_yaw left
+                        print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    else:
+                        policy.set_command(0.0, 0.5, 0.0)
                 elif key == pynput_keyboard.Key.space:
-                    policy.set_command(0.0, 0.0, 0.0)
-                # Handle character keys
+                    if policy.head_mode:
+                        policy.head_offset[:] = 0.0
+                        print("Head offset reset to zero")
+                    else:
+                        policy.set_command(0.0, 0.0, 0.0)
                 elif hasattr(key, 'char'):
-                    if key.char == 'a' or key.char == 'A':
-                        policy.set_command(0.0, 0.0, 4.0)
+                    if key.char == 'h' or key.char == 'H':
+                        policy.toggle_head_mode()
+                    elif key.char == 'a' or key.char == 'A':
+                        if policy.head_mode:
+                            policy.head_offset[3] = policy.head_max   # head_roll
+                            print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        else:
+                            policy.set_command(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
-                        policy.set_command(0.0, 0.0, -4.0)
+                        if policy.head_mode:
+                            policy.head_offset[3] = -policy.head_max  # head_roll
+                            print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        else:
+                            policy.set_command(0.0, 0.0, -4.0)
             except Exception as e:
                 print(f"Key press error: {e}")
 
@@ -564,13 +610,16 @@ def main():
         listener.start()
 
         print("\nKeyboard controls enabled:")
-        print("  UP arrow:    lin_vel_x = +0.5")
-        print("  DOWN arrow:  lin_vel_x = -0.5")
-        print("  RIGHT arrow: lin_vel_y = +0.5")
-        print("  LEFT arrow:  lin_vel_y = -0.5")
-        print("  A key:       ang_vel_z = -1.0")
-        print("  E key:       ang_vel_z = +1.0")
-        print("  SPACE:       Stop (all velocities = 0.0)")
+        print("  [ Velocity mode (default) ]")
+        print("  UP/DOWN arrow:   lin_vel_x ±0.5")
+        print("  LEFT/RIGHT arrow: lin_vel_y ±0.5")
+        print("  A / E:           ang_vel_z ±4.0")
+        print("  SPACE:           stop (all velocities = 0)")
+        print("  [ Head mode — press H to toggle ]")
+        print("  UP/DOWN arrow:   head_pitch ±0.3 rad (max)")
+        print("  LEFT/RIGHT arrow: head_yaw ±0.3 rad (max)")
+        print("  A / E:           head_roll ±0.3 rad (max)")
+        print("  SPACE:           reset head offset to zero")
         print("\nNote: Keyboard listener captures keys system-wide")
 
     except ImportError:
