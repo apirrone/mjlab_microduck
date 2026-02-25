@@ -449,6 +449,8 @@ def make_microduck_velocity_env_cfg(
                 {"step": 0, "weight": -0.4},
                 {"step": 250 * 24, "weight": -0.8},
                 {"step": 500 * 24, "weight": -1.0},
+                {"step": 750 * 24, "weight": -1.2},
+                {"step": 1000 * 24, "weight": -1.4},
                 # {"step": 750 * 24, "weight": -1.2},
                 # {"step": 1000 * 24, "weight": -1.4},
                 # {"step": 1250 * 24, "weight": -1.6},

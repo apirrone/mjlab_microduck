@@ -115,7 +115,7 @@ class PolicyInference:
         self.head_mode = False
         # Offsets added on top of policy output for neck joints [neck_pitch, head_pitch, head_yaw, head_roll]
         self.head_offset = np.zeros(4, dtype=np.float32)
-        self.head_max = 1.0  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
+        self.head_max = 1.5  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
 
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
@@ -631,7 +631,7 @@ def main():
         import traceback
         traceback.print_exc()
 
-    with mujoco.viewer.launch_passive(model, data) as viewer:
+    with mujoco.viewer.launch_passive(model, data, show_left_ui=False, show_right_ui=False) as viewer:
         viewer.sync()
         start_time = time.time()
 
