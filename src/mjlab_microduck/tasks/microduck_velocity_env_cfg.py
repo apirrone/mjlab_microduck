@@ -523,9 +523,10 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "velocity_stages": [
-                {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
-                {"step": 500 * 24, "lin_vel_range": 0.35, "ang_vel_range": 1.6},   # Intermediate step
-                {"step": 1000 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.7},   # Target values
+                {"step": 0, "lin_vel_range": 0.0, "ang_vel_range": 0.0}, # For standing
+                # {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
+                # {"step": 500 * 24, "lin_vel_range": 0.35, "ang_vel_range": 1.6},   # Intermediate step
+                # {"step": 1000 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.7},   # Target values
             ],
         },
     )
