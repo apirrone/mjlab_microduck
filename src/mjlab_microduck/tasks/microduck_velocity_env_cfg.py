@@ -449,8 +449,8 @@ def make_microduck_velocity_env_cfg(
                 {"step": 0, "weight": -0.4},
                 {"step": 250 * 24, "weight": -0.8},
                 {"step": 500 * 24, "weight": -1.0},
-                {"step": 750 * 24, "weight": -1.2},
-                {"step": 1000 * 24, "weight": -1.4},
+                # {"step": 750 * 24, "weight": -1.2},
+                # {"step": 1000 * 24, "weight": -1.4},
                 # {"step": 750 * 24, "weight": -1.2},
                 # {"step": 1000 * 24, "weight": -1.4},
                 # {"step": 1250 * 24, "weight": -1.6},
@@ -525,29 +525,28 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "velocity_stages": [
-                {"step": 0, "lin_vel_range": 0.0, "ang_vel_range": 0.0}, # For standing
-                # {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
-                # {"step": 500 * 24, "lin_vel_range": 0.35, "ang_vel_range": 1.6},   # Intermediate step
-                # {"step": 1000 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.7},   # Target values
+                {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
+                {"step": 500 * 24, "lin_vel_range": 0.35, "ang_vel_range": 1.6},   # Intermediate step
+                {"step": 1000 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.7},   # Target values
             ],
         },
     )
 
     # Neck offset magnitude curriculum - start at 0, ramp up gradually
     # Disabled for standing
-    # if ENABLE_NECK_OFFSET_RANDOMIZATION:
-        # cfg.curriculum["neck_offset_magnitude"] = CurriculumTermCfg(
-            # func=microduck_mdp.neck_offset_curriculum,
-            # params={
-                # "event_name": "randomize_neck_offset_target",
-                # "offset_stages": [
-                    # {"step": 0,          "max_offset": 0.0},
-                    # {"step": 500 * 24,   "max_offset": 0.1},
-                    # {"step": 750 * 24,  "max_offset": 0.2},
-                    # {"step": 1000 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
-                # ],
-            # },
-        # )
+    if ENABLE_NECK_OFFSET_RANDOMIZATION:
+        cfg.curriculum["neck_offset_magnitude"] = CurriculumTermCfg(
+            func=microduck_mdp.neck_offset_curriculum,
+            params={
+                "event_name": "randomize_neck_offset_target",
+                "offset_stages": [
+                    {"step": 0,          "max_offset": 0.0},
+                    {"step": 500 * 24,   "max_offset": 0.1},
+                    {"step": 750 * 24,  "max_offset": 0.2},
+                    {"step": 1000 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
+                ],
+            },
+        )
 
     # Disable default curriculum
     del cfg.curriculum["terrain_levels"]
