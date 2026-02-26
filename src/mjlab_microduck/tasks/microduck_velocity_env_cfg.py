@@ -183,23 +183,27 @@ def make_microduck_velocity_env_cfg(
     # Body dynamics rewards
     cfg.rewards["soft_landing"].weight = -1e-05
 
-    # Replace built-in air_time with adaptive version that uses different
-    # swing-time windows for walking vs running.
-    del cfg.rewards["air_time"]
-    cfg.rewards["air_time"] = RewardTermCfg(
-        func=microduck_mdp.air_time_adaptive,
-        weight=5.0,
-        params={
-            "sensor_name": "feet_ground_contact",
-            "command_name": "twist",
-            "command_threshold": 0.01,
-            "running_threshold": 0.5,
-            "walk_threshold_min": 0.10,  # 100–250 ms: deliberate walking cadence
-            "walk_threshold_max": 0.25,
-            "run_threshold_min": 0.05,   # 50–250 ms: faster running cadence
-            "run_threshold_max": 0.25,
-        },
-    )
+
+    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].params["command_threshold"] = 0.01
+
+    # # Replace built-in air_time with adaptive version that uses different
+    # # swing-time windows for walking vs running.
+    # del cfg.rewards["air_time"]
+    # cfg.rewards["air_time"] = RewardTermCfg(
+        # func=microduck_mdp.air_time_adaptive,
+        # weight=5.0,
+        # params={
+            # "sensor_name": "feet_ground_contact",
+            # "command_name": "twist",
+            # "command_threshold": 0.01,
+            # "running_threshold": 0.5,
+            # "walk_threshold_min": 0.10,  # 100–250 ms: deliberate walking cadence
+            # "walk_threshold_max": 0.25,
+            # "run_threshold_min": 0.05,   # 50–250 ms: faster running cadence
+            # "run_threshold_max": 0.25,
+        # },
+    # )
 
     # Reward staying still at zero command. Uses a tight Gaussian on body velocity:
     # reward peaks at 0 m/s and decays quickly, so moving faster is always worse.
@@ -562,11 +566,11 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "velocity_stages": [
-                {"step": 0,           "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
+                {"step": 0,          "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
                 {"step": 500 * 24,   "lin_vel_range": 0.35, "ang_vel_range": 1.6},
-                {"step": 1000 * 24,  "lin_vel_range": 0.5,  "ang_vel_range": 1.7},
-                {"step": 1500 * 24,  "lin_vel_range": 0.7,  "ang_vel_range": 2.0},
-                {"step": 2000 * 24,  "lin_vel_range": 1.0,  "ang_vel_range": 2.5},
+                {"step": 1000 * 24,  "lin_vel_range": 0.4,  "ang_vel_range": 1.7},
+                # {"step": 1500 * 24,  "lin_vel_range": 0.7,  "ang_vel_range": 2.0},
+                # {"step": 2000 * 24,  "lin_vel_range": 1.0,  "ang_vel_range": 2.5},
             ],
         },
     )
