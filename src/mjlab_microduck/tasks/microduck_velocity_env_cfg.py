@@ -41,8 +41,10 @@ from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import (
     CurriculumTermCfg,
     EventTermCfg,
+    ObservationTermCfg,
     RewardTermCfg,
 )
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.rl import (
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -154,7 +156,7 @@ def make_microduck_velocity_env_cfg(
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0  # was 1.0
+    cfg.rewards["upright"].weight = 2.0  # increased from 1.0 to fight lateral lean
 
     # Foot-specific configurations
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
@@ -191,6 +193,25 @@ def make_microduck_velocity_env_cfg(
             "air_time_threshold": 0.05,
         },
     )
+
+    # Reward taking recovery steps after a push (body velocity high, command zero).
+    # Symmetric to no_step_when_standing: that penalises stepping when still,
+    # this rewards stepping when pushed.  Together they teach:
+    #   "don't step when undisturbed, DO step when knocked around."
+    # NOTE: command_name gate is critical — prevents this from firing during
+    # normal walking (where body_vel > 0.2 is common at 0.3 m/s), which would
+    # otherwise reward single-foot stepping asymmetrically during walking.
+    cfg.rewards["recovery_stepping"] = RewardTermCfg(
+        func=microduck_mdp.recovery_stepping_reward,
+        weight=3.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "command_name": "twist",
+            "command_threshold": 0.01,  # only fires when command is near zero
+            "velocity_threshold": 0.2,  # same gate as the penalty
+            "air_time_threshold": 0.05,
+        },
+    )
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
@@ -207,10 +228,10 @@ def make_microduck_velocity_env_cfg(
     cfg.rewards["action_rate_l2"].weight = -0.6 # was -0.4
 
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_clearance"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.02  # Increased from 0.01 to penalize dragging
 
     cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_swing_height"].params["target_height"] = 0.01  # Reduced for small robot (was 0.03)
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02  # Increased from 0.01 to force foot lifting
 
     # cfg.rewards["leg_action_rate_l2"] = RewardTermCfg(
     # func=microduck_mdp.leg_action_rate_l2, weight=-0.5
@@ -292,8 +313,6 @@ def make_microduck_velocity_env_cfg(
 
     # Velocity-based pushes for robustness training
     if ENABLE_VELOCITY_PUSHES:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
-
         # In play mode, use shorter interval for better visibility
         interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
 
@@ -312,7 +331,6 @@ def make_microduck_velocity_env_cfg(
 
     # Domain randomization - sampled once per episode at reset
     if ENABLE_COM_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize CoM position
         cfg.events["randomize_com"] = EventTermCfg(
             func=mdp.randomize_field,
@@ -327,7 +345,6 @@ def make_microduck_velocity_env_cfg(
         )
 
     if ENABLE_KP_RANDOMIZATION or ENABLE_KD_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize motor PD gains
         # Uses custom function that handles DelayedActuator
         kp_range = KP_RANDOMIZATION_RANGE if ENABLE_KP_RANDOMIZATION else (1.0, 1.0)
@@ -344,7 +361,6 @@ def make_microduck_velocity_env_cfg(
         )
 
     if ENABLE_MASS_INERTIA_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize mass and inertia together (physically consistent)
         # Using the same scale for both prevents invalid inertia tensors
         cfg.events["randomize_mass_inertia"] = EventTermCfg(
@@ -357,7 +373,6 @@ def make_microduck_velocity_env_cfg(
         )
 
     if ENABLE_JOINT_FRICTION_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize joint friction losses (wear, temperature effects)
         cfg.events["randomize_joint_friction"] = EventTermCfg(
             func=mdp.randomize_field,
@@ -372,7 +387,6 @@ def make_microduck_velocity_env_cfg(
         )
 
     if ENABLE_JOINT_DAMPING_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         # Randomize joint damping (lubrication, temperature effects)
         cfg.events["randomize_joint_damping"] = EventTermCfg(
             func=mdp.randomize_field,
@@ -388,7 +402,6 @@ def make_microduck_velocity_env_cfg(
 
     # IMU orientation randomization (simulates mounting errors)
     if ENABLE_IMU_ORIENTATION_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         cfg.events["randomize_imu_orientation"] = EventTermCfg(
             func=microduck_mdp.randomize_imu_orientation,
             mode="reset",
@@ -400,7 +413,6 @@ def make_microduck_velocity_env_cfg(
 
     # Base orientation randomization (forces reactive behavior)
     if ENABLE_BASE_ORIENTATION_RANDOMIZATION:
-        from mjlab.managers.scene_entity_config import SceneEntityCfg
         cfg.events["randomize_base_orientation"] = EventTermCfg(
             func=microduck_mdp.randomize_base_orientation,
             mode="reset",
@@ -415,7 +427,6 @@ def make_microduck_velocity_env_cfg(
     del cfg.observations["policy"].terms["base_lin_vel"]
 
     # Add base_lin_vel to critic only (privileged information)
-    from mjlab.managers.manager_term_config import ObservationTermCfg
     cfg.observations["critic"].terms["base_lin_vel"] = ObservationTermCfg(
         func=mdp.base_lin_vel,
         scale=1.0,
@@ -428,7 +439,6 @@ def make_microduck_velocity_env_cfg(
     if not USE_PROJECTED_GRAVITY:
         # Remove projected_gravity and add raw_accelerometer
         del cfg.observations["policy"].terms["projected_gravity"]
-        from mjlab.managers.manager_term_config import ObservationTermCfg
         cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
             func=microduck_mdp.raw_accelerometer,
             scale=1.0,

@@ -1412,17 +1412,21 @@ def foot_step_penalty_when_standing(
 def recovery_stepping_reward(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
     velocity_threshold: float = 0.3,
     air_time_threshold: float = 0.05,
 ) -> torch.Tensor:
-    """Reward foot air time only when robot has high velocity (recovering from push).
+    """Reward foot air time only when at zero command AND robot has high velocity (recovering from push).
 
     This encourages the robot to take steps to recover balance when pushed,
-    but doesn't reward unnecessary stepping when standing still.
+    but does NOT fire during normal walking (command > threshold).
 
     Args:
         env: The RL environment
         asset_cfg: Asset configuration (unused but kept for API consistency)
+        command_name: Name of the velocity command in the command manager
+        command_threshold: Speed below which the robot is considered to be in standing mode
         velocity_threshold: Linear velocity threshold to activate stepping reward (m/s)
         air_time_threshold: Minimum air time to count as a step (seconds)
 
@@ -1430,6 +1434,11 @@ def recovery_stepping_reward(
         Reward tensor of shape (num_envs,)
     """
     asset: Entity = env.scene[asset_cfg.name]
+
+    # Only fire for standing envs (command near zero)
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    is_standing_cmd = (total_speed < command_threshold).float()
 
     # Get base linear velocity magnitude
     base_lin_vel = asset.data.root_link_vel_w[:, :3]  # (num_envs, 3)
@@ -1445,8 +1454,8 @@ def recovery_stepping_reward(
     # Reward if either foot has been in air recently
     foot_in_air = (air_time > air_time_threshold).any(dim=1)  # (num_envs,)
 
-    # Only give reward when both conditions are met
-    reward = should_step.float() * foot_in_air.float()
+    # Only give reward when: standing command AND high body velocity AND foot stepped
+    reward = is_standing_cmd * should_step.float() * foot_in_air.float()
 
     return reward
 
