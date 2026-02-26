@@ -194,24 +194,12 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    # Reward taking recovery steps after a push (body velocity high, command zero).
-    # Symmetric to no_step_when_standing: that penalises stepping when still,
-    # this rewards stepping when pushed.  Together they teach:
-    #   "don't step when undisturbed, DO step when knocked around."
-    # NOTE: command_name gate is critical — prevents this from firing during
-    # normal walking (where body_vel > 0.2 is common at 0.3 m/s), which would
-    # otherwise reward single-foot stepping asymmetrically during walking.
-    cfg.rewards["recovery_stepping"] = RewardTermCfg(
-        func=microduck_mdp.recovery_stepping_reward,
-        weight=3.0,
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "command_name": "twist",
-            "command_threshold": 0.01,  # only fires when command is near zero
-            "velocity_threshold": 0.2,  # same gate as the penalty
-            "air_time_threshold": 0.05,
-        },
-    )
+    # NOTE: recovery_stepping_reward removed — it caused the robot to game the
+    # reward by actively walking backward at zero command to keep body_vel > 0.2,
+    # escaping the no_step penalty and earning +3 per step.
+    # Recovery from pushes is instead handled naturally: the no_step_when_standing
+    # penalty is silenced when body_vel > 0.2 (i.e. when pushed), so the robot
+    # takes recovery steps driven by survival instinct (falling ends the episode).
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
