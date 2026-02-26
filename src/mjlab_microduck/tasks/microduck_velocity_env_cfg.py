@@ -189,7 +189,7 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "command_threshold": 0.01,
-            "body_vel_threshold": 0.2,
+            "body_vel_threshold": 100.0,  # effectively unconditional: no escape by walking away
             "air_time_threshold": 0.05,
         },
     )
