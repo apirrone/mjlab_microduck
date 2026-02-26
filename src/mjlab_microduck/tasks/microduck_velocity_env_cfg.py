@@ -189,16 +189,6 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    # Penalise rapid leg joint velocities at zero command to suppress the
-    # standing shake. Gated on command so walking is completely unaffected.
-    cfg.rewards["joint_vel_standing"] = RewardTermCfg(
-        func=microduck_mdp.joint_vel_l2_when_standing,
-        weight=-0.05,
-        params={
-            "command_name": "twist",
-            "command_threshold": 0.01,
-        },
-    )
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 
@@ -476,8 +466,7 @@ def make_microduck_velocity_env_cfg(
                 {"step": 0, "weight": -0.4},
                 {"step": 250 * 24, "weight": -0.8},
                 {"step": 500 * 24, "weight": -1.0},
-                # {"step": 750 * 24, "weight": -1.2},
-                # {"step": 1000 * 24, "weight": -1.4},
+                {"step": 1000 * 24, "weight": -1.5},
                 # {"step": 750 * 24, "weight": -1.2},
                 # {"step": 1000 * 24, "weight": -1.4},
                 # {"step": 1250 * 24, "weight": -1.6},
