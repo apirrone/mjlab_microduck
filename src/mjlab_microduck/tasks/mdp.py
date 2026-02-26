@@ -1396,6 +1396,31 @@ def stillness_at_zero_command(
     return is_standing_cmd * stillness
 
 
+def joint_vel_l2_when_standing(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
+) -> torch.Tensor:
+    """Penalise leg joint velocities only when command is near zero.
+
+    Targets the standing-shake problem: the policy makes rapid oscillating
+    corrections around the home pose when standing. Gated on command so it
+    does not affect the walking gait at all.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    is_standing_cmd = (total_speed < command_threshold).float()
+
+    leg_indices = list(range(0, 5)) + list(range(9, 14))
+    joint_vel = asset.data.joint_vel[:, leg_indices]
+    vel_sq = torch.sum(joint_vel ** 2, dim=-1)
+
+    return is_standing_cmd * vel_sq
+
+
 def foot_step_penalty_when_standing(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
