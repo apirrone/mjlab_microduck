@@ -79,7 +79,7 @@ def make_microduck_velocity_env_cfg(
     std_walking = {
         # Lower body
         r".*hip_yaw.*": 0.3,
-        r".*hip_roll.*": 0.2,
+        r".*hip_roll.*": 0.1,  # tightened from 0.2 to penalize lateral lean during walking
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
         r".*ankle.*": 0.25, # was 0.15
@@ -156,7 +156,7 @@ def make_microduck_velocity_env_cfg(
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 2.0  # increased from 1.0 to fight lateral lean
+    cfg.rewards["upright"].weight = 1.0
 
     # Foot-specific configurations
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
