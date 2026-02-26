@@ -1656,15 +1656,27 @@ def randomize_base_orientation(
 def reset_z_height_cmd(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
+    height_min: float = 0.06,
+    height_max: float = 0.12,
     nominal_height: float = 0.10,
 ):
-    """Reset commanded CoM height to nominal at episode start."""
+    """Randomise commanded CoM height at episode start.
+
+    Walking environments ignore the command (their height target stays nominal
+    inside com_height_tracking), so it is safe to randomise for all reset envs.
+    Randomising at reset (not only at intervals) gives the policy diverse height
+    targets from the very first timestep of every episode.
+    """
     if not hasattr(env, "_z_height_cmd"):
         env._z_height_cmd = torch.full(
             (env.num_envs,), nominal_height, device=env.device
         )
     if len(env_ids) > 0:
-        env._z_height_cmd[env_ids] = nominal_height
+        rand_heights = (
+            torch.rand(len(env_ids), device=env.device) * (height_max - height_min)
+            + height_min
+        )
+        env._z_height_cmd[env_ids] = rand_heights
 
 
 def randomize_z_height_cmd(
@@ -1715,6 +1727,20 @@ def z_height_command_obs(
             (env.num_envs,), nominal_height, device=env.device
         )
     return env._z_height_cmd.unsqueeze(1)
+
+
+def com_height_obs(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+    """Return the current CoM (root link) height as a (num_envs, 1) observation.
+
+    Together with z_height_cmd this gives the policy explicit error feedback:
+        error = z_height_cmd - com_height
+    so it can learn a simple closed-loop height controller.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    return asset.data.root_link_pos_w[:, 2:3]
 
 
 def com_height_tracking(

@@ -231,6 +231,10 @@ class PolicyInference:
         world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         return self.quat_rotate_inverse(quat, world_gravity)
 
+    def get_com_height(self):
+        """Get current CoM (trunk_base) height from MuJoCo world frame."""
+        return float(self.data.xpos[self.trunk_base_id, 2])
+
     def get_base_ang_vel(self):
         """Get base angular velocity from IMU gyro sensor.
 
@@ -335,7 +339,7 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
-            # Commanded CoM height - 1D (always appended after command)
+            # Commanded CoM height - 1D
             obs.append(np.array([self.z_height_cmd], dtype=np.float32))
 
         # Concatenate all observations
@@ -798,7 +802,7 @@ def main():
                             cmd_start = 6+3*policy.n_joints
                             cmd_end = cmd_start + 3
                             print(f"  Command [{cmd_start}:{cmd_end}]:      {obs[cmd_start:cmd_end]}")
-                            print(f"  Z height [{cmd_end}]:       {obs[cmd_end]:.4f} m")
+                            print(f"  Z height cmd [{cmd_end}]:   {obs[cmd_end]:.4f} m")
                         print(f"\nAction output:")
                         print(f"  Raw action: {action}")
                         print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")

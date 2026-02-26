@@ -322,7 +322,11 @@ def make_microduck_velocity_env_cfg(
         cfg.events["reset_z_height_cmd"] = EventTermCfg(
             func=microduck_mdp.reset_z_height_cmd,
             mode="reset",
-            params={"nominal_height": Z_HEIGHT_NOMINAL},
+            params={
+                "height_min": Z_HEIGHT_MIN,
+                "height_max": Z_HEIGHT_MAX,
+                "nominal_height": Z_HEIGHT_NOMINAL,
+            },
         )
         cfg.events["randomize_z_height_cmd"] = EventTermCfg(
             func=microduck_mdp.randomize_z_height_cmd,
@@ -517,6 +521,14 @@ def make_microduck_velocity_env_cfg(
             func=microduck_mdp.z_height_command_obs,
             scale=1.0,
             params={"nominal_height": Z_HEIGHT_NOMINAL},
+        )
+        # Current CoM height — privileged info for the critic only.
+        # The critic uses it to compute better advantage estimates during training.
+        # The actor infers height from joint positions (which encode it implicitly),
+        # so no FK is needed at deployment on the real robot.
+        cfg.observations["critic"].terms["com_height"] = ObservationTermCfg(
+            func=microduck_mdp.com_height_obs,
+            scale=1.0,
         )
 
     # Commands
