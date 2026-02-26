@@ -1653,6 +1653,108 @@ def randomize_base_orientation(
     env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat
 
 
+def reset_z_height_cmd(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    nominal_height: float = 0.10,
+):
+    """Reset commanded CoM height to nominal at episode start."""
+    if not hasattr(env, "_z_height_cmd"):
+        env._z_height_cmd = torch.full(
+            (env.num_envs,), nominal_height, device=env.device
+        )
+    if len(env_ids) > 0:
+        env._z_height_cmd[env_ids] = nominal_height
+
+
+def randomize_z_height_cmd(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
+    height_min: float = 0.07,
+    height_max: float = 0.11,
+    nominal_height: float = 0.10,
+):
+    """Sample a new target CoM height at intervals.
+
+    Only randomises heights for environments that are currently in standing mode
+    (velocity command below threshold). Walking environments are reset to the
+    nominal height so the transition from standing back to walking is smooth.
+    """
+    if not hasattr(env, "_z_height_cmd"):
+        env._z_height_cmd = torch.full(
+            (env.num_envs,), nominal_height, device=env.device
+        )
+    if len(env_ids) == 0:
+        return
+
+    command = env.command_manager.get_command(command_name)
+    total_speed = (
+        torch.norm(command[env_ids, :2], dim=1) + torch.abs(command[env_ids, 2])
+    )
+    is_standing = total_speed < command_threshold
+
+    # Random height for standing envs, nominal for walking envs
+    rand_heights = (
+        torch.rand(len(env_ids), device=env.device) * (height_max - height_min)
+        + height_min
+    )
+    env._z_height_cmd[env_ids] = torch.where(
+        is_standing, rand_heights, torch.full_like(rand_heights, nominal_height)
+    )
+
+
+def z_height_command_obs(
+    env: ManagerBasedRlEnv,
+    nominal_height: float = 0.10,
+) -> torch.Tensor:
+    """Return the current commanded CoM height as a (num_envs, 1) observation."""
+    if not hasattr(env, "_z_height_cmd"):
+        env._z_height_cmd = torch.full(
+            (env.num_envs,), nominal_height, device=env.device
+        )
+    return env._z_height_cmd.unsqueeze(1)
+
+
+def com_height_tracking(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
+    nominal_height: float = 0.10,
+    height_std: float = 0.025,
+) -> torch.Tensor:
+    """Gaussian reward for tracking the commanded CoM height.
+
+    When standing (velocity command near zero) the target is the value stored in
+    ``env._z_height_cmd`` (set by ``randomize_z_height_cmd``).  When walking the
+    target falls back to ``nominal_height`` so the reward acts the same as the
+    previous fixed-range ``com_height_target``.
+
+    Returns a value in (0, 1] — use a positive weight.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    com_height = asset.data.root_link_pos_w[:, 2]
+
+    if not hasattr(env, "_z_height_cmd"):
+        env._z_height_cmd = torch.full(
+            (env.num_envs,), nominal_height, device=env.device
+        )
+
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    is_standing = total_speed < command_threshold
+
+    # Target: commanded height when standing, nominal when walking
+    target = torch.where(is_standing, env._z_height_cmd,
+                         torch.full_like(env._z_height_cmd, nominal_height))
+
+    height_error = com_height - target
+    reward = torch.exp(-height_error ** 2 / height_std ** 2)
+    return reward
+
+
 class VelocityCommandCommandOnly(UniformVelocityCommand):
     """Like UniformVelocityCommand but only draws the command arrows (no actual velocity arrows)."""
 

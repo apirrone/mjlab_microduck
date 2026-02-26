@@ -14,6 +14,13 @@ ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
 ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion robustness
+ENABLE_Z_HEIGHT_CONTROL = True  # Commanded CoM height (crouching) at zero velocity
+
+# Z-height (crouch) control parameters
+Z_HEIGHT_NOMINAL = 0.10  # Normal standing CoM height (m) — midpoint of original [0.08, 0.11] range
+Z_HEIGHT_MIN = 0.07      # Lowest crouch (3 cm below nominal)
+Z_HEIGHT_MAX = 0.11      # Slightly raised (matches old range top)
+Z_HEIGHT_INTERVAL_S = (3.0, 7.0)  # Sample new height target every 3–7 s
 
 # Neck offset randomization parameters
 NECK_OFFSET_MAX_ANGLE = 0.3
@@ -255,13 +262,18 @@ def make_microduck_velocity_env_cfg(
     # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
 
-    # CoM height target
-    cfg.rewards["com_height_target"] = RewardTermCfg(
-        func=microduck_mdp.com_height_target,
+    # CoM height tracking — replaces the old fixed-range com_height_target.
+    # When walking, tracks the nominal height (same behaviour as before).
+    # When standing with a z_height command active, tracks the commanded height
+    # so the robot learns to crouch on demand.
+    cfg.rewards["com_height_tracking"] = RewardTermCfg(
+        func=microduck_mdp.com_height_tracking,
         weight=1.2,
         params={
-            "target_height_min": 0.08,
-            "target_height_max": 0.11,
+            "command_name": "twist",
+            "command_threshold": 0.01,
+            "nominal_height": Z_HEIGHT_NOMINAL,
+            "height_std": 0.025,
         },
     )
 
@@ -297,6 +309,26 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.reset_action_history,
         mode="reset",
     )
+
+    # Z-height (crouch) command: train the robot to modulate its CoM height on demand
+    if ENABLE_Z_HEIGHT_CONTROL:
+        cfg.events["reset_z_height_cmd"] = EventTermCfg(
+            func=microduck_mdp.reset_z_height_cmd,
+            mode="reset",
+            params={"nominal_height": Z_HEIGHT_NOMINAL},
+        )
+        cfg.events["randomize_z_height_cmd"] = EventTermCfg(
+            func=microduck_mdp.randomize_z_height_cmd,
+            mode="interval",
+            interval_range_s=Z_HEIGHT_INTERVAL_S,
+            params={
+                "command_name": "twist",
+                "command_threshold": 0.01,
+                "height_min": Z_HEIGHT_MIN,
+                "height_max": Z_HEIGHT_MAX,
+                "nominal_height": Z_HEIGHT_NOMINAL,
+            },
+        )
 
     # Neck offset randomization: randomly offset head joints to train robustness
     if ENABLE_NECK_OFFSET_RANDOMIZATION:
@@ -469,6 +501,16 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms[gravity_term_name].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
+
+    # Z-height command observation (1D scalar: target CoM height in metres)
+    # Appended to the policy observation so the policy can condition its leg
+    # behaviour on the current crouch target.
+    if ENABLE_Z_HEIGHT_CONTROL:
+        cfg.observations["policy"].terms["z_height_cmd"] = ObservationTermCfg(
+            func=microduck_mdp.z_height_command_obs,
+            scale=1.0,
+            params={"nominal_height": Z_HEIGHT_NOMINAL},
+        )
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
