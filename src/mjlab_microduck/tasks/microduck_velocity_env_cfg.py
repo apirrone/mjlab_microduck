@@ -172,6 +172,25 @@ def make_microduck_velocity_env_cfg(
     # Air time reward
     cfg.rewards["air_time"].weight = 5.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
+
+    # Penalise stepping at zero command when body is still.
+    # Symmetric counterpart to air_time: that reward gives +5 for stepping when
+    # walking (command > 0.01), this gives -5 for stepping when standing still
+    # (command < 0.01 AND body velocity < 0.2 m/s).
+    # The body-velocity gate means pushes don't trigger the penalty, so the
+    # robot can still take recovery steps after a disturbance.
+    # This ONLY fires for standing envs — command > 0.01 makes it zero — so it
+    # cannot interfere with walking learning at all.
+    cfg.rewards["no_step_when_standing"] = RewardTermCfg(
+        func=microduck_mdp.foot_step_penalty_when_standing,
+        weight=-5.0,
+        params={
+            "command_name": "twist",
+            "command_threshold": 0.01,
+            "body_vel_threshold": 0.2,
+            "air_time_threshold": 0.05,
+        },
+    )
     cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
     cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
 

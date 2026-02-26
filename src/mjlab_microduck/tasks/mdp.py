@@ -1370,6 +1370,45 @@ def standing_phase(
     return phase.unsqueeze(-1)  # Shape: (num_envs, 1)
 
 
+def foot_step_penalty_when_standing(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
+    body_vel_threshold: float = 0.2,
+    air_time_threshold: float = 0.05,
+) -> torch.Tensor:
+    """Penalise stepping when at zero command and the body is not being pushed.
+
+    Symmetric counterpart to the air_time reward:
+    - air_time gives  +reward for stepping when command > threshold  (walk)
+    - this gives      -reward for stepping when command < threshold  (stand)
+
+    The body-velocity gate prevents penalising recovery steps after a push:
+    if the robot is already moving fast (pushed), no penalty is applied so it
+    can still take steps to catch itself.
+
+    Returns a value in [0, 1] (use a negative weight in the config).
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    contact_sensor = env.scene.sensors["feet_ground_contact"]
+
+    # Was either foot recently lifted? (last completed air phase > threshold)
+    air_time = contact_sensor.data.last_air_time[:, :2]  # (num_envs, 2)
+    any_foot_stepped = (air_time > air_time_threshold).any(dim=1).float()
+
+    # Are we in standing mode? (command near zero)
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    is_standing = (total_speed < command_threshold).float()
+
+    # Is the body still? (not being pushed)
+    body_vel = torch.norm(asset.data.root_link_vel_w[:, :2], dim=1)
+    is_still = (body_vel < body_vel_threshold).float()
+
+    return any_foot_stepped * is_standing * is_still
+
+
 def recovery_stepping_reward(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
