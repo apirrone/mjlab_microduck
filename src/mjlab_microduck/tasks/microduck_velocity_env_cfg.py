@@ -215,8 +215,6 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    cfg.rewards["air_time"].params["threshold_min"] = 0.05  # Lowered from 0.10 to allow faster running cadence
-    cfg.rewards["air_time"].params["threshold_max"] = 0.25
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
