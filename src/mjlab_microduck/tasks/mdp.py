@@ -1370,6 +1370,48 @@ def standing_phase(
     return phase.unsqueeze(-1)  # Shape: (num_envs, 1)
 
 
+def air_time_adaptive(
+    env: ManagerBasedRlEnv,
+    sensor_name: str,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,    # below this: no reward (standing)
+    running_threshold: float = 0.5,     # above this: use running air-time window
+    walk_threshold_min: float = 0.10,
+    walk_threshold_max: float = 0.25,
+    run_threshold_min: float = 0.05,
+    run_threshold_max: float = 0.25,
+) -> torch.Tensor:
+    """Air-time reward with separate swing-time windows for walking vs running.
+
+    - command < command_threshold  → 0 (standing, no reward)
+    - command_threshold–running_threshold → walk window [walk_min, walk_max]
+    - command > running_threshold  → run  window [run_min,  run_max]
+
+    This lets the walking gait keep its deliberate 100–250 ms swing while
+    running can use a faster 50–250 ms cadence.
+    """
+    sensor = env.scene.sensors[sensor_name]
+    current_air_time = sensor.data.current_air_time  # (num_envs, num_feet)
+    assert current_air_time is not None
+
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+
+    is_walking = ((total_speed >= command_threshold) & (total_speed < running_threshold)).float()  # (num_envs,)
+    is_running = (total_speed >= running_threshold).float()
+
+    # Per-env thresholds broadcast over feet
+    tmin = (is_walking * walk_threshold_min + is_running * run_threshold_min).unsqueeze(1)
+    tmax = (is_walking * walk_threshold_max + is_running * run_threshold_max).unsqueeze(1)
+
+    in_range = (current_air_time > tmin) & (current_air_time < tmax)
+    reward = torch.sum(in_range.float(), dim=1)  # sum over feet
+
+    # Zero reward when standing
+    active = (total_speed >= command_threshold).float()
+    return reward * active
+
+
 def stillness_at_zero_command(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
