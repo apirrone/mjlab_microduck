@@ -88,6 +88,17 @@ def make_microduck_velocity_env_cfg(
         r".*head.*": 0.1, # Was 0.1
     }
 
+    std_running = {
+        # Running needs much larger joint excursions
+        r".*hip_yaw.*": 0.5,
+        r".*hip_roll.*": 0.2,  # slightly relaxed for CoM shifting at speed
+        r".*hip_pitch.*": 0.8,  # big hip flexion/extension for bounding
+        r".*knee.*": 0.8,       # deep knee bend for running
+        r".*ankle.*": 0.5,      # more plantarflexion push-off
+        r".*neck.*": 0.1,
+        r".*head.*": 0.1,
+    }
+
     site_names = ["left_foot", "right_foot"]
 
     # Contact sensor for feet - LEFT, RIGHT order
@@ -150,8 +161,9 @@ def make_microduck_velocity_env_cfg(
     # Pose reward configuration
     cfg.rewards["pose"].params["std_standing"] = std_standing  # tight when command=0
     cfg.rewards["pose"].params["std_walking"] = std_walking
-    cfg.rewards["pose"].params["std_running"] = std_walking
+    cfg.rewards["pose"].params["std_running"] = std_running    # relaxed for fast running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
+    cfg.rewards["pose"].params["running_threshold"] = 0.5      # switch to running pose at 0.5 m/s
     cfg.rewards["pose"].weight = 2.0  # was 1.0
 
     # Body-specific reward configurations
@@ -189,8 +201,8 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    cfg.rewards["air_time"].params["threshold_min"] = 0.10  # Increased from 0.055 to slow down gait (100ms swing)
-    cfg.rewards["air_time"].params["threshold_max"] = 0.25  # Increased from 0.15 to allow slower stepping (250ms max swing)
+    cfg.rewards["air_time"].params["threshold_min"] = 0.05  # Lowered from 0.10 to allow faster running cadence
+    cfg.rewards["air_time"].params["threshold_max"] = 0.25
 
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
@@ -538,9 +550,11 @@ def make_microduck_velocity_env_cfg(
         params={
             "command_name": "twist",
             "velocity_stages": [
-                {"step": 0, "lin_vel_range": 0.3, "ang_vel_range": 1.5},           # Start at current values
-                {"step": 500 * 24, "lin_vel_range": 0.35, "ang_vel_range": 1.6},   # Intermediate step
-                {"step": 1000 * 24, "lin_vel_range": 0.4, "ang_vel_range": 1.7},   # Target values
+                {"step": 0,           "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
+                {"step": 500 * 24,   "lin_vel_range": 0.35, "ang_vel_range": 1.6},
+                {"step": 1000 * 24,  "lin_vel_range": 0.5,  "ang_vel_range": 1.7},
+                {"step": 1500 * 24,  "lin_vel_range": 0.7,  "ang_vel_range": 2.0},
+                {"step": 2000 * 24,  "lin_vel_range": 1.0,  "ang_vel_range": 2.5},
             ],
         },
     )
