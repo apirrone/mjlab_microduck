@@ -1370,6 +1370,32 @@ def standing_phase(
     return phase.unsqueeze(-1)  # Shape: (num_envs, 1)
 
 
+def stillness_at_zero_command(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    command_threshold: float = 0.01,
+    vel_std: float = 0.1,
+) -> torch.Tensor:
+    """Reward staying still when command is near zero.
+
+    Returns exp(-body_vel² / vel_std²) when command < threshold, else 0.
+    This is monotonically decreasing with body speed — moving faster is always
+    less rewarding. There is no threshold the robot can cross to 'escape' it,
+    unlike gate-based stepping penalties.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+
+    command = env.command_manager.get_command(command_name)
+    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+    is_standing_cmd = (total_speed < command_threshold).float()
+
+    body_vel = torch.norm(asset.data.root_link_vel_w[:, :2], dim=1)
+    stillness = torch.exp(-body_vel ** 2 / vel_std ** 2)
+
+    return is_standing_cmd * stillness
+
+
 def foot_step_penalty_when_standing(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
