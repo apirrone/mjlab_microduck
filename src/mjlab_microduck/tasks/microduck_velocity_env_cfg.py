@@ -17,9 +17,9 @@ ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion r
 ENABLE_Z_HEIGHT_CONTROL = True  # Commanded CoM height (crouching) at zero velocity
 
 # Z-height (crouch) control parameters
-Z_HEIGHT_NOMINAL = 0.10  # Normal standing CoM height (m) — midpoint of original [0.08, 0.11] range
-Z_HEIGHT_MIN = 0.07      # Lowest crouch (3 cm below nominal)
-Z_HEIGHT_MAX = 0.11      # Slightly raised (matches old range top)
+Z_HEIGHT_NOMINAL = 0.10  # Normal standing CoM height (m)
+Z_HEIGHT_MIN = 0.06      # Lowest crouch (4 cm below nominal — enough to dip the head)
+Z_HEIGHT_MAX = 0.12      # Slightly raised stance
 Z_HEIGHT_INTERVAL_S = (3.0, 7.0)  # Sample new height target every 3–7 s
 
 # Neck offset randomization parameters
@@ -73,12 +73,16 @@ def make_microduck_velocity_env_cfg(
     """Create Microduck velocity tracking environment configuration."""
 
     std_standing = {
-        # Lower body — tighter to keep the robot in home pose when standing
+        # Lower body — lateral joints tight (no lateral lean), sagittal joints relaxed
+        # so the robot can freely crouch when a z_height command is given.
+        # Tight std → strong restoring force → prevents crouching.
+        # Sagittal joints (hip_pitch, knee, ankle) must be loose enough that
+        # the height-tracking reward (~4.0 weight) can overcome the pose penalty.
         r".*hip_yaw.*": 0.1,
         r".*hip_roll.*": 0.1,
-        r".*hip_pitch.*": 0.15,
-        r".*knee.*": 0.15,
-        r".*ankle.*": 0.1,
+        r".*hip_pitch.*": 0.5,   # relaxed from 0.15 — knee flex needed for crouching
+        r".*knee.*": 0.5,        # relaxed from 0.15 — main joint for height control
+        r".*ankle.*": 0.3,       # relaxed from 0.1  — assists height modulation
         r".*neck.*": 0.1,
         r".*head.*": 0.1,
     }
@@ -266,14 +270,17 @@ def make_microduck_velocity_env_cfg(
     # When walking, tracks the nominal height (same behaviour as before).
     # When standing with a z_height command active, tracks the commanded height
     # so the robot learns to crouch on demand.
+    # Weight must dominate the pose-reward penalty for crouched leg positions:
+    # at weight=4.0 and std=0.015, the gradient at 3 cm error ≈ +3.9 (gain),
+    # while relaxed std_standing (0.5) means pose penalty ≈ −0.9 (loss) → net +3.
     cfg.rewards["com_height_tracking"] = RewardTermCfg(
         func=microduck_mdp.com_height_tracking,
-        weight=1.2,
+        weight=4.0,
         params={
             "command_name": "twist",
             "command_threshold": 0.01,
             "nominal_height": Z_HEIGHT_NOMINAL,
-            "height_std": 0.025,
+            "height_std": 0.015,  # tight: half-reward at 1.5 cm error
         },
     )
 
