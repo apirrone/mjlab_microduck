@@ -79,9 +79,9 @@ def make_microduck_velocity_env_cfg(
         # Tight std → strong restoring force → fights against com_offset_tracking.
         r".*hip_yaw.*": 0.1,
         r".*hip_roll.*": 0.1,
-        r".*hip_pitch.*": 0.5,   # loose — allows leaning forward/backward (Δx, Δpitch)
-        r".*knee.*": 0.5,        # loose — allows height changes (Δz)
-        r".*ankle.*": 0.3,       # loose — assists height and lean modulation
+        r".*hip_pitch.*": 0.8,   # very loose — 20° lean needs ~0.35 rad, std=0.5 → -0.39 loss
+        r".*knee.*": 0.8,        # very loose — crouching needs deep knee bend
+        r".*ankle.*": 0.5,       # loose — assists height and lean modulation
         r".*neck.*": 0.1,
         r".*head.*": 0.1,
     }
@@ -178,7 +178,10 @@ def make_microduck_velocity_env_cfg(
 
     # Body-specific reward configurations
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0
+    # Reduced: com_offset_tracking already keeps the robot upright when orientation
+    # command is zero (same orientation error term). Having both at high weight
+    # makes it impossible to track large commanded tilts.
+    cfg.rewards["upright"].weight = 0.3
 
     # Foot-specific configurations
     for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
@@ -273,7 +276,7 @@ def make_microduck_velocity_env_cfg(
     if ENABLE_COM_OFFSET_CONTROL:
         cfg.rewards["com_offset_tracking"] = RewardTermCfg(
             func=microduck_mdp.com_offset_tracking,
-            weight=0.5,  # updated by com_offset_weight curriculum
+            weight=1.0,  # updated by com_offset_weight curriculum
             params={
                 "nominal_height": COM_OFFSET_NOMINAL_HEIGHT,
                 "translation_std": 0.02,  # 2 cm: half-reward at 2 cm error
@@ -646,9 +649,9 @@ def make_microduck_velocity_env_cfg(
             params={
                 "reward_name": "com_offset_tracking",
                 "weight_stages": [
-                    {"step": 0,           "weight": 0.5},  # posture maintenance from start
-                    {"step": 2000 * 24,   "weight": 1.5},  # ramp up as commands activate
-                    {"step": 3000 * 24,   "weight": 2.0},  # full weight at full range
+                    {"step": 0,           "weight": 1.0},  # posture maintenance from start
+                    {"step": 2000 * 24,   "weight": 4.0},  # ramp up strongly as commands activate
+                    {"step": 3000 * 24,   "weight": 6.0},  # full weight must dominate pose(2)+upright(0.3)
                 ],
             },
         )
