@@ -1,6 +1,11 @@
 
 # MjLab Microduck
 
+Main repo : https://github.com/apirrone/microduck
+
+https://github.com/user-attachments/assets/e9a0d4de-8a3d-4e44-b490-e873728cf2bf
+
+
 ## Training
 
 ```
@@ -23,4 +28,5 @@ uv run play Mjlab-Velocity-Flat-MicroDuck --wandb-run-path <...>
 
 ```
 uv run export.py Mjlab-Velocity-Flat-MicroDuck --wandb-run-path <...>
+
 ````
