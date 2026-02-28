@@ -339,8 +339,11 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
-            # CoM offset command [Δx, Δy, Δz, Δroll, Δpitch, Δyaw] - 6D
-            obs.append(self.com_offset)
+            # CoM offset command — normalized to [-1, 1] (must match com_offset_command_obs) - 6D
+            com_offset_norm = self.com_offset.copy()
+            com_offset_norm[:3] /= COM_OFFSET_MAX_TRANSLATION
+            com_offset_norm[3:] /= (COM_OFFSET_MAX_ROTATION_DEG * np.pi / 180.0)
+            obs.append(com_offset_norm)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)

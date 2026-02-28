@@ -511,6 +511,10 @@ def make_microduck_velocity_env_cfg(
         cfg.observations["policy"].terms["com_offset_cmd"] = ObservationTermCfg(
             func=microduck_mdp.com_offset_command_obs,
             scale=1.0,
+            params={
+                "max_translation": COM_OFFSET_MAX_TRANSLATION,
+                "max_rotation_rad": COM_OFFSET_MAX_ROTATION_DEG * math.pi / 180.0,
+            },
         )
 
     # Commands
@@ -654,8 +658,10 @@ def make_microduck_velocity_env_cfg(
             params={
                 "event_name": "randomize_com_offset_cmd",
                 "offset_stages": [
-                    {"step": 0,           "max_translation": 0.0,                   "max_rotation_deg": 0.0},
-                    {"step": 2000 * 24,   "max_translation": 0.01,                  "max_rotation_deg": 5.0},
+                    # Start non-zero from day 1 so gradients flow through those obs dims.
+                    # Zero inputs for N iterations → zero gradient → dead input weights.
+                    {"step": 0,           "max_translation": 0.005,                  "max_rotation_deg": 5.0},
+                    {"step": 2000 * 24,   "max_translation": 0.010,                  "max_rotation_deg": 10.0},
                     {"step": 3000 * 24,   "max_translation": COM_OFFSET_MAX_TRANSLATION, "max_rotation_deg": COM_OFFSET_MAX_ROTATION_DEG},
                 ],
             },

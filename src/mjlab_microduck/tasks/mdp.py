@@ -1687,14 +1687,28 @@ def randomize_com_offset_cmd(
     env._com_offset_cmd[env_ids] = torch.cat([translation, rotation], dim=1)
 
 
-def com_offset_command_obs(env: ManagerBasedRlEnv) -> torch.Tensor:
-    """Return CoM offset commands as a (num_envs, 6) observation.
+def com_offset_command_obs(
+    env: ManagerBasedRlEnv,
+    max_translation: float = 0.025,
+    max_rotation_rad: float = 0.349,
+) -> torch.Tensor:
+    """Return normalized CoM offset commands as (num_envs, 6).
 
-    Order: [Δx, Δy, Δz (metres), Δroll, Δpitch, Δyaw (radians)]
+    Normalizes translations by max_translation and rotations by max_rotation_rad so
+    the output spans [-1, 1] when commands are at their maximum.  This keeps the
+    translation dims (otherwise in metres, ~0.025) on the same scale as joint-angle
+    observations (~0-1 rad), preventing the first-layer weights for those inputs from
+    receiving near-zero gradients.
+
+    Order: [Δx, Δy, Δz (norm), Δroll, Δpitch, Δyaw (norm)]
     """
     if not hasattr(env, "_com_offset_cmd"):
         env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
-    return env._com_offset_cmd
+    cmd = env._com_offset_cmd  # (N, 6)
+    normalized = torch.empty_like(cmd)
+    normalized[:, :3] = cmd[:, :3] / max_translation
+    normalized[:, 3:] = cmd[:, 3:] / max_rotation_rad
+    return normalized
 
 
 def _quat_to_euler_xyz(quat: torch.Tensor) -> torch.Tensor:
@@ -1776,9 +1790,12 @@ def com_offset_tracking(
     xy_error_x = horiz_disp_b_x - com_offset[:, 0]
     xy_error_y = horiz_disp_b_y - com_offset[:, 1]
 
-    # --- Orientation tracking (Euler angles) ---
+    # --- Orientation tracking (roll + pitch only) ---
+    # We intentionally skip yaw: the robot's absolute heading changes continuously
+    # during turning and has no meaningful "zero" reference, so including it would
+    # directly conflict with angular-velocity tracking (turning commands).
     euler = _quat_to_euler_xyz(quat_w)   # (N, 3) [roll, pitch, yaw]
-    orient_error = euler - com_offset[:, 3:6]  # (N, 3)
+    orient_error = euler[:, :2] - com_offset[:, 3:5]  # (N, 2) [roll_err, pitch_err]
 
     # --- Combined reward ---
     trans_sq = z_error ** 2 + xy_error_x ** 2 + xy_error_y ** 2
