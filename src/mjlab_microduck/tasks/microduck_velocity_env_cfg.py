@@ -519,6 +519,8 @@ def make_microduck_velocity_env_cfg(
                 "max_rotation_rad": COM_OFFSET_MAX_ROTATION_DEG * math.pi / 180.0,
             },
         )
+        # Policy obs total: base_ang_vel(3) + proj_gravity(3) + joint_pos(14) +
+        #                   joint_vel(14) + last_action(14) + vel_cmd(3) + com_offset_cmd(3) = 54D
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
@@ -650,8 +652,8 @@ def make_microduck_velocity_env_cfg(
                 "reward_name": "com_offset_tracking",
                 "weight_stages": [
                     {"step": 0,           "weight": 1.0},  # posture maintenance from start
-                    {"step": 2000 * 24,   "weight": 4.0},  # ramp up strongly as commands activate
-                    {"step": 3000 * 24,   "weight": 6.0},  # full weight must dominate pose(2)+upright(0.3)
+                    {"step": 2000 * 24,   "weight": 3.0},  # ramp up as commands activate
+                    {"step": 3000 * 24,   "weight": 4.0},  # full weight — cleaner reward needs less force
                 ],
             },
         )

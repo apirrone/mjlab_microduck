@@ -125,8 +125,8 @@ class PolicyInference:
 
         # Body (CoM offset) control mode
         self.body_mode = False
-        # CoM offset command [Δx, Δy, Δz (m), Δroll, Δpitch, Δyaw (rad)] — appended to obs
-        self.com_offset = np.zeros(6, dtype=np.float32)
+        # CoM offset command [Δz (m), Δroll (rad), Δpitch (rad)] — appended to obs
+        self.com_offset = np.zeros(3, dtype=np.float32)
         self.com_trans_max = COM_OFFSET_MAX_TRANSLATION
         self.com_rot_max = COM_OFFSET_MAX_ROTATION_DEG * np.pi / 180.0
 
@@ -286,8 +286,8 @@ class PolicyInference:
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
         6. command (3D) - velocity command
-        7. com_offset_cmd (6D) - [Δx,Δy,Δz (m), Δroll,Δpitch,Δyaw (rad)]
-        Total: 57D
+        7. com_offset_cmd (3D) - [Δz (m), Δroll (rad), Δpitch (rad)]
+        Total: 54D
 
         Order for imitation task (use_imitation=True):
         1. command (3D) - velocity command
@@ -339,10 +339,10 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
-            # CoM offset command — normalized to [-1, 1] (must match com_offset_command_obs) - 6D
+            # CoM offset [Δz, Δroll, Δpitch] — normalized to [-1, 1] (must match com_offset_command_obs) - 3D
             com_offset_norm = self.com_offset.copy()
-            com_offset_norm[:3] /= COM_OFFSET_MAX_TRANSLATION
-            com_offset_norm[3:] /= (COM_OFFSET_MAX_ROTATION_DEG * np.pi / 180.0)
+            com_offset_norm[0] /= COM_OFFSET_MAX_TRANSLATION
+            com_offset_norm[1:] /= (COM_OFFSET_MAX_ROTATION_DEG * np.pi / 180.0)
             obs.append(com_offset_norm)
 
         # Concatenate all observations
@@ -365,7 +365,7 @@ class PolicyInference:
             self.head_mode = False  # mutually exclusive
             print("Body mode: ON  (CoM offset control)")
             print(f"  UP/DOWN:    Δz ±{self.com_trans_max*100:.1f} cm  (raise/lower CoM)")
-            print(f"  LEFT/RIGHT: Δy ±{self.com_trans_max*100:.1f} cm  (lean left/right)")
+            print(f"  LEFT/RIGHT: Δroll ±{COM_OFFSET_MAX_ROTATION_DEG:.0f}°  (lean left/right)")
             print(f"  A / E:      Δpitch ±{COM_OFFSET_MAX_ROTATION_DEG:.0f}°  (lean forward/backward)")
             print(f"  SPACE:      reset all offsets to zero")
             print(f"  Current com_offset: {self.com_offset}")
@@ -538,9 +538,9 @@ def main():
         expected_obs_size = 3 + 2 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
         breakdown = f"3(command) + 2(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
     else:
-        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3) + com_offset(6)
-        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3 + 6
-        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(vel_cmd) + 6(com_offset_cmd)"
+        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3) + com_offset(3)
+        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3 + 3
+        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(vel_cmd) + 3(com_offset_cmd)"
 
     if test_obs.size != expected_obs_size:
         print(f"\nWARNING: Observation size mismatch!")
@@ -594,8 +594,8 @@ def main():
             try:
                 if key == pynput_keyboard.Key.up:
                     if policy.body_mode:
-                        policy.com_offset[2] = policy.com_trans_max   # Δz max (raise)
-                        print(f"com_offset Δz: {policy.com_offset[2]*100:.1f} cm  (raised to max)")
+                        policy.com_offset[0] = policy.com_trans_max   # Δz max (raise)
+                        print(f"com_offset Δz: {policy.com_offset[0]*100:.1f} cm  (raised to max)")
                     elif policy.head_mode:
                         policy.head_offset[1] = policy.head_max   # head_pitch up
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -603,8 +603,8 @@ def main():
                         policy.set_command(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
                     if policy.body_mode:
-                        policy.com_offset[2] = -policy.com_trans_max  # Δz min (lower)
-                        print(f"com_offset Δz: {policy.com_offset[2]*100:.1f} cm  (lowered to min)")
+                        policy.com_offset[0] = -policy.com_trans_max  # Δz min (lower)
+                        print(f"com_offset Δz: {policy.com_offset[0]*100:.1f} cm  (lowered to min)")
                     elif policy.head_mode:
                         policy.head_offset[1] = -policy.head_max  # head_pitch down
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -612,8 +612,8 @@ def main():
                         policy.set_command(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
                     if policy.body_mode:
-                        policy.com_offset[1] = -policy.com_trans_max  # Δy right
-                        print(f"com_offset Δy: {policy.com_offset[1]*100:.1f} cm  (lean right)")
+                        policy.com_offset[1] = -policy.com_rot_max  # Δroll right
+                        print(f"com_offset Δroll: {np.degrees(policy.com_offset[1]):.1f}°  (lean right)")
                     elif policy.head_mode:
                         policy.head_offset[2] = -policy.head_max  # head_yaw right
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -621,8 +621,8 @@ def main():
                         policy.set_command(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
                     if policy.body_mode:
-                        policy.com_offset[1] = policy.com_trans_max   # Δy left
-                        print(f"com_offset Δy: {policy.com_offset[1]*100:.1f} cm  (lean left)")
+                        policy.com_offset[1] = policy.com_rot_max   # Δroll left
+                        print(f"com_offset Δroll: {np.degrees(policy.com_offset[1]):.1f}°  (lean left)")
                     elif policy.head_mode:
                         policy.head_offset[2] = policy.head_max   # head_yaw left
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -644,8 +644,8 @@ def main():
                         policy.toggle_head_mode()
                     elif key.char == 'a' or key.char == 'A':
                         if policy.body_mode:
-                            policy.com_offset[4] = policy.com_rot_max   # Δpitch forward
-                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[4]):.1f}°  (lean forward)")
+                            policy.com_offset[2] = policy.com_rot_max   # Δpitch forward
+                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[2]):.1f}°  (lean forward)")
                         elif policy.head_mode:
                             policy.head_offset[3] = policy.head_max   # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -653,8 +653,8 @@ def main():
                             policy.set_command(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
                         if policy.body_mode:
-                            policy.com_offset[4] = -policy.com_rot_max  # Δpitch backward
-                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[4]):.1f}°  (lean backward)")
+                            policy.com_offset[2] = -policy.com_rot_max  # Δpitch backward
+                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[2]):.1f}°  (lean backward)")
                         elif policy.head_mode:
                             policy.head_offset[3] = -policy.head_max  # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
@@ -818,11 +818,10 @@ def main():
                             print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
                             cmd_start = 6+3*policy.n_joints
                             cmd_end = cmd_start + 3
-                            offset_end = cmd_end + 6
+                            offset_end = cmd_end + 3
                             print(f"  Vel cmd [{cmd_start}:{cmd_end}]:      {obs[cmd_start:cmd_end]}")
                             print(f"  com_offset [{cmd_end}:{offset_end}]:  {obs[cmd_end:offset_end]}")
-                            print(f"    Δx={obs[cmd_end]:.3f}m Δy={obs[cmd_end+1]:.3f}m Δz={obs[cmd_end+2]:.3f}m")
-                            print(f"    Δroll={np.degrees(obs[cmd_end+3]):.1f}° Δpitch={np.degrees(obs[cmd_end+4]):.1f}° Δyaw={np.degrees(obs[cmd_end+5]):.1f}°")
+                            print(f"    Δz={obs[cmd_end]:.3f} Δroll={obs[cmd_end+1]:.3f} Δpitch={obs[cmd_end+2]:.3f}  (normalized)")
                         print(f"\nAction output:")
                         print(f"  Raw action: {action}")
                         print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")

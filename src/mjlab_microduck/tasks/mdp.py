@@ -1659,7 +1659,7 @@ def reset_com_offset_cmd(
 ):
     """Reset CoM offset commands to zero at episode start."""
     if not hasattr(env, "_com_offset_cmd"):
-        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
+        env._com_offset_cmd = torch.zeros(env.num_envs, 3, device=env.device)
     if len(env_ids) > 0:
         env._com_offset_cmd[env_ids] = 0.0
 
@@ -1673,18 +1673,18 @@ def randomize_com_offset_cmd(
     """Sample new CoM offset commands at intervals.
 
     Args:
-        max_translation: Maximum translation offset in metres (±max for x, y, z).
-        max_rotation_rad: Maximum rotation offset in radians (±max for roll, pitch, yaw).
+        max_translation: Maximum height offset in metres (±max for Δz).
+        max_rotation_rad: Maximum rotation offset in radians (±max for Δroll, Δpitch).
     """
     if not hasattr(env, "_com_offset_cmd"):
-        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
+        env._com_offset_cmd = torch.zeros(env.num_envs, 3, device=env.device)
     if len(env_ids) == 0:
         return
 
     n = len(env_ids)
-    translation = (torch.rand(n, 3, device=env.device) * 2 - 1) * max_translation
-    rotation = (torch.rand(n, 3, device=env.device) * 2 - 1) * max_rotation_rad
-    env._com_offset_cmd[env_ids] = torch.cat([translation, rotation], dim=1)
+    dz    = (torch.rand(n, 1, device=env.device) * 2 - 1) * max_translation
+    droll_dpitch = (torch.rand(n, 2, device=env.device) * 2 - 1) * max_rotation_rad
+    env._com_offset_cmd[env_ids] = torch.cat([dz, droll_dpitch], dim=1)
 
 
 def com_offset_command_obs(
@@ -1692,22 +1692,19 @@ def com_offset_command_obs(
     max_translation: float = 0.025,
     max_rotation_rad: float = 0.349,
 ) -> torch.Tensor:
-    """Return normalized CoM offset commands as (num_envs, 6).
+    """Return normalized CoM offset commands as (num_envs, 3).
 
-    Normalizes translations by max_translation and rotations by max_rotation_rad so
-    the output spans [-1, 1] when commands are at their maximum.  This keeps the
-    translation dims (otherwise in metres, ~0.025) on the same scale as joint-angle
-    observations (~0-1 rad), preventing the first-layer weights for those inputs from
-    receiving near-zero gradients.
+    Order: [Δz (norm), Δroll (norm), Δpitch (norm)]
 
-    Order: [Δx, Δy, Δz (norm), Δroll, Δpitch, Δyaw (norm)]
+    Normalizes Δz by max_translation and Δroll/Δpitch by max_rotation_rad so the
+    output spans [-1, 1], keeping all dims on the same scale as joint-angle obs.
     """
     if not hasattr(env, "_com_offset_cmd"):
-        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
-    cmd = env._com_offset_cmd  # (N, 6)
+        env._com_offset_cmd = torch.zeros(env.num_envs, 3, device=env.device)
+    cmd = env._com_offset_cmd  # (N, 3): [Δz, Δroll, Δpitch]
     normalized = torch.empty_like(cmd)
-    normalized[:, :3] = cmd[:, :3] / max_translation
-    normalized[:, 3:] = cmd[:, 3:] / max_rotation_rad
+    normalized[:, 0:1] = cmd[:, 0:1] / max_translation
+    normalized[:, 1:]  = cmd[:, 1:]  / max_rotation_rad
     return normalized
 
 
@@ -1745,64 +1742,44 @@ def com_offset_tracking(
     nominal_height: float = 0.10,
     translation_std: float = 0.02,
     rotation_std: float = 0.2,
-    left_foot_site_idx: int = 1,
-    right_foot_site_idx: int = 2,
 ) -> torch.Tensor:
-    """Gaussian reward for tracking commanded CoM offset (position + orientation).
+    """Gaussian reward for tracking commanded CoM height + body orientation.
 
     Tracks:
-    - Z: CoM height vs nominal_height + Δz command
-    - XY: CoM position relative to foot centroid in body frame vs (Δx, Δy) command
-    - Orientation: base Euler angles [roll, pitch, yaw] vs (Δroll, Δpitch, Δyaw) commands
+    - Z (index 2): CoM height vs nominal_height + Δz command
+    - Roll (index 3): body roll vs Δroll command
+    - Pitch (index 4): body pitch vs Δpitch command
+
+    Indices 0 (Δx), 1 (Δy), 5 (Δyaw) are present in the obs but intentionally
+    not tracked here:
+    - Δx/Δy via foot-centroid displacement was removed because during walking one
+      foot is always airborne, shifting the centroid toward the stance foot and
+      producing a systematic lateral bias that causes one-sided leaning.
+    - Δyaw is the robot's heading, which changes continuously during turning.
 
     Returns a value in (0, 1]. Use with a positive weight.
     """
     asset: Entity = env.scene[asset_cfg.name]
 
     if not hasattr(env, "_com_offset_cmd"):
-        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
+        env._com_offset_cmd = torch.zeros(env.num_envs, 3, device=env.device)
 
-    com_offset = env._com_offset_cmd  # (N, 6): [Δx, Δy, Δz, Δroll, Δpitch, Δyaw]
+    com_offset = env._com_offset_cmd  # (N, 3): [Δz, Δroll, Δpitch]
 
     com_pos_w = asset.data.root_link_pos_w   # (N, 3) world frame
     quat_w = asset.data.root_link_quat_w     # (N, 4) [w, x, y, z]
 
-    # --- Z-height tracking (world frame) ---
-    com_z = com_pos_w[:, 2]
-    z_error = com_z - (nominal_height + com_offset[:, 2])
+    # --- Z-height tracking ---
+    z_error = com_pos_w[:, 2] - (nominal_height + com_offset[:, 0])
 
-    # --- XY lean tracking (body frame, relative to foot centroid) ---
-    site_xpos = asset.data.data.site_xpos   # (N, n_sites, 3)
-    left_foot_xy = site_xpos[:, left_foot_site_idx, :2]    # (N, 2) world XY
-    right_foot_xy = site_xpos[:, right_foot_site_idx, :2]  # (N, 2) world XY
-    foot_centroid_xy = (left_foot_xy + right_foot_xy) / 2  # (N, 2)
+    # --- Roll + pitch tracking ---
+    euler = _quat_to_euler_xyz(quat_w)          # (N, 3) [roll, pitch, yaw]
+    orient_error = euler[:, :2] - com_offset[:, 1:3]  # (N, 2) [roll_err, pitch_err]
 
-    horiz_disp_w = com_pos_w[:, :2] - foot_centroid_xy  # (N, 2) world XY offset
-
-    # Rotate horizontal displacement to body frame using only yaw
-    w, x, y, z = quat_w[:, 0], quat_w[:, 1], quat_w[:, 2], quat_w[:, 3]
-    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
-    cos_yaw = torch.cos(yaw)
-    sin_yaw = torch.sin(yaw)
-    horiz_disp_b_x = cos_yaw * horiz_disp_w[:, 0] + sin_yaw * horiz_disp_w[:, 1]
-    horiz_disp_b_y = -sin_yaw * horiz_disp_w[:, 0] + cos_yaw * horiz_disp_w[:, 1]
-
-    xy_error_x = horiz_disp_b_x - com_offset[:, 0]
-    xy_error_y = horiz_disp_b_y - com_offset[:, 1]
-
-    # --- Orientation tracking (roll + pitch only) ---
-    # We intentionally skip yaw: the robot's absolute heading changes continuously
-    # during turning and has no meaningful "zero" reference, so including it would
-    # directly conflict with angular-velocity tracking (turning commands).
-    euler = _quat_to_euler_xyz(quat_w)   # (N, 3) [roll, pitch, yaw]
-    orient_error = euler[:, :2] - com_offset[:, 3:5]  # (N, 2) [roll_err, pitch_err]
-
-    # --- Combined reward ---
-    trans_sq = z_error ** 2 + xy_error_x ** 2 + xy_error_y ** 2
+    trans_sq = z_error ** 2
     rot_sq = torch.sum(orient_error ** 2, dim=1)
 
-    reward = torch.exp(-trans_sq / translation_std ** 2) * torch.exp(-rot_sq / rotation_std ** 2)
-    return reward
+    return torch.exp(-trans_sq / translation_std ** 2) * torch.exp(-rot_sq / rotation_std ** 2)
 
 
 def com_offset_curriculum(
