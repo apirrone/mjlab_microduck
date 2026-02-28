@@ -14,13 +14,13 @@ ENABLE_VELOCITY_PUSHES = True  # Velocity-based pushes for robustness training
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True  # Simulates mounting errors
 ENABLE_BASE_ORIENTATION_RANDOMIZATION = False  # Randomize initial tilt to force reactive behavior
 ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion robustness
-ENABLE_Z_HEIGHT_CONTROL = True  # Commanded CoM height (crouching) at zero velocity
+ENABLE_COM_OFFSET_CONTROL = True  # CoM offset commands (x,y,z translation + rotation)
 
-# Z-height (crouch) control parameters
-Z_HEIGHT_NOMINAL = 0.10  # Normal standing CoM height (m)
-Z_HEIGHT_MIN = 0.06      # Lowest crouch (4 cm below nominal — enough to dip the head)
-Z_HEIGHT_MAX = 0.12      # Slightly raised stance
-Z_HEIGHT_INTERVAL_S = (3.0, 7.0)  # Sample new height target every 3–7 s
+# CoM offset control parameters
+COM_OFFSET_NOMINAL_HEIGHT = 0.10  # Nominal CoM height above ground (m)
+COM_OFFSET_MAX_TRANSLATION = 0.025  # ±2.5 cm max translation command
+COM_OFFSET_MAX_ROTATION_DEG = 20.0  # ±20° max rotation command
+COM_OFFSET_INTERVAL_S = (2.0, 5.0)  # Sample new offset every 2–5 seconds
 
 # Neck offset randomization parameters
 NECK_OFFSET_MAX_ANGLE = 0.3
@@ -73,16 +73,15 @@ def make_microduck_velocity_env_cfg(
     """Create Microduck velocity tracking environment configuration."""
 
     std_standing = {
-        # Lower body — lateral joints tight (no lateral lean), sagittal joints relaxed
-        # so the robot can freely crouch when a z_height command is given.
-        # Tight std → strong restoring force → prevents crouching.
-        # Sagittal joints (hip_pitch, knee, ankle) must be loose enough that
-        # the height-tracking reward (~4.0 weight) can overcome the pose penalty.
+        # Lower body — lateral joints tight (no lateral lean when not commanded).
+        # Sagittal joints (hip_pitch, knee, ankle) kept loose so the robot can
+        # flex to follow commanded height (Δz) and lean (Δx/Δy) offsets.
+        # Tight std → strong restoring force → fights against com_offset_tracking.
         r".*hip_yaw.*": 0.1,
         r".*hip_roll.*": 0.1,
-        r".*hip_pitch.*": 0.5,   # relaxed from 0.15 — knee flex needed for crouching
-        r".*knee.*": 0.5,        # relaxed from 0.15 — main joint for height control
-        r".*ankle.*": 0.3,       # relaxed from 0.1  — assists height modulation
+        r".*hip_pitch.*": 0.5,   # loose — allows leaning forward/backward (Δx, Δpitch)
+        r".*knee.*": 0.5,        # loose — allows height changes (Δz)
+        r".*ankle.*": 0.3,       # loose — assists height and lean modulation
         r".*neck.*": 0.1,
         r".*head.*": 0.1,
     }
@@ -266,23 +265,21 @@ def make_microduck_velocity_env_cfg(
     # func=microduck_mdp.neck_joint_vel_l2, weight=-0.1
     # )
 
-    # CoM height tracking — replaces the old fixed-range com_height_target.
-    # When walking, tracks the nominal height (same behaviour as before).
-    # When standing with a z_height command active, tracks the commanded height
-    # so the robot learns to crouch on demand.
-    # Weight must dominate the pose-reward penalty for crouched leg positions:
-    # at weight=4.0 and std=0.015, the gradient at 3 cm error ≈ +3.9 (gain),
-    # while relaxed std_standing (0.5) means pose penalty ≈ −0.9 (loss) → net +3.
-    cfg.rewards["com_height_tracking"] = RewardTermCfg(
-        func=microduck_mdp.com_height_tracking,
-        weight=4.0,
-        params={
-            "command_name": "twist",
-            "command_threshold": 0.01,
-            "nominal_height": Z_HEIGHT_NOMINAL,
-            "height_std": 0.015,  # tight: half-reward at 1.5 cm error
-        },
-    )
+    # CoM offset tracking — rewards the robot for following commanded 6D body offsets
+    # (Δx, Δy, Δz translation + Δroll, Δpitch, Δyaw rotation).
+    # With zero commands (first 2000 iterations) this acts as a posture-maintenance
+    # reward: keeps nominal height and upright orientation.
+    # Weight starts low and ramps up via curriculum once offset commands activate.
+    if ENABLE_COM_OFFSET_CONTROL:
+        cfg.rewards["com_offset_tracking"] = RewardTermCfg(
+            func=microduck_mdp.com_offset_tracking,
+            weight=0.5,  # updated by com_offset_weight curriculum
+            params={
+                "nominal_height": COM_OFFSET_NOMINAL_HEIGHT,
+                "translation_std": 0.02,  # 2 cm: half-reward at 2 cm error
+                "rotation_std": 0.2,      # ~11°: half-reward at ~11° error
+            },
+        )
 
     # === SURVIVAL REWARD (applies to all tasks) ===
     # Critical baseline reward for staying alive
@@ -317,27 +314,20 @@ def make_microduck_velocity_env_cfg(
         mode="reset",
     )
 
-    # Z-height (crouch) command: train the robot to modulate its CoM height on demand
-    if ENABLE_Z_HEIGHT_CONTROL:
-        cfg.events["reset_z_height_cmd"] = EventTermCfg(
-            func=microduck_mdp.reset_z_height_cmd,
+    # CoM offset commands: 6D body control (Δx,Δy,Δz + Δroll,Δpitch,Δyaw)
+    # Range starts at 0 and ramps up via curriculum after walking is established.
+    if ENABLE_COM_OFFSET_CONTROL:
+        cfg.events["reset_com_offset_cmd"] = EventTermCfg(
+            func=microduck_mdp.reset_com_offset_cmd,
             mode="reset",
-            params={
-                "height_min": Z_HEIGHT_MIN,
-                "height_max": Z_HEIGHT_MAX,
-                "nominal_height": Z_HEIGHT_NOMINAL,
-            },
         )
-        cfg.events["randomize_z_height_cmd"] = EventTermCfg(
-            func=microduck_mdp.randomize_z_height_cmd,
+        cfg.events["randomize_com_offset_cmd"] = EventTermCfg(
+            func=microduck_mdp.randomize_com_offset_cmd,
             mode="interval",
-            interval_range_s=Z_HEIGHT_INTERVAL_S,
+            interval_range_s=COM_OFFSET_INTERVAL_S,
             params={
-                "command_name": "twist",
-                "command_threshold": 0.01,
-                "height_min": Z_HEIGHT_MIN,
-                "height_max": Z_HEIGHT_MAX,
-                "nominal_height": Z_HEIGHT_NOMINAL,
+                "max_translation": 0.0,   # updated by com_offset_magnitude curriculum
+                "max_rotation_rad": 0.0,  # updated by com_offset_magnitude curriculum
             },
         )
 
@@ -513,21 +503,13 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
-    # Z-height command observation (1D scalar: target CoM height in metres)
-    # Appended to the policy observation so the policy can condition its leg
-    # behaviour on the current crouch target.
-    if ENABLE_Z_HEIGHT_CONTROL:
-        cfg.observations["policy"].terms["z_height_cmd"] = ObservationTermCfg(
-            func=microduck_mdp.z_height_command_obs,
-            scale=1.0,
-            params={"nominal_height": Z_HEIGHT_NOMINAL},
-        )
-        # Current CoM height — privileged info for the critic only.
-        # The critic uses it to compute better advantage estimates during training.
-        # The actor infers height from joint positions (which encode it implicitly),
-        # so no FK is needed at deployment on the real robot.
-        cfg.observations["critic"].terms["com_height"] = ObservationTermCfg(
-            func=microduck_mdp.com_height_obs,
+    # CoM offset command observation (6D: Δx,Δy,Δz in m, Δroll,Δpitch,Δyaw in rad)
+    # Appended to the policy observation so the policy can condition body posture
+    # on the commanded offset. No privileged info needed — the policy infers
+    # current position/orientation from joint_pos + IMU feedback.
+    if ENABLE_COM_OFFSET_CONTROL:
+        cfg.observations["policy"].terms["com_offset_cmd"] = ObservationTermCfg(
+            func=microduck_mdp.com_offset_command_obs,
             scale=1.0,
         )
 
@@ -648,6 +630,33 @@ def make_microduck_velocity_env_cfg(
                     {"step": 500 * 24,   "max_offset": 0.1},
                     {"step": 750 * 24,  "max_offset": 0.2},
                     {"step": 1000 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
+                ],
+            },
+        )
+
+    # CoM offset curriculum — activate after walking is established (~2000 iters)
+    if ENABLE_COM_OFFSET_CONTROL:
+        # Ramp up reward weight alongside offset range activation
+        cfg.curriculum["com_offset_weight"] = CurriculumTermCfg(
+            func=mdp.reward_weight,
+            params={
+                "reward_name": "com_offset_tracking",
+                "weight_stages": [
+                    {"step": 0,           "weight": 0.5},  # posture maintenance from start
+                    {"step": 2000 * 24,   "weight": 1.5},  # ramp up as commands activate
+                    {"step": 3000 * 24,   "weight": 2.0},  # full weight at full range
+                ],
+            },
+        )
+        # Gradually unlock the offset command range
+        cfg.curriculum["com_offset_magnitude"] = CurriculumTermCfg(
+            func=microduck_mdp.com_offset_curriculum,
+            params={
+                "event_name": "randomize_com_offset_cmd",
+                "offset_stages": [
+                    {"step": 0,           "max_translation": 0.0,                   "max_rotation_deg": 0.0},
+                    {"step": 2000 * 24,   "max_translation": 0.01,                  "max_rotation_deg": 5.0},
+                    {"step": 3000 * 24,   "max_translation": COM_OFFSET_MAX_TRANSLATION, "max_rotation_deg": COM_OFFSET_MAX_ROTATION_DEG},
                 ],
             },
         )

@@ -16,10 +16,11 @@ MICRODUCK_XML = "src/mjlab_microduck/robot/microduck/scene.xml"
 # This is the reference pose that:
 # - Actions are offsets from (motor_target = DEFAULT_POSE + action * scale)
 # - Joint observations are relative to (obs_joint_pos = current_pos - DEFAULT_POSE)
-# Z-height (crouch) control — must match training config
-Z_HEIGHT_NOMINAL = 0.10  # Normal standing CoM height (m)  — must match training
-Z_HEIGHT_MIN = 0.06      # Lowest crouch (m)               — must match training
-Z_HEIGHT_MAX = 0.12      # Highest stance (m)               — must match training
+
+# CoM offset control constants — must match training config (COM_OFFSET_* in env cfg)
+COM_OFFSET_NOMINAL_HEIGHT = 0.10   # Nominal CoM height above ground (m)
+COM_OFFSET_MAX_TRANSLATION = 0.025  # ±2.5 cm max translation
+COM_OFFSET_MAX_ROTATION_DEG = 20.0  # ±20° max rotation
 
 DEFAULT_POSE = np.array([
     0.0,   # left_hip_yaw
@@ -122,9 +123,12 @@ class PolicyInference:
         self.head_offset = np.zeros(4, dtype=np.float32)
         self.head_max = 1.5  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
 
-        # Height control mode
-        self.height_mode = False
-        self.z_height_cmd = Z_HEIGHT_NOMINAL  # Current commanded CoM height (m)
+        # Body (CoM offset) control mode
+        self.body_mode = False
+        # CoM offset command [Δx, Δy, Δz (m), Δroll, Δpitch, Δyaw (rad)] — appended to obs
+        self.com_offset = np.zeros(6, dtype=np.float32)
+        self.com_trans_max = COM_OFFSET_MAX_TRANSLATION
+        self.com_rot_max = COM_OFFSET_MAX_ROTATION_DEG * np.pi / 180.0
 
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
@@ -231,10 +235,6 @@ class PolicyInference:
         world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         return self.quat_rotate_inverse(quat, world_gravity)
 
-    def get_com_height(self):
-        """Get current CoM (trunk_base) height from MuJoCo world frame."""
-        return float(self.data.xpos[self.trunk_base_id, 2])
-
     def get_base_ang_vel(self):
         """Get base angular velocity from IMU gyro sensor.
 
@@ -286,8 +286,8 @@ class PolicyInference:
         4. joint_vel (14D) - relative to default (zero)
         5. actions (14D) - last action
         6. command (3D) - velocity command
-        7. z_height_cmd (1D) - commanded CoM height
-        Total: 52D
+        7. com_offset_cmd (6D) - [Δx,Δy,Δz (m), Δroll,Δpitch,Δyaw (rad)]
+        Total: 57D
 
         Order for imitation task (use_imitation=True):
         1. command (3D) - velocity command
@@ -339,8 +339,8 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
-            # Commanded CoM height - 1D
-            obs.append(np.array([self.z_height_cmd], dtype=np.float32))
+            # CoM offset command [Δx, Δy, Δz, Δroll, Δpitch, Δyaw] - 6D
+            obs.append(self.com_offset)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
@@ -349,24 +349,25 @@ class PolicyInference:
         """Toggle head control mode on/off."""
         self.head_mode = not self.head_mode
         if self.head_mode:
-            self.height_mode = False  # mutually exclusive
+            self.body_mode = False  # mutually exclusive
             print("Head mode: ON")
             print(f"  UP/DOWN: head_pitch  |  LEFT/RIGHT: head_yaw  |  A/E: head_roll  |  SPACE: reset  (max ±{self.head_max:.2f} rad)")
         else:
             print("Head mode: OFF  (arrows and A/E back to velocity control)")
 
-    def toggle_height_mode(self):
-        """Toggle height (crouch) control mode on/off."""
-        self.height_mode = not self.height_mode
-        if self.height_mode:
+    def toggle_body_mode(self):
+        """Toggle CoM offset (body) control mode on/off."""
+        self.body_mode = not self.body_mode
+        if self.body_mode:
             self.head_mode = False  # mutually exclusive
-            # Zero velocity so the robot stands still while crouching
-            self.command[:] = 0.0
-            print("Height mode: ON  (velocity zeroed)")
-            print(f"  UP: raise to max ({Z_HEIGHT_MAX:.2f} m)  |  DOWN: crouch to min ({Z_HEIGHT_MIN:.2f} m)  |  SPACE: nominal ({Z_HEIGHT_NOMINAL:.2f} m)")
-            print(f"  Current: {self.z_height_cmd:.3f} m")
+            print("Body mode: ON  (CoM offset control)")
+            print(f"  UP/DOWN:    Δz ±{self.com_trans_max*100:.1f} cm  (raise/lower CoM)")
+            print(f"  LEFT/RIGHT: Δy ±{self.com_trans_max*100:.1f} cm  (lean left/right)")
+            print(f"  A / E:      Δpitch ±{COM_OFFSET_MAX_ROTATION_DEG:.0f}°  (lean forward/backward)")
+            print(f"  SPACE:      reset all offsets to zero")
+            print(f"  Current com_offset: {self.com_offset}")
         else:
-            print(f"Height mode: OFF  (current height cmd kept at {self.z_height_cmd:.3f} m)")
+            print(f"Body mode: OFF  (com_offset kept at {self.com_offset})")
 
     def set_command(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
         """Set velocity command and switch policy if needed."""
@@ -534,9 +535,9 @@ def main():
         expected_obs_size = 3 + 2 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
         breakdown = f"3(command) + 2(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
     else:
-        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3) + z_height(1)
-        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3 + 1
-        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command) + 1(z_height)"
+        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3) + com_offset(6)
+        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3 + 6
+        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(vel_cmd) + 6(com_offset_cmd)"
 
     if test_obs.size != expected_obs_size:
         print(f"\nWARNING: Observation size mismatch!")
@@ -589,60 +590,72 @@ def main():
         def on_press(key):
             try:
                 if key == pynput_keyboard.Key.up:
-                    if policy.height_mode:
-                        policy.z_height_cmd = Z_HEIGHT_MAX
-                        print(f"Height cmd: {policy.z_height_cmd:.3f} m  (raised to max)")
+                    if policy.body_mode:
+                        policy.com_offset[2] = policy.com_trans_max   # Δz max (raise)
+                        print(f"com_offset Δz: {policy.com_offset[2]*100:.1f} cm  (raised to max)")
                     elif policy.head_mode:
                         policy.head_offset[1] = policy.head_max   # head_pitch up
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
                     else:
                         policy.set_command(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
-                    if policy.height_mode:
-                        policy.z_height_cmd = Z_HEIGHT_MIN
-                        print(f"Height cmd: {policy.z_height_cmd:.3f} m  (crouched to min)")
+                    if policy.body_mode:
+                        policy.com_offset[2] = -policy.com_trans_max  # Δz min (lower)
+                        print(f"com_offset Δz: {policy.com_offset[2]*100:.1f} cm  (lowered to min)")
                     elif policy.head_mode:
                         policy.head_offset[1] = -policy.head_max  # head_pitch down
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
                     else:
                         policy.set_command(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
-                    if policy.head_mode:
+                    if policy.body_mode:
+                        policy.com_offset[1] = -policy.com_trans_max  # Δy right
+                        print(f"com_offset Δy: {policy.com_offset[1]*100:.1f} cm  (lean right)")
+                    elif policy.head_mode:
                         policy.head_offset[2] = -policy.head_max  # head_yaw right
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
-                    elif not policy.height_mode:
+                    else:
                         policy.set_command(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
-                    if policy.head_mode:
+                    if policy.body_mode:
+                        policy.com_offset[1] = policy.com_trans_max   # Δy left
+                        print(f"com_offset Δy: {policy.com_offset[1]*100:.1f} cm  (lean left)")
+                    elif policy.head_mode:
                         policy.head_offset[2] = policy.head_max   # head_yaw left
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
-                    elif not policy.height_mode:
+                    else:
                         policy.set_command(0.0, 0.5, 0.0)
                 elif key == pynput_keyboard.Key.space:
-                    if policy.height_mode:
-                        policy.z_height_cmd = Z_HEIGHT_NOMINAL
-                        print(f"Height cmd reset to nominal: {Z_HEIGHT_NOMINAL:.3f} m")
+                    if policy.body_mode:
+                        policy.com_offset[:] = 0.0
+                        print("com_offset reset to zero")
                     elif policy.head_mode:
                         policy.head_offset[:] = 0.0
                         print("Head offset reset to zero")
                     else:
                         policy.set_command(0.0, 0.0, 0.0)
                 elif hasattr(key, 'char'):
-                    if key.char == 'j' or key.char == 'J':
-                        policy.toggle_height_mode()
+                    if key.char == 'b' or key.char == 'B':
+                        policy.toggle_body_mode()
                     elif key.char == 'h' or key.char == 'H':
                         policy.toggle_head_mode()
                     elif key.char == 'a' or key.char == 'A':
-                        if policy.head_mode:
+                        if policy.body_mode:
+                            policy.com_offset[4] = policy.com_rot_max   # Δpitch forward
+                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[4]):.1f}°  (lean forward)")
+                        elif policy.head_mode:
                             policy.head_offset[3] = policy.head_max   # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
-                        elif not policy.height_mode:
+                        else:
                             policy.set_command(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
-                        if policy.head_mode:
+                        if policy.body_mode:
+                            policy.com_offset[4] = -policy.com_rot_max  # Δpitch backward
+                            print(f"com_offset Δpitch: {np.degrees(policy.com_offset[4]):.1f}°  (lean backward)")
+                        elif policy.head_mode:
                             policy.head_offset[3] = -policy.head_max  # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
-                        elif not policy.height_mode:
+                        else:
                             policy.set_command(0.0, 0.0, -4.0)
             except Exception as e:
                 print(f"Key press error: {e}")
@@ -661,10 +674,11 @@ def main():
         print("  LEFT/RIGHT arrow: head_yaw ±max rad")
         print("  A / E:            head_roll ±max rad")
         print("  SPACE:            reset head offset to zero")
-        print("  [ Height mode — press J to toggle (zeros velocity) ]")
-        print(f"  UP arrow:         raise to max ({Z_HEIGHT_MAX:.2f} m)")
-        print(f"  DOWN arrow:       crouch to min ({Z_HEIGHT_MIN:.2f} m)")
-        print(f"  SPACE:            reset to nominal ({Z_HEIGHT_NOMINAL:.2f} m)")
+        print("  [ Body mode — press B to toggle ]")
+        print(f"  UP/DOWN arrow:    Δz ±{COM_OFFSET_MAX_TRANSLATION*100:.1f} cm  (raise/lower CoM)")
+        print(f"  LEFT/RIGHT arrow: Δy ±{COM_OFFSET_MAX_TRANSLATION*100:.1f} cm  (lean left/right)")
+        print(f"  A / E:            Δpitch ±{COM_OFFSET_MAX_ROTATION_DEG:.0f}°  (lean forward/backward)")
+        print(f"  SPACE:            reset all com_offset to zero")
         print("\nNote: Keyboard listener captures keys system-wide")
 
     except ImportError:
@@ -793,7 +807,7 @@ def main():
                             print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
                             print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
                         else:
-                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command, z_height
+                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, vel_cmd, com_offset
                             print(f"  Ang vel [0:3]:        {obs[0:3]}")
                             print(f"  Proj grav [3:6]:      {obs[3:6]}")
                             print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
@@ -801,8 +815,11 @@ def main():
                             print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
                             cmd_start = 6+3*policy.n_joints
                             cmd_end = cmd_start + 3
-                            print(f"  Command [{cmd_start}:{cmd_end}]:      {obs[cmd_start:cmd_end]}")
-                            print(f"  Z height cmd [{cmd_end}]:   {obs[cmd_end]:.4f} m")
+                            offset_end = cmd_end + 6
+                            print(f"  Vel cmd [{cmd_start}:{cmd_end}]:      {obs[cmd_start:cmd_end]}")
+                            print(f"  com_offset [{cmd_end}:{offset_end}]:  {obs[cmd_end:offset_end]}")
+                            print(f"    Δx={obs[cmd_end]:.3f}m Δy={obs[cmd_end+1]:.3f}m Δz={obs[cmd_end+2]:.3f}m")
+                            print(f"    Δroll={np.degrees(obs[cmd_end+3]):.1f}° Δpitch={np.degrees(obs[cmd_end+4]):.1f}° Δyaw={np.degrees(obs[cmd_end+5]):.1f}°")
                         print(f"\nAction output:")
                         print(f"  Raw action: {action}")
                         print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")

@@ -1653,132 +1653,169 @@ def randomize_base_orientation(
     env.sim.data.qpos[env_ids, root_quat_idx:root_quat_idx+4] = new_quat
 
 
-def reset_z_height_cmd(
+def reset_com_offset_cmd(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
-    height_min: float = 0.06,
-    height_max: float = 0.12,
-    nominal_height: float = 0.10,
 ):
-    """Randomise commanded CoM height at episode start.
-
-    Walking environments ignore the command (their height target stays nominal
-    inside com_height_tracking), so it is safe to randomise for all reset envs.
-    Randomising at reset (not only at intervals) gives the policy diverse height
-    targets from the very first timestep of every episode.
-    """
-    if not hasattr(env, "_z_height_cmd"):
-        env._z_height_cmd = torch.full(
-            (env.num_envs,), nominal_height, device=env.device
-        )
+    """Reset CoM offset commands to zero at episode start."""
+    if not hasattr(env, "_com_offset_cmd"):
+        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
     if len(env_ids) > 0:
-        rand_heights = (
-            torch.rand(len(env_ids), device=env.device) * (height_max - height_min)
-            + height_min
-        )
-        env._z_height_cmd[env_ids] = rand_heights
+        env._com_offset_cmd[env_ids] = 0.0
 
 
-def randomize_z_height_cmd(
+def randomize_com_offset_cmd(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
-    command_name: str = "twist",
-    command_threshold: float = 0.01,
-    height_min: float = 0.07,
-    height_max: float = 0.11,
-    nominal_height: float = 0.10,
+    max_translation: float = 0.0,
+    max_rotation_rad: float = 0.0,
 ):
-    """Sample a new target CoM height at intervals.
+    """Sample new CoM offset commands at intervals.
 
-    Only randomises heights for environments that are currently in standing mode
-    (velocity command below threshold). Walking environments are reset to the
-    nominal height so the transition from standing back to walking is smooth.
+    Args:
+        max_translation: Maximum translation offset in metres (±max for x, y, z).
+        max_rotation_rad: Maximum rotation offset in radians (±max for roll, pitch, yaw).
     """
-    if not hasattr(env, "_z_height_cmd"):
-        env._z_height_cmd = torch.full(
-            (env.num_envs,), nominal_height, device=env.device
-        )
+    if not hasattr(env, "_com_offset_cmd"):
+        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
     if len(env_ids) == 0:
         return
 
-    command = env.command_manager.get_command(command_name)
-    total_speed = (
-        torch.norm(command[env_ids, :2], dim=1) + torch.abs(command[env_ids, 2])
-    )
-    is_standing = total_speed < command_threshold
-
-    # Random height for standing envs, nominal for walking envs
-    rand_heights = (
-        torch.rand(len(env_ids), device=env.device) * (height_max - height_min)
-        + height_min
-    )
-    env._z_height_cmd[env_ids] = torch.where(
-        is_standing, rand_heights, torch.full_like(rand_heights, nominal_height)
-    )
+    n = len(env_ids)
+    translation = (torch.rand(n, 3, device=env.device) * 2 - 1) * max_translation
+    rotation = (torch.rand(n, 3, device=env.device) * 2 - 1) * max_rotation_rad
+    env._com_offset_cmd[env_ids] = torch.cat([translation, rotation], dim=1)
 
 
-def z_height_command_obs(
-    env: ManagerBasedRlEnv,
-    nominal_height: float = 0.10,
-) -> torch.Tensor:
-    """Return the current commanded CoM height as a (num_envs, 1) observation."""
-    if not hasattr(env, "_z_height_cmd"):
-        env._z_height_cmd = torch.full(
-            (env.num_envs,), nominal_height, device=env.device
-        )
-    return env._z_height_cmd.unsqueeze(1)
+def com_offset_command_obs(env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Return CoM offset commands as a (num_envs, 6) observation.
+
+    Order: [Δx, Δy, Δz (metres), Δroll, Δpitch, Δyaw (radians)]
+    """
+    if not hasattr(env, "_com_offset_cmd"):
+        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
+    return env._com_offset_cmd
 
 
-def com_height_obs(
+def _quat_to_euler_xyz(quat: torch.Tensor) -> torch.Tensor:
+    """Convert quaternion [w, x, y, z] to Euler angles [roll, pitch, yaw] (XYZ convention).
+
+    Args:
+        quat: (num_envs, 4) quaternion tensor [w, x, y, z]
+
+    Returns:
+        (num_envs, 3) Euler angles [roll, pitch, yaw] in radians
+    """
+    w, x, y, z = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
+
+    # Roll (rotation around x-axis)
+    sinr_cosp = 2.0 * (w * x + y * z)
+    cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+    roll = torch.atan2(sinr_cosp, cosr_cosp)
+
+    # Pitch (rotation around y-axis)
+    sinp = torch.clamp(2.0 * (w * y - z * x), -1.0, 1.0)
+    pitch = torch.asin(sinp)
+
+    # Yaw (rotation around z-axis)
+    siny_cosp = 2.0 * (w * z + x * y)
+    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+    yaw = torch.atan2(siny_cosp, cosy_cosp)
+
+    return torch.stack([roll, pitch, yaw], dim=1)
+
+
+def com_offset_tracking(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
-) -> torch.Tensor:
-    """Return the current CoM (root link) height as a (num_envs, 1) observation.
-
-    Together with z_height_cmd this gives the policy explicit error feedback:
-        error = z_height_cmd - com_height
-    so it can learn a simple closed-loop height controller.
-    """
-    asset: Entity = env.scene[asset_cfg.name]
-    return asset.data.root_link_pos_w[:, 2:3]
-
-
-def com_height_tracking(
-    env: ManagerBasedRlEnv,
-    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
-    command_name: str = "twist",
-    command_threshold: float = 0.01,
     nominal_height: float = 0.10,
-    height_std: float = 0.025,
+    translation_std: float = 0.02,
+    rotation_std: float = 0.2,
+    left_foot_site_idx: int = 1,
+    right_foot_site_idx: int = 2,
 ) -> torch.Tensor:
-    """Gaussian reward for tracking the commanded CoM height.
+    """Gaussian reward for tracking commanded CoM offset (position + orientation).
 
-    When standing (velocity command near zero) the target is the value stored in
-    ``env._z_height_cmd`` (set by ``randomize_z_height_cmd``).  When walking the
-    target falls back to ``nominal_height`` so the reward acts the same as the
-    previous fixed-range ``com_height_target``.
+    Tracks:
+    - Z: CoM height vs nominal_height + Δz command
+    - XY: CoM position relative to foot centroid in body frame vs (Δx, Δy) command
+    - Orientation: base Euler angles [roll, pitch, yaw] vs (Δroll, Δpitch, Δyaw) commands
 
-    Returns a value in (0, 1] — use a positive weight.
+    Returns a value in (0, 1]. Use with a positive weight.
     """
     asset: Entity = env.scene[asset_cfg.name]
-    com_height = asset.data.root_link_pos_w[:, 2]
 
-    if not hasattr(env, "_z_height_cmd"):
-        env._z_height_cmd = torch.full(
-            (env.num_envs,), nominal_height, device=env.device
-        )
+    if not hasattr(env, "_com_offset_cmd"):
+        env._com_offset_cmd = torch.zeros(env.num_envs, 6, device=env.device)
 
-    command = env.command_manager.get_command(command_name)
-    total_speed = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
-    is_standing = total_speed < command_threshold
+    com_offset = env._com_offset_cmd  # (N, 6): [Δx, Δy, Δz, Δroll, Δpitch, Δyaw]
 
-    # Target: commanded height when standing, nominal when walking
-    target = torch.where(is_standing, env._z_height_cmd,
-                         torch.full_like(env._z_height_cmd, nominal_height))
+    com_pos_w = asset.data.root_link_pos_w   # (N, 3) world frame
+    quat_w = asset.data.root_link_quat_w     # (N, 4) [w, x, y, z]
 
-    height_error = com_height - target
-    reward = torch.exp(-height_error ** 2 / height_std ** 2)
+    # --- Z-height tracking (world frame) ---
+    com_z = com_pos_w[:, 2]
+    z_error = com_z - (nominal_height + com_offset[:, 2])
+
+    # --- XY lean tracking (body frame, relative to foot centroid) ---
+    site_xpos = asset.data.data.site_xpos   # (N, n_sites, 3)
+    left_foot_xy = site_xpos[:, left_foot_site_idx, :2]    # (N, 2) world XY
+    right_foot_xy = site_xpos[:, right_foot_site_idx, :2]  # (N, 2) world XY
+    foot_centroid_xy = (left_foot_xy + right_foot_xy) / 2  # (N, 2)
+
+    horiz_disp_w = com_pos_w[:, :2] - foot_centroid_xy  # (N, 2) world XY offset
+
+    # Rotate horizontal displacement to body frame using only yaw
+    w, x, y, z = quat_w[:, 0], quat_w[:, 1], quat_w[:, 2], quat_w[:, 3]
+    yaw = torch.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+    cos_yaw = torch.cos(yaw)
+    sin_yaw = torch.sin(yaw)
+    horiz_disp_b_x = cos_yaw * horiz_disp_w[:, 0] + sin_yaw * horiz_disp_w[:, 1]
+    horiz_disp_b_y = -sin_yaw * horiz_disp_w[:, 0] + cos_yaw * horiz_disp_w[:, 1]
+
+    xy_error_x = horiz_disp_b_x - com_offset[:, 0]
+    xy_error_y = horiz_disp_b_y - com_offset[:, 1]
+
+    # --- Orientation tracking (Euler angles) ---
+    euler = _quat_to_euler_xyz(quat_w)   # (N, 3) [roll, pitch, yaw]
+    orient_error = euler - com_offset[:, 3:6]  # (N, 3)
+
+    # --- Combined reward ---
+    trans_sq = z_error ** 2 + xy_error_x ** 2 + xy_error_y ** 2
+    rot_sq = torch.sum(orient_error ** 2, dim=1)
+
+    reward = torch.exp(-trans_sq / translation_std ** 2) * torch.exp(-rot_sq / rotation_std ** 2)
     return reward
+
+
+def com_offset_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    offset_stages: list,
+) -> torch.Tensor:
+    """Update CoM offset randomization range based on training progress.
+
+    Each stage: {"step": N, "max_translation": M_metres, "max_rotation_deg": D_degrees}
+    """
+    del env_ids  # Unused
+
+    assert event_name in env.cfg.events, f"Event '{event_name}' not found"
+    event_cfg = env.cfg.events[event_name]
+
+    current_translation = offset_stages[0]["max_translation"]
+    current_rotation_deg = offset_stages[0]["max_rotation_deg"]
+
+    for stage in offset_stages:
+        if env.common_step_counter > stage["step"]:
+            current_translation = stage["max_translation"]
+            current_rotation_deg = stage["max_rotation_deg"]
+
+    current_rotation_rad = current_rotation_deg * torch.pi / 180.0
+    event_cfg.params["max_translation"] = current_translation
+    event_cfg.params["max_rotation_rad"] = float(current_rotation_rad)
+
+    return torch.tensor([current_translation])
 
 
 class VelocityCommandCommandOnly(UniformVelocityCommand):
