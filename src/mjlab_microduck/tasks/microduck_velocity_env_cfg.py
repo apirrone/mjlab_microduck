@@ -298,6 +298,12 @@ def make_microduck_velocity_env_cfg(
         mode="reset",
     )
 
+    # Body command: reset to zero at episode start
+    cfg.events["reset_body_cmd"] = EventTermCfg(
+        func=microduck_mdp.reset_body_cmd,
+        mode="reset",
+    )
+
     # Neck offset randomization: randomly offset head joints to train robustness
     if ENABLE_NECK_OFFSET_RANDOMIZATION:
         cfg.events["reset_neck_offset"] = EventTermCfg(
@@ -469,6 +475,12 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms[gravity_term_name].noise = Unoise(n_min=-0.007, n_max=0.007)  # was 0.15
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
+
+    # Body command observation: [z_height, pitch, roll] — appended after velocity command
+    cfg.observations["policy"].terms["body_cmd"] = ObservationTermCfg(
+        func=microduck_mdp.body_cmd_observation,
+        scale=1.0,
+    )
 
     # Commands
     command: UniformVelocityCommandCfg = cfg.commands["twist"]

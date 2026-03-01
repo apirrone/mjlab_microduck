@@ -111,6 +111,9 @@ class PolicyInference:
         # Command (lin_vel_x, lin_vel_y, ang_vel_z)
         self.command = np.zeros(3, dtype=np.float32)
 
+        # Body pose command (z_height, pitch, roll) — appended after velocity command
+        self.body_cmd = np.zeros(3, dtype=np.float32)
+
         # Head control mode
         self.head_mode = False
         # Offsets added on top of policy output for neck joints [neck_pitch, head_pitch, head_yaw, head_roll]
@@ -325,6 +328,8 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
+            # Body pose command (z_height, pitch, roll) - 3D
+            obs.append(self.body_cmd)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
@@ -504,9 +509,9 @@ def main():
         expected_obs_size = 3 + 2 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
         breakdown = f"3(command) + 2(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
     else:
-        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3)
-        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
-        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)"
+        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3) + body_cmd(3)
+        expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3 + 3
+        breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command) + 3(body_cmd)"
 
     if test_obs.size != expected_obs_size:
         print(f"\nWARNING: Observation size mismatch!")
@@ -748,14 +753,17 @@ def main():
                             print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
                             print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
                         else:
-                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command
+                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command, body_cmd
                             print(f"  Ang vel [0:3]:        {obs[0:3]}")
                             print(f"  Proj grav [3:6]:      {obs[3:6]}")
                             print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
                             print(f"  Joint vel [{6+policy.n_joints}:{6+2*policy.n_joints}]:    {obs[6+policy.n_joints:6+2*policy.n_joints]}")
                             print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
-                            cmd_end = 6+3*policy.n_joints+3
-                            print(f"  Command [{6+3*policy.n_joints}:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
+                            cmd_start = 6+3*policy.n_joints
+                            cmd_end = cmd_start+3
+                            body_end = cmd_end+3
+                            print(f"  Command [{cmd_start}:{cmd_end}]:      {obs[cmd_start:cmd_end]}")
+                            print(f"  Body cmd [{cmd_end}:{body_end}]:    {obs[cmd_end:body_end]} (z_height, pitch, roll)")
                         print(f"\nAction output:")
                         print(f"  Raw action: {action}")
                         print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")

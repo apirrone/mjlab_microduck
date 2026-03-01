@@ -90,6 +90,31 @@ def randomize_neck_offset_target(
         ) * max_offset
 
 
+# ---------------------------------------------------------------------------
+# Body command observation (z_height, pitch, roll targets)
+# ---------------------------------------------------------------------------
+
+def reset_body_cmd(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+) -> None:
+    """Zero the body command tensor at episode start."""
+    if not hasattr(env, "_body_cmd"):
+        env._body_cmd = torch.zeros(env.num_envs, 3, device=env.device)
+    if len(env_ids) > 0:
+        env._body_cmd[env_ids] = 0.0
+
+
+def body_cmd_observation(env: ManagerBasedRlEnv) -> torch.Tensor:
+    """Return body pose commands [z_height, pitch, roll] as observation (num_envs, 3).
+
+    Values are zero until body commands are enabled/set externally.
+    """
+    if not hasattr(env, "_body_cmd"):
+        env._body_cmd = torch.zeros(env.num_envs, 3, device=env.device)
+    return env._body_cmd
+
+
 class ImitationRewardState:
     """State for tracking imitation reward computation"""
 
