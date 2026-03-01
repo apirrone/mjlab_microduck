@@ -91,7 +91,7 @@ def randomize_neck_offset_target(
 
 
 # ---------------------------------------------------------------------------
-# Body command observation (z_height, pitch, roll targets)
+# Body command: z_height offset, pitch, roll targets
 # ---------------------------------------------------------------------------
 
 def reset_body_cmd(
@@ -105,14 +105,110 @@ def reset_body_cmd(
         env._body_cmd[env_ids] = 0.0
 
 
-def body_cmd_observation(env: ManagerBasedRlEnv) -> torch.Tensor:
-    """Return body pose commands [z_height, pitch, roll] as observation (num_envs, 3).
+def randomize_body_cmd(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    max_z: float = 0.0,
+    max_pitch: float = 0.0,
+    max_roll: float = 0.0,
+) -> None:
+    """Sample random body pose commands for selected environments.
 
-    Values are zero until body commands are enabled/set externally.
+    Called as an interval event. Draws uniform targets in [-max, max] for each
+    of z_offset (m), pitch (rad), roll (rad).
     """
     if not hasattr(env, "_body_cmd"):
         env._body_cmd = torch.zeros(env.num_envs, 3, device=env.device)
-    return env._body_cmd
+    if len(env_ids) > 0:
+        n = len(env_ids)
+        env._body_cmd[env_ids, 0] = (torch.rand(n, device=env.device) * 2 - 1) * max_z
+        env._body_cmd[env_ids, 1] = (torch.rand(n, device=env.device) * 2 - 1) * max_pitch
+        env._body_cmd[env_ids, 2] = (torch.rand(n, device=env.device) * 2 - 1) * max_roll
+
+
+def body_cmd_observation(
+    env: ManagerBasedRlEnv,
+    max_z: float = 0.03,
+    max_angle: float = 0.349,  # ~20 deg
+) -> torch.Tensor:
+    """Return normalized body pose commands (num_envs, 3).
+
+    Output: [z_offset / max_z, pitch / max_angle, roll / max_angle]
+    Each dimension is in [-1, 1] at the curriculum maximum.
+    """
+    if not hasattr(env, "_body_cmd"):
+        env._body_cmd = torch.zeros(env.num_envs, 3, device=env.device)
+    out = torch.empty_like(env._body_cmd)
+    out[:, 0] = env._body_cmd[:, 0] / max_z
+    out[:, 1] = env._body_cmd[:, 1] / max_angle
+    out[:, 2] = env._body_cmd[:, 2] / max_angle
+    return out
+
+
+def body_cmd_tracking(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    nominal_height: float = 0.10,
+    z_std: float = 0.02,
+    angle_std: float = 0.1,
+) -> torch.Tensor:
+    """Reward tracking body pose commands [z_offset, pitch, roll].
+
+    Returns mean of three Gaussian rewards (z, pitch, roll), each in [0, 1].
+    """
+    if not hasattr(env, "_body_cmd"):
+        return torch.zeros(env.num_envs, device=env.device)
+
+    asset: Entity = env.scene[asset_cfg.name]
+
+    # Actual body state
+    z_actual = asset.data.root_link_pos_w[:, 2]
+    quat = asset.data.root_link_quat_w  # (num_envs, 4) [w, x, y, z]
+    w, x, y, z_q = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
+    roll_actual = torch.atan2(2.0 * (w * x + y * z_q), 1.0 - 2.0 * (x * x + y * y))
+    pitch_actual = torch.asin(torch.clamp(2.0 * (w * y - z_q * x), -1.0, 1.0))
+
+    # Targets: z_offset is relative to nominal standing height
+    z_target = nominal_height + env._body_cmd[:, 0]
+    pitch_target = env._body_cmd[:, 1]
+    roll_target = env._body_cmd[:, 2]
+
+    z_rew = torch.exp(-((z_actual - z_target) / z_std) ** 2)
+    pitch_rew = torch.exp(-((pitch_actual - pitch_target) / angle_std) ** 2)
+    roll_rew = torch.exp(-((roll_actual - roll_target) / angle_std) ** 2)
+
+    return (z_rew + pitch_rew + roll_rew) / 3.0
+
+
+def body_cmd_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    event_name: str,
+    reward_name: str,
+    stages: list[dict],
+) -> torch.Tensor:
+    """Update body command range and tracking reward weight by training stage.
+
+    Each stage dict: {"step", "max_z", "max_pitch", "max_roll", "reward_weight"}.
+    Updates the interval event params and the reward weight in-place.
+    """
+    del env_ids  # unused
+
+    assert event_name in env.cfg.events, f"Event '{event_name}' not found"
+    event_cfg = env.cfg.events[event_name]
+    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
+
+    current = stages[0]
+    for stage in stages:
+        if env.common_step_counter > stage["step"]:
+            current = stage
+
+    event_cfg.params["max_z"] = current["max_z"]
+    event_cfg.params["max_pitch"] = current["max_pitch"]
+    event_cfg.params["max_roll"] = current["max_roll"]
+    reward_term_cfg.weight = current["reward_weight"]
+
+    return torch.tensor([current["reward_weight"]])
 
 
 class ImitationRewardState:

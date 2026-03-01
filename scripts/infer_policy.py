@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import math
 import pickle
 import time
 import numpy as np
@@ -11,6 +12,13 @@ import mujoco.viewer
 import onnxruntime as ort
 
 MICRODUCK_XML = "src/mjlab_microduck/robot/microduck/scene.xml"
+
+# Body command normalization — must match BODY_CMD_MAX_Z / BODY_CMD_MAX_ANGLE_DEG in env cfg
+BODY_CMD_MAX_Z = 0.03
+BODY_CMD_MAX_ANGLE = math.radians(20.0)
+# Step size per key press in body control mode
+BODY_CMD_Z_STEP = 0.005          # 5 mm per press
+BODY_CMD_ANGLE_STEP = math.radians(3.0)  # 3° per press
 
 # Default pose used by the policy (legs flexed, standing position)
 # This is the reference pose that:
@@ -119,6 +127,9 @@ class PolicyInference:
         # Offsets added on top of policy output for neck joints [neck_pitch, head_pitch, head_yaw, head_roll]
         self.head_offset = np.zeros(4, dtype=np.float32)
         self.head_max = 1.5  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
+
+        # Body control mode (z_height, pitch, roll — fed into policy obs as body_cmd)
+        self.body_mode = False
 
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
@@ -328,20 +339,38 @@ class PolicyInference:
             # Velocity task: command comes last
             # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
-            # Body pose command (z_height, pitch, roll) - 3D
-            obs.append(self.body_cmd)
+            # Body pose command (normalized) - 3D: [z/max_z, pitch/max_angle, roll/max_angle]
+            body_cmd_norm = np.array([
+                self.body_cmd[0] / BODY_CMD_MAX_Z,
+                self.body_cmd[1] / BODY_CMD_MAX_ANGLE,
+                self.body_cmd[2] / BODY_CMD_MAX_ANGLE,
+            ], dtype=np.float32)
+            obs.append(body_cmd_norm)
 
         # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
 
     def toggle_head_mode(self):
-        """Toggle head control mode on/off."""
+        """Toggle head control mode on/off (mutually exclusive with body mode)."""
         self.head_mode = not self.head_mode
         if self.head_mode:
+            self.body_mode = False
             print("Head mode: ON")
             print(f"  UP/DOWN: head_pitch  |  LEFT/RIGHT: head_yaw  |  A/E: head_roll  |  SPACE: reset  (max ±{self.head_max:.2f} rad)")
         else:
             print("Head mode: OFF  (arrows and A/E back to velocity control)")
+
+    def toggle_body_mode(self):
+        """Toggle body control mode on/off (mutually exclusive with head mode)."""
+        self.body_mode = not self.body_mode
+        if self.body_mode:
+            self.head_mode = False
+            print("Body mode: ON")
+            print(f"  UP/DOWN: z_height ±{BODY_CMD_Z_STEP*100:.0f}mm  |  LEFT/RIGHT: roll ±{math.degrees(BODY_CMD_ANGLE_STEP):.0f}°  |  A/E: pitch ±{math.degrees(BODY_CMD_ANGLE_STEP):.0f}°  |  SPACE: reset")
+            print(f"  Ranges: z=[±{BODY_CMD_MAX_Z*100:.0f}mm]  pitch/roll=[±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°]")
+            print(f"  Current: z={self.body_cmd[0]*100:.1f}mm  pitch={math.degrees(self.body_cmd[1]):.1f}°  roll={math.degrees(self.body_cmd[2]):.1f}°")
+        else:
+            print("Body mode: OFF  (arrows and A/E back to velocity control)")
 
     def set_command(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
         """Set velocity command and switch policy if needed."""
@@ -567,45 +596,68 @@ def main():
                     if policy.head_mode:
                         policy.head_offset[1] = policy.head_max   # head_pitch up
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_mode:
+                        policy.body_cmd[0] = float(np.clip(policy.body_cmd[0] + BODY_CMD_Z_STEP, -BODY_CMD_MAX_Z, BODY_CMD_MAX_Z))
+                        print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                     else:
                         policy.set_command(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
                     if policy.head_mode:
                         policy.head_offset[1] = -policy.head_max  # head_pitch down
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_mode:
+                        policy.body_cmd[0] = float(np.clip(policy.body_cmd[0] - BODY_CMD_Z_STEP, -BODY_CMD_MAX_Z, BODY_CMD_MAX_Z))
+                        print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                     else:
                         policy.set_command(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
                     if policy.head_mode:
                         policy.head_offset[2] = -policy.head_max  # head_yaw right
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_mode:
+                        policy.body_cmd[2] = float(np.clip(policy.body_cmd[2] + BODY_CMD_ANGLE_STEP, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE))
+                        print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                     else:
                         policy.set_command(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
                     if policy.head_mode:
                         policy.head_offset[2] = policy.head_max   # head_yaw left
                         print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_mode:
+                        policy.body_cmd[2] = float(np.clip(policy.body_cmd[2] - BODY_CMD_ANGLE_STEP, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE))
+                        print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                     else:
                         policy.set_command(0.0, 0.5, 0.0)
                 elif key == pynput_keyboard.Key.space:
                     if policy.head_mode:
                         policy.head_offset[:] = 0.0
                         print("Head offset reset to zero")
+                    elif policy.body_mode:
+                        policy.body_cmd[:] = 0.0
+                        print("Body cmd reset to zero")
                     else:
                         policy.set_command(0.0, 0.0, 0.0)
                 elif hasattr(key, 'char'):
                     if key.char == 'h' or key.char == 'H':
                         policy.toggle_head_mode()
+                    elif key.char == 'b' or key.char == 'B':
+                        policy.toggle_body_mode()
                     elif key.char == 'a' or key.char == 'A':
                         if policy.head_mode:
                             policy.head_offset[3] = policy.head_max   # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        elif policy.body_mode:
+                            policy.body_cmd[1] = float(np.clip(policy.body_cmd[1] + BODY_CMD_ANGLE_STEP, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE))
+                            print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                         else:
                             policy.set_command(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
                         if policy.head_mode:
                             policy.head_offset[3] = -policy.head_max  # head_roll
                             print(f"Head offset: pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        elif policy.body_mode:
+                            policy.body_cmd[1] = float(np.clip(policy.body_cmd[1] - BODY_CMD_ANGLE_STEP, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE))
+                            print(f"Body cmd: z={policy.body_cmd[0]*100:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                         else:
                             policy.set_command(0.0, 0.0, -4.0)
             except Exception as e:
@@ -616,15 +668,20 @@ def main():
 
         print("\nKeyboard controls enabled:")
         print("  [ Velocity mode (default) ]")
-        print("  UP/DOWN arrow:   lin_vel_x ±0.5")
+        print("  UP/DOWN arrow:    lin_vel_x ±0.5")
         print("  LEFT/RIGHT arrow: lin_vel_y ±0.5")
-        print("  A / E:           ang_vel_z ±4.0")
-        print("  SPACE:           stop (all velocities = 0)")
+        print("  A / E:            ang_vel_z ±4.0")
+        print("  SPACE:            stop (all velocities = 0)")
         print("  [ Head mode — press H to toggle ]")
-        print("  UP/DOWN arrow:   head_pitch ±0.3 rad (max)")
-        print("  LEFT/RIGHT arrow: head_yaw ±0.3 rad (max)")
-        print("  A / E:           head_roll ±0.3 rad (max)")
-        print("  SPACE:           reset head offset to zero")
+        print("  UP/DOWN arrow:    head_pitch ±max")
+        print("  LEFT/RIGHT arrow: head_yaw ±max")
+        print("  A / E:            head_roll ±max")
+        print("  SPACE:            reset head offset to zero")
+        print("  [ Body mode — press B to toggle ]")
+        print(f"  UP/DOWN arrow:    z_height ±{BODY_CMD_Z_STEP*100:.0f}mm per press")
+        print(f"  LEFT/RIGHT arrow: roll ±{math.degrees(BODY_CMD_ANGLE_STEP):.0f}° per press")
+        print(f"  A / E:            pitch ±{math.degrees(BODY_CMD_ANGLE_STEP):.0f}° per press")
+        print("  SPACE:            reset body cmd to zero")
         print("\nNote: Keyboard listener captures keys system-wide")
 
     except ImportError:

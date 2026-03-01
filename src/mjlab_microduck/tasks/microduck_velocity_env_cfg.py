@@ -19,6 +19,15 @@ ENABLE_NECK_OFFSET_RANDOMIZATION = True  # Random neck offsets for head-motion r
 NECK_OFFSET_MAX_ANGLE = 0.3
 NECK_OFFSET_INTERVAL_S = (2.0, 5.0)  # Sample new random target every 2–5 seconds
 
+# Body command parameters (z_height offset, pitch, roll)
+# Phase 1 (0–3000 iter): tiny non-zero range keeps input weights alive, reward=0
+# Phase 2 (3000+ iter): growing range + growing reward weight
+BODY_CMD_NOMINAL_HEIGHT = 0.10       # nominal standing height (m)
+BODY_CMD_MAX_Z = 0.03                # final max z offset (m)
+BODY_CMD_MAX_ANGLE_DEG = 20.0        # final max pitch/roll (degrees)
+BODY_CMD_INTERVAL_S = (2.0, 5.0)    # resample interval (seconds)
+BODY_CMD_PHASE2_STEP = 3000         # iteration where phase 2 begins
+
 # Observation configuration
 USE_PROJECTED_GRAVITY = True  # If True, use projected gravity instead of raw accelerometer
 
@@ -303,6 +312,28 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.reset_body_cmd,
         mode="reset",
     )
+    # Body command: resample random targets at intervals (tiny range in phase 1)
+    cfg.events["randomize_body_cmd"] = EventTermCfg(
+        func=microduck_mdp.randomize_body_cmd,
+        mode="interval",
+        interval_range_s=BODY_CMD_INTERVAL_S,
+        params={
+            "max_z": 0.002,               # 2mm — keep input weights alive, weight=0
+            "max_pitch": math.radians(1.0),
+            "max_roll": math.radians(1.0),
+        },
+    )
+
+    # Body command tracking reward (weight=0 during phase 1)
+    cfg.rewards["body_cmd_tracking"] = RewardTermCfg(
+        func=microduck_mdp.body_cmd_tracking,
+        weight=0.0,
+        params={
+            "nominal_height": BODY_CMD_NOMINAL_HEIGHT,
+            "z_std": 0.02,
+            "angle_std": math.radians(10.0),
+        },
+    )
 
     # Neck offset randomization: randomly offset head joints to train robustness
     if ENABLE_NECK_OFFSET_RANDOMIZATION:
@@ -476,10 +507,14 @@ def make_microduck_velocity_env_cfg(
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)  # was 0.05
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)  # was 2.0
 
-    # Body command observation: [z_height, pitch, roll] — appended after velocity command
+    # Body command observation: normalized [z_offset/max_z, pitch/max_angle, roll/max_angle]
     cfg.observations["policy"].terms["body_cmd"] = ObservationTermCfg(
         func=microduck_mdp.body_cmd_observation,
         scale=1.0,
+        params={
+            "max_z": BODY_CMD_MAX_Z,
+            "max_angle": math.radians(BODY_CMD_MAX_ANGLE_DEG),
+        },
     )
 
     # Commands
@@ -541,18 +576,50 @@ def make_microduck_velocity_env_cfg(
         # },
     # )
 
-    # Gradually increase standing env fraction after walking is established
+    # Gradually increase standing env fraction after walking is established,
+    # then go 100% standing at phase 2 (all velocity commands zeroed).
     cfg.curriculum["standing_envs"] = CurriculumTermCfg(
         func=microduck_mdp.standing_envs_curriculum,
         params={
             "command_name": "twist",
             "standing_stages": [
-                {"step": 0,           "rel_standing_envs": 0.02},
-                {"step": 500 * 24,    "rel_standing_envs": 0.05},
-                {"step": 750 * 24,    "rel_standing_envs": 0.1},
-                {"step": 1000 * 24,   "rel_standing_envs": 0.15},
-                {"step": 1500 * 24,   "rel_standing_envs": 0.2},
-                {"step": 2000 * 24,   "rel_standing_envs": 0.25},
+                {"step": 0,                          "rel_standing_envs": 0.02},
+                {"step": 500 * 24,                   "rel_standing_envs": 0.05},
+                {"step": 750 * 24,                   "rel_standing_envs": 0.1},
+                {"step": 1000 * 24,                  "rel_standing_envs": 0.15},
+                {"step": 1500 * 24,                  "rel_standing_envs": 0.2},
+                {"step": 2000 * 24,                  "rel_standing_envs": 0.25},
+                # Phase 2: standing only — body control training begins
+                {"step": BODY_CMD_PHASE2_STEP * 24,  "rel_standing_envs": 1.0},
+            ],
+        },
+    )
+
+    # Body command curriculum: tiny range during phase 1 (weight=0), grows in phase 2
+    _max_angle = math.radians(BODY_CMD_MAX_ANGLE_DEG)
+    cfg.curriculum["body_cmd"] = CurriculumTermCfg(
+        func=microduck_mdp.body_cmd_curriculum,
+        params={
+            "event_name": "randomize_body_cmd",
+            "reward_name": "body_cmd_tracking",
+            "stages": [
+                # Phase 1: tiny range, weight=0 (input weights stay alive)
+                {"step": 0,
+                 "max_z": 0.002, "max_pitch": math.radians(1.0), "max_roll": math.radians(1.0),
+                 "reward_weight": 0.0},
+                # Phase 2: ramp up range and reward weight gently
+                {"step": (BODY_CMD_PHASE2_STEP + 0) * 24,
+                 "max_z": 0.005, "max_pitch": math.radians(2.0), "max_roll": math.radians(2.0),
+                 "reward_weight": 0.5},
+                {"step": (BODY_CMD_PHASE2_STEP + 500) * 24,
+                 "max_z": 0.010, "max_pitch": math.radians(5.0), "max_roll": math.radians(5.0),
+                 "reward_weight": 1.0},
+                {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,
+                 "max_z": 0.020, "max_pitch": math.radians(10.0), "max_roll": math.radians(10.0),
+                 "reward_weight": 1.5},
+                {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,
+                 "max_z": BODY_CMD_MAX_Z, "max_pitch": _max_angle, "max_roll": _max_angle,
+                 "reward_weight": 2.0},
             ],
         },
     )
