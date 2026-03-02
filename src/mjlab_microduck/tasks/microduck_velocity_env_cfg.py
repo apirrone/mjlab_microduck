@@ -624,11 +624,11 @@ def make_microduck_velocity_env_cfg(
         params={
             "event_name": "randomize_body_cmd",
             "range_stages": [
-                # Phase 1: small non-zero range to keep body_cmd input weights alive.
-                # No tracking reward → no incentive to follow, but weights receive gradient
-                # from other rewards and won't be zero when phase 2 starts.
+                # Phase 1: zero range — body_cmd obs stays [0,0,0], no effect on walking.
+                # Phase 2 compensates for dead input weights by starting with a large enough
+                # range that ignoring body_cmd causes a clear reward drop (weights adapt fast).
                 {"step": 0,
-                 "max_z": 0.005, "max_pitch": math.radians(2.0), "max_roll": math.radians(2.0)},
+                 "max_z": 0.0, "max_pitch": 0.0, "max_roll": 0.0},
                 # Phase 2: jump to medium range immediately — large enough that ignoring
                 # body_cmd causes a clear reward drop (gradient signal to wake up dead weights)
                 {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,
