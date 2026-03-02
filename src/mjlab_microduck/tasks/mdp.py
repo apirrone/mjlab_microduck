@@ -180,35 +180,33 @@ def body_cmd_tracking(
     return (z_rew + pitch_rew + roll_rew) / 3.0
 
 
-def body_cmd_curriculum(
+def body_cmd_range_curriculum(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
     event_name: str,
-    reward_name: str,
-    stages: list[dict],
+    range_stages: list[dict],
 ) -> torch.Tensor:
-    """Update body command range and tracking reward weight by training stage.
+    """Update body command randomization range by training stage.
 
-    Each stage dict: {"step", "max_z", "max_pitch", "max_roll", "reward_weight"}.
-    Updates the interval event params and the reward weight in-place.
+    Each stage dict: {"step", "max_z", "max_pitch", "max_roll"}.
+    Only updates the interval event params — reward weight is handled separately
+    via the base mdp.reward_weight curriculum.
     """
     del env_ids  # unused
 
     assert event_name in env.cfg.events, f"Event '{event_name}' not found"
     event_cfg = env.cfg.events[event_name]
-    reward_term_cfg = env.reward_manager.get_term_cfg(reward_name)
 
-    current = stages[0]
-    for stage in stages:
+    current = range_stages[0]
+    for stage in range_stages:
         if env.common_step_counter > stage["step"]:
             current = stage
 
     event_cfg.params["max_z"] = current["max_z"]
     event_cfg.params["max_pitch"] = current["max_pitch"]
     event_cfg.params["max_roll"] = current["max_roll"]
-    reward_term_cfg.weight = current["reward_weight"]
 
-    return torch.tensor([current["reward_weight"]])
+    return torch.tensor([current["max_z"]])
 
 
 class ImitationRewardState:

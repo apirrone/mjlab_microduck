@@ -595,31 +595,45 @@ def make_microduck_velocity_env_cfg(
         },
     )
 
-    # Body command curriculum: tiny range during phase 1 (weight=0), grows in phase 2
+    # Body command curriculum — split into two separate curricula to avoid
+    # relying on env.reward_manager.get_term_cfg (unverified API):
+    #   1. mdp.reward_weight  → updates body_cmd_tracking reward weight (same API as action_rate_weight)
+    #   2. body_cmd_range_curriculum → updates randomize_body_cmd event params
     _max_angle = math.radians(BODY_CMD_MAX_ANGLE_DEG)
-    cfg.curriculum["body_cmd"] = CurriculumTermCfg(
-        func=microduck_mdp.body_cmd_curriculum,
+
+    cfg.curriculum["body_cmd_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "body_cmd_tracking",
+            "weight_stages": [
+                # Phase 1: weight stays 0
+                {"step": 0,                                    "weight": 0.0},
+                # Phase 2: ramp up gently
+                {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,  "weight": 0.5},
+                {"step": (BODY_CMD_PHASE2_STEP + 500)  * 24,  "weight": 1.0},
+                {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,  "weight": 1.5},
+                {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,  "weight": 2.0},
+            ],
+        },
+    )
+
+    cfg.curriculum["body_cmd_range"] = CurriculumTermCfg(
+        func=microduck_mdp.body_cmd_range_curriculum,
         params={
             "event_name": "randomize_body_cmd",
-            "reward_name": "body_cmd_tracking",
-            "stages": [
-                # Phase 1: zero range, zero weight — body_cmd obs is always [0,0,0]
+            "range_stages": [
+                # Phase 1: zero range — body_cmd obs is always [0,0,0]
                 {"step": 0,
-                 "max_z": 0.0, "max_pitch": 0.0, "max_roll": 0.0,
-                 "reward_weight": 0.0},
-                # Phase 2: ramp up range and reward weight gently
-                {"step": (BODY_CMD_PHASE2_STEP + 0) * 24,
-                 "max_z": 0.005, "max_pitch": math.radians(2.0), "max_roll": math.radians(2.0),
-                 "reward_weight": 0.5},
-                {"step": (BODY_CMD_PHASE2_STEP + 500) * 24,
-                 "max_z": 0.010, "max_pitch": math.radians(5.0), "max_roll": math.radians(5.0),
-                 "reward_weight": 1.0},
+                 "max_z": 0.0, "max_pitch": 0.0, "max_roll": 0.0},
+                # Phase 2: grow range to match reward weight schedule
+                {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,
+                 "max_z": 0.005, "max_pitch": math.radians(2.0),  "max_roll": math.radians(2.0)},
+                {"step": (BODY_CMD_PHASE2_STEP + 500)  * 24,
+                 "max_z": 0.010, "max_pitch": math.radians(5.0),  "max_roll": math.radians(5.0)},
                 {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,
-                 "max_z": 0.020, "max_pitch": math.radians(10.0), "max_roll": math.radians(10.0),
-                 "reward_weight": 1.5},
+                 "max_z": 0.020, "max_pitch": math.radians(10.0), "max_roll": math.radians(10.0)},
                 {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,
-                 "max_z": BODY_CMD_MAX_Z, "max_pitch": _max_angle, "max_roll": _max_angle,
-                 "reward_weight": 2.0},
+                 "max_z": BODY_CMD_MAX_Z, "max_pitch": _max_angle, "max_roll": _max_angle},
             ],
         },
     )
