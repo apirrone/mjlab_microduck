@@ -325,13 +325,16 @@ def make_microduck_velocity_env_cfg(
     )
 
     # Body command tracking reward (weight=0 during phase 1)
+    # Tighter Gaussians than what you might expect: z_std=0.01 (not 0.02) and angle_std=5° (not 10°)
+    # — narrower stds give stronger gradient signals at the command scales used in phase 2,
+    #   which is important to overcome the dead-input-weight problem from phase 1.
     cfg.rewards["body_cmd_tracking"] = RewardTermCfg(
         func=microduck_mdp.body_cmd_tracking,
         weight=0.0,
         params={
             "nominal_height": BODY_CMD_NOMINAL_HEIGHT,
-            "z_std": 0.02,
-            "angle_std": math.radians(10.0),
+            "z_std": 0.01,
+            "angle_std": math.radians(5.0),
         },
     )
 
@@ -606,13 +609,12 @@ def make_microduck_velocity_env_cfg(
         params={
             "reward_name": "body_cmd_tracking",
             "weight_stages": [
-                # Phase 1: weight stays 0
+                # Phase 1: weight stays 0 (no tracking signal)
                 {"step": 0,                                    "weight": 0.0},
-                # Phase 2: ramp up gently
-                {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,  "weight": 0.5},
-                {"step": (BODY_CMD_PHASE2_STEP + 500)  * 24,  "weight": 1.0},
-                {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,  "weight": 1.5},
-                {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,  "weight": 2.0},
+                # Phase 2: start at 2.0 immediately — strong signal needed to overcome dead weights
+                {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,  "weight": 2.0},
+                {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,  "weight": 3.0},
+                {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,  "weight": 4.0},
             ],
         },
     )
@@ -622,18 +624,46 @@ def make_microduck_velocity_env_cfg(
         params={
             "event_name": "randomize_body_cmd",
             "range_stages": [
-                # Phase 1: zero range — body_cmd obs is always [0,0,0]
+                # Phase 1: small non-zero range to keep body_cmd input weights alive.
+                # No tracking reward → no incentive to follow, but weights receive gradient
+                # from other rewards and won't be zero when phase 2 starts.
                 {"step": 0,
-                 "max_z": 0.0, "max_pitch": 0.0, "max_roll": 0.0},
-                # Phase 2: grow range to match reward weight schedule
+                 "max_z": 0.005, "max_pitch": math.radians(2.0), "max_roll": math.radians(2.0)},
+                # Phase 2: jump to medium range immediately — large enough that ignoring
+                # body_cmd causes a clear reward drop (gradient signal to wake up dead weights)
                 {"step": (BODY_CMD_PHASE2_STEP + 0)    * 24,
-                 "max_z": 0.005, "max_pitch": math.radians(2.0),  "max_roll": math.radians(2.0)},
-                {"step": (BODY_CMD_PHASE2_STEP + 500)  * 24,
                  "max_z": 0.010, "max_pitch": math.radians(5.0),  "max_roll": math.radians(5.0)},
-                {"step": (BODY_CMD_PHASE2_STEP + 1000) * 24,
+                {"step": (BODY_CMD_PHASE2_STEP + 500)  * 24,
                  "max_z": 0.020, "max_pitch": math.radians(10.0), "max_roll": math.radians(10.0)},
-                {"step": (BODY_CMD_PHASE2_STEP + 2000) * 24,
+                {"step": (BODY_CMD_PHASE2_STEP + 1500) * 24,
                  "max_z": BODY_CMD_MAX_Z, "max_pitch": _max_angle, "max_roll": _max_angle},
+            ],
+        },
+    )
+
+    # Kill rewards that directly conflict with body_cmd tracking in phase 2.
+    #
+    # com_height_target [0.08, 0.11]: blocks z_cmd > ±1cm (e.g. z_cmd=-2cm → target=0.08m = lower limit)
+    cfg.curriculum["com_height_phase2"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "com_height_target",
+            "weight_stages": [
+                {"step": 0,                         "weight": 1.2},
+                {"step": BODY_CMD_PHASE2_STEP * 24, "weight": 0.0},
+            ],
+        },
+    )
+
+    # upright: rewards zero pitch/roll — directly opposes pitch/roll body commands.
+    # Keep a small residual (0.2) so the robot doesn't flop in the absence of a body_cmd.
+    cfg.curriculum["upright_phase2"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "upright",
+            "weight_stages": [
+                {"step": 0,                         "weight": 1.0},
+                {"step": BODY_CMD_PHASE2_STEP * 24, "weight": 0.2},
             ],
         },
     )

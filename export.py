@@ -1,6 +1,7 @@
 """Script to play RL agent with RSL-RL."""
 
 import os
+import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -14,7 +15,7 @@ from mjlab.envs import ManagerBasedRlEnv
 from mjlab.rl import RslRlVecEnvWrapper
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.tracking.mdp import MotionCommandCfg
-from mjlab.utils.os import get_wandb_checkpoint_path
+from mjlab.utils.os import get_checkpoint_path, get_wandb_checkpoint_path
 from mjlab_microduck.tasks.imitation_command import ImitationCommandCfg
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
@@ -27,6 +28,7 @@ class ExportConfig:
     agent: Literal["zero", "random", "trained"] = "trained"
     registry_name: str | None = None
     wandb_run_path: str | None = None
+    checkpoint: int | None = None      # Select checkpoint by iteration number (e.g. 3000)
     checkpoint_file: str | None = None
     motion_file: str | None = None
     num_envs: int | None = None
@@ -152,6 +154,32 @@ def run_export(task_id: str, cfg: ExportConfig):
             if not resume_path.exists():
                 raise FileNotFoundError(f"Checkpoint file not found: {resume_path}")
             print(f"[INFO]: Loading checkpoint: {resume_path.name}")
+        elif cfg.checkpoint is not None:
+            # Select a specific checkpoint iteration, from wandb or local.
+            checkpoint_filename = f"model_{cfg.checkpoint}.pt"
+            if cfg.wandb_run_path is not None:
+                import wandb
+                api = wandb.Api()
+                wandb_run = api.run(str(cfg.wandb_run_path))
+                run_id = cfg.wandb_run_path.split("/")[-1]
+                download_dir = log_root_path / "wandb_checkpoints" / run_id
+                resume_path = download_dir / checkpoint_filename
+                if resume_path.exists():
+                    print(f"[INFO]: Loading checkpoint: {checkpoint_filename} (run: {run_id}, cached)")
+                else:
+                    available = [f.name for f in wandb_run.files() if "model" in f.name]
+                    if checkpoint_filename not in available:
+                        raise FileNotFoundError(
+                            f"Checkpoint '{checkpoint_filename}' not found in wandb run. "
+                            f"Available: {sorted(available)}"
+                        )
+                    wandb_run.file(checkpoint_filename).download(str(download_dir), replace=True)
+                    print(f"[INFO]: Loading checkpoint: {checkpoint_filename} (run: {run_id}, downloaded)")
+            else:
+                resume_path = get_checkpoint_path(
+                    log_root_path, checkpoint=re.escape(checkpoint_filename)
+                )
+                print(f"[INFO]: Loading checkpoint: {resume_path.name}")
         else:
             if cfg.wandb_run_path is None:
                 raise ValueError(
