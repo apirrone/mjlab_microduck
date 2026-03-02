@@ -79,8 +79,9 @@ def make_microduck_standing_env_cfg(play: bool = False):
     # Reduce upright: body_cmd will request pitch/roll, upright must not dominate.
     cfg.rewards["upright"].weight = 0.5
 
-    # body_cmd_tracking starts at weight=0; curriculum below grows it from iter 200.
-    cfg.rewards["body_cmd_tracking"].weight = 0.0
+    # body_cmd_tracking: curriculum sets initial weight=1.0 from iter 0.
+    # With body_cmd=[0,0,0], this reward peaks at z=nominal_height — acts as height guide.
+    cfg.rewards["body_cmd_tracking"].weight = 1.0
 
     # -------------------------------------------------------------------------
     # Curriculum
@@ -93,17 +94,18 @@ def make_microduck_standing_env_cfg(play: bool = False):
 
     _max_angle = math.radians(BODY_CMD_MAX_ANGLE_DEG)
 
-    # Body_cmd weight: brief 200-iter standing warm-up, then ramp up.
+    # Body_cmd weight: start non-zero from iter 0.
+    # When body_cmd=[0,0,0] (warm-up phase), body_cmd_tracking peaks at z=nominal_height,
+    # pitch=0, roll=0 — it naturally replaces com_height_target as the standing height guide.
     cfg.curriculum["body_cmd_weight"] = CurriculumTermCfg(
         func=mdp.reward_weight,
         params={
             "reward_name": "body_cmd_tracking",
             "weight_stages": [
-                {"step": 0,         "weight": 0.0},
-                {"step": 200 * 24,  "weight": 1.0},
-                {"step": 500 * 24,  "weight": 2.0},
-                {"step": 1000 * 24, "weight": 3.0},
-                {"step": 2000 * 24, "weight": 4.0},
+                {"step": 0,         "weight": 1.0},  # height guide from iter 0
+                {"step": 200 * 24,  "weight": 2.0},  # body_cmd commands start
+                {"step": 500 * 24,  "weight": 3.0},
+                {"step": 1000 * 24, "weight": 4.0},
             ],
         },
     )
