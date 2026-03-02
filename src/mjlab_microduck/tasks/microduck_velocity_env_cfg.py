@@ -312,15 +312,15 @@ def make_microduck_velocity_env_cfg(
         func=microduck_mdp.reset_body_cmd,
         mode="reset",
     )
-    # Body command: resample random targets at intervals (tiny range in phase 1)
+    # Body command: resample random targets at intervals (zero during phase 1, grows in phase 2)
     cfg.events["randomize_body_cmd"] = EventTermCfg(
         func=microduck_mdp.randomize_body_cmd,
         mode="interval",
         interval_range_s=BODY_CMD_INTERVAL_S,
         params={
-            "max_z": 0.002,               # 2mm — keep input weights alive, weight=0
-            "max_pitch": math.radians(1.0),
-            "max_roll": math.radians(1.0),
+            "max_z": 0.0,
+            "max_pitch": 0.0,
+            "max_roll": 0.0,
         },
     )
 
@@ -603,9 +603,9 @@ def make_microduck_velocity_env_cfg(
             "event_name": "randomize_body_cmd",
             "reward_name": "body_cmd_tracking",
             "stages": [
-                # Phase 1: tiny range, weight=0 (input weights stay alive)
+                # Phase 1: zero range, zero weight — body_cmd obs is always [0,0,0]
                 {"step": 0,
-                 "max_z": 0.002, "max_pitch": math.radians(1.0), "max_roll": math.radians(1.0),
+                 "max_z": 0.0, "max_pitch": 0.0, "max_roll": 0.0,
                  "reward_weight": 0.0},
                 # Phase 2: ramp up range and reward weight gently
                 {"step": (BODY_CMD_PHASE2_STEP + 0) * 24,
