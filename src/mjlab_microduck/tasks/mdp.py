@@ -905,10 +905,11 @@ def mouth_perpendicular_to_ground(
     Weighted by max(0, sin(2π*phase)) so it only applies during the descent.
     """
     asset = env.scene[asset_cfg.name]
-    # site_xmat: (num_envs, num_sites, 3, 3) — columns are site axes in world frame
-    xmat = asset.data.site_xmat[:, asset_cfg.site_ids[0], :, :]  # (num_envs, 3, 3)
-    # x-axis of site frame in world coords = first column
-    x_axis_z = xmat[:, 2, 0]  # z-component of site x-axis
+    # site_quat_w: (num_envs, num_sites, 4) as [w, x, y, z]
+    q = asset.data.site_quat_w[:, asset_cfg.site_ids[0], :]  # (num_envs, 4)
+    w, qx, qy, qz = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+    # z-component of the site x-axis in world frame (first column of rotation matrix)
+    x_axis_z = 2.0 * (qx * qz - w * qy)
     # dot with [0, 0, -1]: 1 = perfectly downward, -1 = upward
     alignment = -x_axis_z
 
