@@ -899,6 +899,7 @@ def ground_pick_return_pose(
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
     std: float = 0.3,
     command_name: str = "twist",
+    joint_indices: Optional[list] = None,
 ) -> torch.Tensor:
     """Reward for returning to the standing pose after ground pick, weighted by the return phase.
 
@@ -906,11 +907,18 @@ def ground_pick_return_pose(
     smoothly weighted by max(0, -sin(2π*phase)).
 
     Args:
-        std: Gaussian std per joint (rad). 0.3 rad gives a meaningful gradient.
+        std: Gaussian std per joint (rad).
+        joint_indices: Subset of joints to evaluate. Use to apply different stds
+            to leg joints vs neck/head joints (call this reward twice).
     """
     asset = env.scene[asset_cfg.name]
-    joint_pos = asset.data.joint_pos        # (num_envs, n_joints)
-    default_pos = asset.data.default_joint_pos  # (num_envs, n_joints)
+    joint_pos  = asset.data.joint_pos        # (num_envs, n_joints)
+    default_pos = asset.data.default_joint_pos
+
+    if joint_indices is not None:
+        joint_pos   = joint_pos[:, joint_indices]
+        default_pos = default_pos[:, joint_indices]
+
     pose_reward = torch.exp(-((joint_pos - default_pos) / std) ** 2).mean(dim=-1)
 
     # Return weight: max(0, -sin(2π*phase)) — peaks at 1 at phase=0.75, zero at 0.5 and 1

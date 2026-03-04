@@ -118,26 +118,43 @@ def make_microduck_ground_pick_env_cfg(play: bool = False) -> ManagerBasedRlEnvC
     # ── Rewards: main ground pick objectives ──────────────────────────────────
 
     # Approach phase: reward mouth tip being close to the ground.
-    # Gaussian with std=0.03 m gives a strong gradient at ~3 cm above floor.
+    # std=0.10 m provides gradient from ~20 cm away so the policy gets a useful
+    # signal even from the fully-upright start pose.
+    # (std=0.03 was too tight — exp(-(0.2/0.03)²)≈0, zero gradient from standing height)
     cfg.rewards["mouth_ground_proximity"] = RewardTermCfg(
         func=microduck_mdp.mouth_ground_proximity,
         weight=4.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", site_names=["mouth_tip"]),
-            "std": 0.03,
+            "std": 0.10,
             "target_height": 0.0,
             "command_name": "twist",
         },
     )
 
-    # Return phase: reward joint positions returning to the home (standing) pose.
-    # std=0.3 rad per joint — enough gradient at typical errors of 0.2–0.5 rad.
-    cfg.rewards["ground_pick_return_pose"] = RewardTermCfg(
+    # Return phase — legs (joints 0-4 left, 9-13 right): relaxed std, robust to pushes.
+    _LEG_JOINTS = [0, 1, 2, 3, 4, 9, 10, 11, 12, 13]
+    cfg.rewards["ground_pick_return_pose_legs"] = RewardTermCfg(
         func=microduck_mdp.ground_pick_return_pose,
         weight=2.0,
         params={
-            "std": 0.3,
+            "std": 0.4,
             "command_name": "twist",
+            "joint_indices": _LEG_JOINTS,
+        },
+    )
+
+    # Return phase — neck/head (joints 5-8): tight std to prevent backward overshoot
+    # and head-body collision (head geoms have no collision mesh, so self_collisions
+    # can't catch it — the pose reward is the only guard).
+    _NECK_JOINTS = [5, 6, 7, 8]
+    cfg.rewards["ground_pick_return_pose_neck"] = RewardTermCfg(
+        func=microduck_mdp.ground_pick_return_pose,
+        weight=3.0,
+        params={
+            "std": 0.15,
+            "command_name": "twist",
+            "joint_indices": _NECK_JOINTS,
         },
     )
 
