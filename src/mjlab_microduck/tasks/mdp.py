@@ -1859,3 +1859,44 @@ def jump_air_height(
     jump_weight = torch.clamp(cmd[:, 1], min=0.0)  # max(0, sin(2π*phase))
 
     return jump_weight * height_reward
+
+
+def jump_vertical_velocity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward upward trunk velocity during the jump phase.
+
+    Provides a sharp, immediate gradient for the explosive push-off.  The
+    policy naturally learns to preload (crouch) first because a prior crouch
+    is what produces the highest upward velocity on extension.
+    """
+    asset = env.scene[asset_cfg.name]
+    v_z = asset.data.root_link_lin_vel_w[:, 2]  # (num_envs,)
+
+    cmd = env.command_manager.get_command(command_name)
+    jump_weight = torch.clamp(cmd[:, 1], min=0.0)
+
+    return jump_weight * torch.clamp(v_z, min=0.0)  # only reward upward velocity
+
+
+def jump_feet_in_air(
+    env: ManagerBasedRlEnv,
+    sensor_name: str = "feet_ground_contact",
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward both feet being off the ground during the jump phase.
+
+    Uses current_air_time > 0 from the contact sensor (True when no foot
+    contact is detected).  Combined with jump_vertical_velocity this strongly
+    incentivises actually leaving the ground rather than just crouching.
+    """
+    sensor = env.scene[sensor_name]
+    # current_air_time: [B, num_slots] — > 0 when feet are in the air
+    in_air = (sensor.data.current_air_time[:, 0] > 0.0).float()  # (num_envs,)
+
+    cmd = env.command_manager.get_command(command_name)
+    jump_weight = torch.clamp(cmd[:, 1], min=0.0)
+
+    return jump_weight * in_air

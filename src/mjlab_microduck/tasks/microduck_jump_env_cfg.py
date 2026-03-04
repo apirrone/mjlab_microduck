@@ -120,10 +120,28 @@ def make_microduck_jump_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # std=0.04 m gives reward ≈ 0.37 at standing height — useful gradient from the start.
     cfg.rewards["jump_air_height"] = RewardTermCfg(
         func=microduck_mdp.jump_air_height,
-        weight=5.0,
+        weight=4.0,
         params={
             "target_height": 0.14,
             "std": 0.04,
+            "command_name": "twist",
+        },
+    )
+
+    # Jump phase: reward upward trunk velocity — immediate gradient for explosive push-off.
+    # The policy learns to preload (crouch) first because that produces the highest v_z.
+    cfg.rewards["jump_vertical_velocity"] = RewardTermCfg(
+        func=microduck_mdp.jump_vertical_velocity,
+        weight=3.0,
+        params={"command_name": "twist"},
+    )
+
+    # Jump phase: reward both feet leaving the ground simultaneously.
+    cfg.rewards["jump_feet_in_air"] = RewardTermCfg(
+        func=microduck_mdp.jump_feet_in_air,
+        weight=3.0,
+        params={
+            "sensor_name": feet_ground_cfg.name,
             "command_name": "twist",
         },
     )
