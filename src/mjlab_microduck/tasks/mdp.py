@@ -1852,7 +1852,7 @@ def jump_air_height(
         std: Gaussian std (m).
     """
     asset = env.scene[asset_cfg.name]
-    trunk_z = asset.data.root_pos_w[:, 2]
+    trunk_z = asset.data.root_link_pos_w[:, 2]  # (num_envs,)
     height_reward = torch.exp(-((trunk_z - target_height) / std) ** 2)
 
     cmd = env.command_manager.get_command(command_name)
