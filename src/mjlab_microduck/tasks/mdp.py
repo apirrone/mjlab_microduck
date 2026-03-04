@@ -1820,3 +1820,42 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
     def _update_metrics(self) -> None:
         pass  # No velocity tracking metrics for ground pick
+
+
+class JumpPhaseCommand(GroundPickPhaseCommand):
+    """Phase-encoding command for the jump task.
+
+    Same cyclic encoding as GroundPickPhaseCommand but with a shorter period:
+        Phase ∈ [0, 0.5]: jump phase  — reward high trunk height.
+        Phase ∈ [0.5, 1.0]: land phase — reward returning to default pose.
+
+    PERIOD = 2.0 s (1 s up + 1 s land).
+    """
+    PERIOD: float = 2.0
+
+
+def jump_air_height(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    target_height: float = 0.14,
+    std: float = 0.04,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward high trunk height during the jump phase (sin > 0).
+
+    Uses a Gaussian centred at target_height.  std=0.04 m gives a gradient of
+    ~0.37 from a typical standing height of ~0.10 m, so the policy receives a
+    useful signal before it has learned to jump at all.
+
+    Args:
+        target_height: Target trunk z-height in world frame (m).
+        std: Gaussian std (m).
+    """
+    asset = env.scene[asset_cfg.name]
+    trunk_z = asset.data.root_pos_w[:, 2]
+    height_reward = torch.exp(-((trunk_z - target_height) / std) ** 2)
+
+    cmd = env.command_manager.get_command(command_name)
+    jump_weight = torch.clamp(cmd[:, 1], min=0.0)  # max(0, sin(2π*phase))
+
+    return jump_weight * height_reward

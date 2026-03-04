@@ -19,6 +19,10 @@ from .microduck_ground_pick_env_cfg import (
     make_microduck_ground_pick_env_cfg,
     MicroduckGroundPickRlCfg,
 )
+from .microduck_jump_env_cfg import (
+    make_microduck_jump_env_cfg,
+    MicroduckJumpRlCfg,
+)
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -48,6 +52,16 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 print("✓ Ground pick task registered: Mjlab-GroundPick-Flat-MicroDuck")
+
+# Jump task — episodic policy: crouch, jump, land safely and return to standing
+register_mjlab_task(
+    task_id="Mjlab-Jump-Flat-MicroDuck",
+    env_cfg=make_microduck_jump_env_cfg(),
+    play_env_cfg=make_microduck_jump_env_cfg(play=True),
+    rl_cfg=MicroduckJumpRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ Jump task registered: Mjlab-Jump-Flat-MicroDuck")
 
 # Imitation motion tracking task
 # Uses frame-based reference motions (reference_motion.pkl)
