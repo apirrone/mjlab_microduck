@@ -115,31 +115,32 @@ def make_microduck_jump_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # ── Rewards: main jump objective ──────────────────────────────────────────
 
-    # Jump phase: reward trunk being high above ground.
-    # target=0.14 m ≈ 40% above typical standing height (~0.10 m).
-    # std=0.04 m gives reward ≈ 0.37 at standing height — useful gradient from the start.
+    # Jump phase: reward trunk being slightly above standing height.
+    # target=0.11 m ≈ 1 cm above standing (~0.10 m) — achievable with a micro-jump.
+    # std=0.01 m: at standing height exp(-1) ≈ 0.37 → strong gradient for even 5 mm gain.
     cfg.rewards["jump_air_height"] = RewardTermCfg(
         func=microduck_mdp.jump_air_height,
-        weight=4.0,
+        weight=3.0,
         params={
-            "target_height": 0.14,
-            "std": 0.04,
+            "target_height": 0.11,
+            "std": 0.01,
             "command_name": "twist",
         },
     )
 
     # Jump phase: reward upward trunk velocity — immediate gradient for explosive push-off.
-    # The policy learns to preload (crouch) first because that produces the highest v_z.
+    # Even a small v_z (0.05–0.1 m/s) scores here, pulling the policy toward explosive extension.
     cfg.rewards["jump_vertical_velocity"] = RewardTermCfg(
         func=microduck_mdp.jump_vertical_velocity,
-        weight=3.0,
+        weight=4.0,
         params={"command_name": "twist"},
     )
 
-    # Jump phase: reward both feet leaving the ground simultaneously.
+    # Jump phase: primary success criterion — any air time at all scores a full point.
+    # Even 1 control step (~20 ms) with both feet off the ground is rewarded.
     cfg.rewards["jump_feet_in_air"] = RewardTermCfg(
         func=microduck_mdp.jump_feet_in_air,
-        weight=3.0,
+        weight=5.0,
         params={
             "sensor_name": feet_ground_cfg.name,
             "command_name": "twist",
@@ -173,25 +174,25 @@ def make_microduck_jump_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # ── Rewards: stability ────────────────────────────────────────────────────
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0  # Stay upright — especially important on landing
+    cfg.rewards["upright"].weight = 0.5  # Reduced — crouch requires forward lean
 
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
 
     cfg.rewards["angular_momentum"].weight = -0.02
 
-    # Heavier landing penalty than ground pick — jump forces are larger.
-    cfg.rewards["soft_landing"].weight = -5e-4
+    # Tiny jump → tiny landing forces; keep penalty light so it doesn't fight the jump.
+    cfg.rewards["soft_landing"].weight = -1e-5
 
     # ── Rewards: regularisation ───────────────────────────────────────────────
 
-    # Moderate smoothness — jumping is explosive so don't over-penalise action rate.
+    # Light smoothness penalty — explosive extension must not be over-penalised.
     cfg.rewards["action_rate_l2"] = RewardTermCfg(
-        func=mdp.action_rate_l2, weight=-0.6
+        func=mdp.action_rate_l2, weight=-0.3
     )
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-0.3
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
     )
 
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
