@@ -136,15 +136,22 @@ def make_microduck_jump_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         params={"command_name": "twist"},
     )
 
-    # Jump phase: primary success criterion — any air time at all scores a full point.
-    # Even 1 control step (~20 ms) with both feet off the ground is rewarded.
+    # Jump phase: reward proportional to time both feet are in the air.
+    # Proportional (not binary) — a 20 ms twitch gives ~20× less reward than 400 ms of real air time.
     cfg.rewards["jump_feet_in_air"] = RewardTermCfg(
         func=microduck_mdp.jump_feet_in_air,
-        weight=5.0,
+        weight=20.0,
         params={
             "sensor_name": feet_ground_cfg.name,
             "command_name": "twist",
         },
+    )
+
+    # Jump phase: penalise lateral motion — directly removes the twitch-sideways hack.
+    cfg.rewards["jump_no_lateral_velocity"] = RewardTermCfg(
+        func=microduck_mdp.jump_no_lateral_velocity,
+        weight=-3.0,
+        params={"command_name": "twist"},
     )
 
     # Land phase — legs: reward returning to default joint angles.
@@ -174,7 +181,7 @@ def make_microduck_jump_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # ── Rewards: stability ────────────────────────────────────────────────────
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 0.5  # Reduced — crouch requires forward lean
+    cfg.rewards["upright"].weight = 2.0  # Strong — tilting sideways must not be rewarded
 
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05

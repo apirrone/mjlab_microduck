@@ -1888,15 +1888,34 @@ def jump_feet_in_air(
 ) -> torch.Tensor:
     """Reward both feet being off the ground during the jump phase.
 
-    Uses current_air_time > 0 from the contact sensor (True when no foot
-    contact is detected).  Combined with jump_vertical_velocity this strongly
-    incentivises actually leaving the ground rather than just crouching.
+    Returns the accumulated air time (proportional), NOT a binary flag.
+    A 20ms twitch gives ~0.02 reward; a real 200ms jump gives ~0.2.
+    This prevents reward hacking via rapid sideways twitches.
     """
     sensor = env.scene[sensor_name]
-    # current_air_time: [B, num_slots] — > 0 when feet are in the air
-    in_air = (sensor.data.current_air_time[:, 0] > 0.0).float()  # (num_envs,)
+    # current_air_time: [B, num_slots] — accumulated seconds feet have been in air
+    air_time = sensor.data.current_air_time[:, 0]  # (num_envs,)
 
     cmd = env.command_manager.get_command(command_name)
     jump_weight = torch.clamp(cmd[:, 1], min=0.0)
 
-    return jump_weight * in_air
+    return jump_weight * air_time
+
+
+def jump_no_lateral_velocity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Penalise horizontal trunk velocity during the jump phase.
+
+    Twitching sideways generates large lateral velocity.  Penalising it
+    removes the incentive to hack jump_feet_in_air via sideways motion.
+    """
+    asset = env.scene[asset_cfg.name]
+    lateral_speed = asset.data.root_link_lin_vel_w[:, :2].norm(dim=-1)  # (num_envs,)
+
+    cmd = env.command_manager.get_command(command_name)
+    jump_weight = torch.clamp(cmd[:, 1], min=0.0)
+
+    return -jump_weight * lateral_speed
