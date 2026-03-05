@@ -974,7 +974,9 @@ def torso_ground_proximity(
     proximity = torch.exp(-((trunk_z - target_height) / std) ** 2)
 
     cmd = env.command_manager.get_command(command_name)
-    approach_weight = torch.clamp(cmd[:, 1], min=0.0)  # sin(2π·phase) > 0 in [0, 0.5]
+    # Use cmd[:, 2] (constant flag, set by SitStandPhaseCommand) so the robot
+    # has full approach incentive from step 0, not a sin() ramp that starts near 0.
+    approach_weight = torch.clamp(cmd[:, 2], min=0.0)
 
     return approach_weight * proximity
 
@@ -1908,7 +1910,10 @@ class SitStandPhaseCommand(GroundPickPhaseCommand):
 
         self.vel_command_b[:, 0] = torch.cos(angle)
         self.vel_command_b[:, 1] = torch.sin(angle)
-        self.vel_command_b[:, 2] = 0.0
+        # cmd[:, 2] = 1 during sit+hold (constant approach incentive), 0 during stand.
+        # torso_ground_proximity uses this so approach weight is 1 from step 0
+        # instead of ramping via sin (which starts near 0 and lets the robot stay still).
+        self.vel_command_b[:, 2] = (p < hold_end).float()
 
     def reset(self, env_ids: torch.Tensor | None) -> dict:
         if env_ids is not None and len(env_ids) > 0:

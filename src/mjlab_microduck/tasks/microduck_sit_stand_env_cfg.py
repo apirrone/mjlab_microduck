@@ -123,7 +123,7 @@ def make_microduck_sit_stand_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
     # exp(-((0.04-0.0)/0.05)²) ≈ 0.45 from crouched — sharp pull to floor.
     cfg.rewards["torso_ground_proximity"] = RewardTermCfg(
         func=microduck_mdp.torso_ground_proximity,
-        weight=3.0,
+        weight=6.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=["trunk_base"]),
             "std": 0.05,
@@ -158,10 +158,9 @@ def make_microduck_sit_stand_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
 
     # ── Rewards: stability ────────────────────────────────────────────────────
 
-    # Lower weight than ground pick — trunk will be nearly horizontal when seated,
-    # so a strict upright penalty would fight the desired motion.
-    cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 0.1
+    # upright removed — it fights trunk tilting during the sit phase.
+    # The return-pose rewards naturally bring the robot to standing orientation.
+    del cfg.rewards["upright"]
 
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
