@@ -118,15 +118,16 @@ def make_microduck_sit_stand_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
     # ── Rewards: main sit/stand objectives ────────────────────────────────────
 
     # Approach phase: reward trunk_base being close to the ground.
-    # std=0.08 m gives gradient from standing height (~0.12 m):
-    # exp(-((0.12-0.02)/0.08)²) ≈ 0.21 — meaningful signal from fully upright.
+    # target_height=0.0 (ground contact); std=0.05 m gives strong gradient:
+    # exp(-((0.12-0.0)/0.05)²) ≈ 0.06 from standing — distant but non-zero.
+    # exp(-((0.04-0.0)/0.05)²) ≈ 0.45 from crouched — sharp pull to floor.
     cfg.rewards["torso_ground_proximity"] = RewardTermCfg(
         func=microduck_mdp.torso_ground_proximity,
         weight=3.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=["trunk_base"]),
-            "std": 0.08,
-            "target_height": 0.02,
+            "std": 0.05,
+            "target_height": 0.0,
             "command_name": "twist",
         },
     )

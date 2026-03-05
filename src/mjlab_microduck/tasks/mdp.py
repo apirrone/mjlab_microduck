@@ -966,8 +966,8 @@ def torso_ground_proximity(
 ) -> torch.Tensor:
     """Reward trunk_base approaching the ground (sit-down approach phase).
 
-    std=0.08 m → gradient from standing (~0.12 m): exp(-((0.12-0.02)/0.08)²) ≈ 0.21
     Weighted by max(0, sin(2π*phase)) so it only applies during the descent.
+    Set target_height=0.0 to pull toward full ground contact.
     """
     asset = env.scene[asset_cfg.name]
     trunk_z = asset.data.body_com_pos_w[:, asset_cfg.body_ids[0], 2]
@@ -1849,13 +1849,46 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
 
 class SitStandPhaseCommand(GroundPickPhaseCommand):
-    """Phase command for sit/stand — identical to GroundPickPhaseCommand but slower.
+    """Non-cyclic phase command for sit/stand.
+
+    Phase advances from START_PHASE to 1.0 then freezes — it does NOT loop.
+    This lets the user stop the policy mid-way (robot seated) and restart with
+    START_PHASE = 0.5 to execute only the stand-up half.
 
     Phase ∈ [0, 0.5]: sit down (reward trunk_base approaching ground).
     Phase ∈ [0.5, 1.0]: stand up (reward returning to default pose).
 
-    Period is 6 seconds (3 s down + 3 s up) to allow time for the slower
-    whole-body movement.
+    Usage:
+        Sit + stand (full cycle): leave START_PHASE = 0.0 (default).
+        Stand only:               set START_PHASE = 0.5 before launching play.
+
+    Period is 6 seconds (3 s down + 3 s up).
     """
 
-    PERIOD: float = 6.0  # 3 s down + 3 s up
+    PERIOD: float = 6.0  # seconds per full cycle
+    START_PHASE: float = 0.0  # override to 0.5 for stand-up-only mode
+
+    def __init__(self, cfg, env: ManagerBasedRlEnv):
+        # Skip GroundPickPhaseCommand.__init__ chain — call grandparent directly
+        # to avoid initialising _gp_phase twice (we use _ss_phase instead)
+        UniformVelocityCommand.__init__(self, cfg, env)
+        self._ss_phase = torch.full(
+            (self.num_envs,), self.START_PHASE, device=self.device
+        )
+        self._frozen = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+
+    def compute(self, dt: float) -> None:
+        advancing = ~self._frozen
+        self._ss_phase[advancing] += dt / self.PERIOD
+        self._ss_phase.clamp_(max=1.0)
+        self._frozen |= self._ss_phase >= 1.0
+
+        self.vel_command_b[:, 0] = torch.cos(2 * torch.pi * self._ss_phase)
+        self.vel_command_b[:, 1] = torch.sin(2 * torch.pi * self._ss_phase)
+        self.vel_command_b[:, 2] = 0.0
+
+    def reset(self, env_ids: torch.Tensor | None) -> dict:
+        if env_ids is not None and len(env_ids) > 0:
+            self._ss_phase[env_ids] = self.START_PHASE
+            self._frozen[env_ids] = False
+        return {}
