@@ -954,6 +954,32 @@ def ground_pick_return_pose(
 
 
 # ==============================================================================
+# Sit Stand Rewards
+# ==============================================================================
+
+def torso_ground_proximity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["trunk_base"]),
+    std: float = 0.08,
+    target_height: float = 0.02,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward trunk_base approaching the ground (sit-down approach phase).
+
+    std=0.08 m → gradient from standing (~0.12 m): exp(-((0.12-0.02)/0.08)²) ≈ 0.21
+    Weighted by max(0, sin(2π*phase)) so it only applies during the descent.
+    """
+    asset = env.scene[asset_cfg.name]
+    trunk_z = asset.data.body_pos_w[:, asset_cfg.body_ids[0], 2]
+    proximity = torch.exp(-((trunk_z - target_height) / std) ** 2)
+
+    cmd = env.command_manager.get_command(command_name)
+    approach_weight = torch.clamp(cmd[:, 1], min=0.0)  # sin(2π·phase) > 0 in [0, 0.5]
+
+    return approach_weight * proximity
+
+
+# ==============================================================================
 # Domain Randomization Events
 # ==============================================================================
 
@@ -1820,3 +1846,16 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
     def _update_metrics(self) -> None:
         pass  # No velocity tracking metrics for ground pick
+
+
+class SitStandPhaseCommand(GroundPickPhaseCommand):
+    """Phase command for sit/stand — identical to GroundPickPhaseCommand but slower.
+
+    Phase ∈ [0, 0.5]: sit down (reward trunk_base approaching ground).
+    Phase ∈ [0.5, 1.0]: stand up (reward returning to default pose).
+
+    Period is 6 seconds (3 s down + 3 s up) to allow time for the slower
+    whole-body movement.
+    """
+
+    PERIOD: float = 6.0  # 3 s down + 3 s up

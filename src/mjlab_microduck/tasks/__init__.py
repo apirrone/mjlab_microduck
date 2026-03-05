@@ -19,6 +19,10 @@ from .microduck_ground_pick_env_cfg import (
     make_microduck_ground_pick_env_cfg,
     MicroduckGroundPickRlCfg,
 )
+from .microduck_sit_stand_env_cfg import (
+    make_microduck_sit_stand_env_cfg,
+    MicroduckSitStandRlCfg,
+)
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -48,6 +52,16 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 print("✓ Ground pick task registered: Mjlab-GroundPick-Flat-MicroDuck")
+
+# Sit/stand task — episodic policy: sit down duck-style, return to standing
+register_mjlab_task(
+    task_id="Mjlab-SitStand-Flat-MicroDuck",
+    env_cfg=make_microduck_sit_stand_env_cfg(),
+    play_env_cfg=make_microduck_sit_stand_env_cfg(play=True),
+    rl_cfg=MicroduckSitStandRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ Sit/stand task registered: Mjlab-SitStand-Flat-MicroDuck")
 
 # Imitation motion tracking task
 # Uses frame-based reference motions (reference_motion.pkl)
