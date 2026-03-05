@@ -6,13 +6,13 @@ obs/action spaces are identical to the walking policy so the two can be
 switched at runtime with a single key-press.
 
 Phase encoding (in the command slot, 3-D):
-    command = [cos(2π·phase), sin(2π·phase), 0]
-    phase ∈ [0, 0.5]  → sit down (reward trunk_base approaching ground)
-    phase ∈ [0.5, 1]  → stand up (reward returning to default joint positions)
+    command = [cos(angle), sin(angle), 0]  — angle is a piecewise remap of phase
+    phase ∈ [0,     0.375): sit down   — sin: 0 → 1  (approach reward active)
+    phase ∈ [0.375, 0.5):  hold seated — sin = 1     (approach at max, 1 s dwell)
+    phase ∈ [0.5,   1.0]:  stand up    — sin: 1 → -1 (return reward kicks in)
 
-Phase is randomised per env on episode reset to de-correlate environments.
-PERIOD = 6 s (3 s down + 3 s up) — slower than ground pick to allow time for
-the whole-body movement.
+Phase is non-cyclic: advances to 1.0 then freezes.
+PERIOD = 8 s (3 s sit + 1 s hold + 4 s stand).
 """
 
 from copy import deepcopy

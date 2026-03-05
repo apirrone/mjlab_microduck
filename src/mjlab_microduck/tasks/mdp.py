@@ -1849,28 +1849,31 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
 
 class SitStandPhaseCommand(GroundPickPhaseCommand):
-    """Non-cyclic phase command for sit/stand.
+    """Non-cyclic phase command for sit/stand with an explicit hold-at-bottom dwell.
 
-    Phase advances from START_PHASE to 1.0 then freezes — it does NOT loop.
-    This lets the user stop the policy mid-way (robot seated) and restart with
-    START_PHASE = 0.5 to execute only the stand-up half.
+    Phase advances from START_PHASE to 1.0 then freezes (no looping).
+    The phase is remapped to a piecewise angle that keeps approach_weight
+    (max(0, sin(angle))) at its maximum during the hold segment, so the
+    robot is continuously rewarded for resting on the ground before standing.
 
-    Phase ∈ [0, 0.5]: sit down (reward trunk_base approaching ground).
-    Phase ∈ [0.5, 1.0]: stand up (reward returning to default pose).
+    Timing (PERIOD = 8 s total):
+        [0,   SIT_FRAC)  = 3 s sit   — angle 0 → π/2,  sin: 0 → 1
+        [SIT_FRAC, HOLD_FRAC) = 1 s hold — angle = π/2, sin = 1 (approach at max)
+        [HOLD_FRAC, 1.0]       = 4 s stand — angle π/2 → 2π, sin: 1 → 0 → -1 → 0
 
     Usage:
         Sit + stand (full cycle): leave START_PHASE = 0.0 (default).
-        Stand only:               set START_PHASE = 0.5 before launching play.
-
-    Period is 6 seconds (3 s down + 3 s up).
+        Stand only:               set SitStandPhaseCommand.START_PHASE = 0.5
+                                  (or HOLD_FRAC) before launching play.
     """
 
-    PERIOD: float = 6.0  # seconds per full cycle
-    START_PHASE: float = 0.0  # override to 0.5 for stand-up-only mode
+    PERIOD: float = 8.0
+    START_PHASE: float = 0.0  # override to HOLD_FRAC for stand-up-only mode
+    SIT_FRAC: float = 0.375   # 3 / 8 s
+    HOLD_FRAC: float = 0.5    # 4 / 8 s  (1 s dwell)
 
     def __init__(self, cfg, env: ManagerBasedRlEnv):
-        # Skip GroundPickPhaseCommand.__init__ chain — call grandparent directly
-        # to avoid initialising _gp_phase twice (we use _ss_phase instead)
+        # Call grandparent to avoid double-initialising _gp_phase
         UniformVelocityCommand.__init__(self, cfg, env)
         self._ss_phase = torch.full(
             (self.num_envs,), self.START_PHASE, device=self.device
@@ -1883,8 +1886,28 @@ class SitStandPhaseCommand(GroundPickPhaseCommand):
         self._ss_phase.clamp_(max=1.0)
         self._frozen |= self._ss_phase >= 1.0
 
-        self.vel_command_b[:, 0] = torch.cos(2 * torch.pi * self._ss_phase)
-        self.vel_command_b[:, 1] = torch.sin(2 * torch.pi * self._ss_phase)
+        p = self._ss_phase
+        sit_end  = self.SIT_FRAC
+        hold_end = self.HOLD_FRAC
+
+        angle = torch.zeros_like(p)
+
+        # Sit: phase [0, sit_end] → angle [0, π/2]
+        sit_mask = p < sit_end
+        angle[sit_mask] = (torch.pi / 2.0) * p[sit_mask] / sit_end
+
+        # Hold: angle fixed at π/2 → sin = 1, approach_weight = 1
+        hold_mask = (p >= sit_end) & (p < hold_end)
+        angle[hold_mask] = torch.pi / 2.0
+
+        # Stand: phase [hold_end, 1] → angle [π/2, 2π]
+        stand_mask = p >= hold_end
+        angle[stand_mask] = (torch.pi / 2.0) + (3.0 * torch.pi / 2.0) * (
+            (p[stand_mask] - hold_end) / (1.0 - hold_end)
+        )
+
+        self.vel_command_b[:, 0] = torch.cos(angle)
+        self.vel_command_b[:, 1] = torch.sin(angle)
         self.vel_command_b[:, 2] = 0.0
 
     def reset(self, env_ids: torch.Tensor | None) -> dict:
