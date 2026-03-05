@@ -284,6 +284,8 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
                 {"step": 500 * 24,   "weight": -0.1},
                 {"step": 1000 * 24,  "weight": -0.3},
                 {"step": 2000 * 24,  "weight": -0.6},
+                {"step": 2500 * 24,  "weight": -0.8},
+                {"step": 3000 * 24,  "weight": -1.0},
             ],
         },
     )
