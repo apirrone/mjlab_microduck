@@ -684,15 +684,19 @@ def body_upright_linear(
 def com_upward_velocity(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    max_height: float = 0.08,
 ) -> torch.Tensor:
-    """Reward upward center-of-mass velocity to incentivize dynamic standup motion.
+    """Reward upward CoM velocity to incentivize dynamic standup motion.
 
-    Only rewards upward movement (clamps to zero when moving down) so the robot
-    isn't penalized for settling after standing up.
+    Gated by height: only active while the CoM is below `max_height` (the
+    standing target). Once standing, the reward is zero so the robot has no
+    incentive to keep squatting to farm upward-velocity reward.
     """
     asset: Entity = env.scene[asset_cfg.name]
+    com_z = asset.data.root_link_pos_w[:, 2]
     vz = asset.data.root_link_lin_vel_w[:, 2]
-    return torch.clamp(vz, min=0.0)
+    below_target = (com_z < max_height).float()
+    return torch.clamp(vz, min=0.0) * below_target
 
 
 def is_alive(env: ManagerBasedRlEnv) -> torch.Tensor:

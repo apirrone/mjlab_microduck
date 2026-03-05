@@ -23,6 +23,7 @@ IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import (
+    CurriculumTermCfg,
     EventTermCfg,
     ObservationTermCfg,
     RewardTermCfg,
@@ -150,7 +151,10 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         "com_upward_velocity": RewardTermCfg(
             func=microduck_mdp.com_upward_velocity,
             weight=3.0,
-            params={"asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",))},
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "max_height": 0.08,  # matches target_height_min — reward vanishes once standing
+            },
         ),
         # Height reward: quadratic penalty below target, +1 when in standing range.
         "com_height_target": RewardTermCfg(
@@ -271,7 +275,6 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
-    from mjlab.managers.manager_term_config import CurriculumTermCfg
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
         func=velocity_mdp.reward_weight,
         params={

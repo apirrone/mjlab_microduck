@@ -10,6 +10,7 @@
         "!foot_tpu_bottom": "collision",
         "!leg_plate": "collision",
         "!bottom_shell": "collision",
+        "!top_shell": "collision",
         "!head_top": "collision",
         "!head_top_base_plate": "collision",
         "!trunk_base": "collision",
