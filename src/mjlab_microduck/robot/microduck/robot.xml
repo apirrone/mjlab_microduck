@@ -58,7 +58,7 @@
       <geom type="mesh" class="visual" pos="0.0125202 -9.32051e-17 0.0351" quat="1 -5.20961e-17 -2.22045e-16 -1.66618e-17" mesh="uc_boards" material="uc_boards_material"/>
       <!-- Part bottom_shell -->
       <geom type="mesh" class="visual" pos="0.0125202 1.69448e-16 0.0352" quat="1 -0 -2.22045e-16 -0" mesh="bottom_shell" material="bottom_shell_material"/>
-      <geom type="mesh" class="self_collision_only" pos="0.0125202 1.69448e-16 0.0352" quat="1 -0 -2.22045e-16 -0" mesh="bottom_shell" material="bottom_shell_material"/>
+      <geom type="mesh" class="collision" pos="0.0125202 1.69448e-16 0.0352" quat="1 -0 -2.22045e-16 -0" mesh="bottom_shell" material="bottom_shell_material"/>
       <!-- Part usb_c_charger -->
       <geom type="mesh" class="visual" pos="-0.0261798 0.01855 -0.01105" quat="0.5 -0.5 0.5 0.5" mesh="usb_c_charger" material="usb_c_charger_material"/>
       <!-- Part bearing -->
@@ -126,10 +126,10 @@
             <inertial pos="-0.0297714 -9.08566e-18 -0.0142481" mass="0.0243882" fullinertia="3.34584e-06 6.61117e-06 5.2143e-06 -5.43166e-21 1.98369e-08 -3.42328e-14"/>
             <!-- Part leg_plate -->
             <geom type="mesh" class="visual" pos="0.0432 -0.01 0.0455" quat="0.5 -0.5 0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
-            <geom type="mesh" class="self_collision_only" pos="0.0432 -0.01 0.0455" quat="0.5 -0.5 0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
+            <geom type="mesh" class="collision" pos="0.0432 -0.01 0.0455" quat="0.5 -0.5 0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
             <!-- Part leg_plate_2 -->
             <geom type="mesh" class="visual" pos="0.0432 0.01 -0.0745" quat="0.5 0.5 0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
-            <geom type="mesh" class="self_collision_only" pos="0.0432 0.01 -0.0745" quat="0.5 0.5 0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
+            <geom type="mesh" class="collision" pos="0.0432 0.01 -0.0745" quat="0.5 0.5 0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
             <!-- Part xl330_6 -->
             <geom type="mesh" class="visual" pos="-0.042 -1.86483e-17 -0.0145" quat="2.26172e-16 0.707107 2.22045e-16 -0.707107" mesh="xl330" material="xl330_material"/>
             <!-- Link leg_plate_2 -->
@@ -139,10 +139,10 @@
               <inertial pos="3.15479e-16 -0.0297714 -0.0142481" mass="0.0243882" fullinertia="6.61117e-06 3.34584e-06 5.2143e-06 3.56115e-20 3.42328e-14 1.98369e-08"/>
               <!-- Part leg_plate_3 -->
               <geom type="mesh" class="visual" pos="-0.01 0.0432 -0.0745" quat="3.79772e-15 3.91621e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
-              <geom type="mesh" class="self_collision_only" pos="-0.01 0.0432 -0.0745" quat="3.79772e-15 3.91621e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
+              <geom type="mesh" class="collision" pos="-0.01 0.0432 -0.0745" quat="3.79772e-15 3.91621e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
               <!-- Part leg_plate_4 -->
               <geom type="mesh" class="visual" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 -3.10862e-15 4.3597e-15" mesh="leg_plate" material="leg_plate_material"/>
-              <geom type="mesh" class="self_collision_only" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 -3.10862e-15 4.3597e-15" mesh="leg_plate" material="leg_plate_material"/>
+              <geom type="mesh" class="collision" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 -3.10862e-15 4.3597e-15" mesh="leg_plate" material="leg_plate_material"/>
               <!-- Part xl330_7 -->
               <geom type="mesh" class="visual" pos="4.47559e-16 -0.042 -0.0145" quat="0.5 0.5 0.5 -0.5" mesh="xl330" material="xl330_material"/>
               <!-- Link foot_tpu_bottom -->
@@ -243,10 +243,10 @@
             <geom type="mesh" class="visual" pos="0.042 -1.4615e-16 -0.0145" quat="0.707107 3.50112e-15 0.707107 2.50663e-15" mesh="xl330" material="xl330_material"/>
             <!-- Part leg_plate_5 -->
             <geom type="mesh" class="visual" pos="-0.0432 0.01 0.0455" quat="0.5 -0.5 -0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
-            <geom type="mesh" class="self_collision_only" pos="-0.0432 0.01 0.0455" quat="0.5 -0.5 -0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
+            <geom type="mesh" class="collision" pos="-0.0432 0.01 0.0455" quat="0.5 -0.5 -0.5 0.5" mesh="leg_plate" material="leg_plate_material"/>
             <!-- Part leg_plate_6 -->
             <geom type="mesh" class="visual" pos="-0.0432 -0.01 -0.0745" quat="0.5 0.5 -0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
-            <geom type="mesh" class="self_collision_only" pos="-0.0432 -0.01 -0.0745" quat="0.5 0.5 -0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
+            <geom type="mesh" class="collision" pos="-0.0432 -0.01 -0.0745" quat="0.5 0.5 -0.5 -0.5" mesh="leg_plate" material="leg_plate_material"/>
             <!-- Link xl330_3 -->
             <body name="xl330_3" pos="0.042 -1.51788e-16 -8.32667e-17" quat="0.707107 2.90779e-15 -3.27516e-15 0.707107">
               <!-- Joint from xl330_2 to xl330_3 -->
@@ -256,10 +256,10 @@
               <geom type="mesh" class="visual" pos="-4.72712e-17 -0.042 -0.0145" quat="0.5 0.5 0.5 -0.5" mesh="xl330" material="xl330_material"/>
               <!-- Part leg_plate_7 -->
               <geom type="mesh" class="visual" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 7.77156e-16 1.44012e-15" mesh="leg_plate" material="leg_plate_material"/>
-              <geom type="mesh" class="self_collision_only" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 7.77156e-16 1.44012e-15" mesh="leg_plate" material="leg_plate_material"/>
+              <geom type="mesh" class="collision" pos="0.01 0.0432 0.0455" quat="0.707107 -0.707107 7.77156e-16 1.44012e-15" mesh="leg_plate" material="leg_plate_material"/>
               <!-- Part leg_plate_8 -->
               <geom type="mesh" class="visual" pos="-0.01 0.0432 -0.0745" quat="3.33889e-15 -2.79611e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
-              <geom type="mesh" class="self_collision_only" pos="-0.01 0.0432 -0.0745" quat="3.33889e-15 -2.79611e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
+              <geom type="mesh" class="collision" pos="-0.01 0.0432 -0.0745" quat="3.33889e-15 -2.79611e-15 -0.707107 -0.707107" mesh="leg_plate" material="leg_plate_material"/>
               <!-- Link foot -->
               <body name="foot" pos="8.32667e-17 -0.042 -5.55112e-17" quat="1 1.85332e-16 4.91968e-15 7.28477e-16">
                 <!-- Joint from xl330_3 to foot -->
