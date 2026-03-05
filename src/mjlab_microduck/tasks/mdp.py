@@ -970,7 +970,7 @@ def torso_ground_proximity(
     Weighted by max(0, sin(2π*phase)) so it only applies during the descent.
     """
     asset = env.scene[asset_cfg.name]
-    trunk_z = asset.data.body_pos_w[:, asset_cfg.body_ids[0], 2]
+    trunk_z = asset.data.body_com_pos_w[:, asset_cfg.body_ids[0], 2]
     proximity = torch.exp(-((trunk_z - target_height) / std) ** 2)
 
     cmd = env.command_manager.get_command(command_name)
