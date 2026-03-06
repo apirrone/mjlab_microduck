@@ -2025,4 +2025,4 @@ def body_pose_cmd_range_curriculum(
     cfg.ranges.lin_vel_y = (-current_angle, current_angle)
     cfg.ranges.ang_vel_z = (-current_angle, current_angle)
 
-    return torch.tensor([current_z, current_angle])
+    return torch.tensor(current_z)
