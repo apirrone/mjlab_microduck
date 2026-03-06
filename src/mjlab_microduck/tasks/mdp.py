@@ -1994,24 +1994,29 @@ def roll_upright_return(
     return return_weight * upright
 
 
-def roll_phase_orientation(
+def roll_orientation_tracking(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
     command_name: str = "twist",
 ) -> torch.Tensor:
-    """Phase-conditioned orientation reward for the forward roll.
+    """Phase-tracking orientation reward for the forward roll.
 
-    Rewards the trunk orientation matching what it should be at each phase:
-        Phase 0 / 1 (start / end): upright    → reward = +upright
-        Phase 0.5   (mid-roll):    inverted    → reward = +upright (inverted = -1, factor = -1)
-        In between:                smooth cosine interpolation
+    Target orientation at each phase: target_upright = cos(2π·phase)
+        phase=0/1  → target=+1 (upright)
+        phase=0.25 → target=0  (horizontal, mid-tuck)
+        phase=0.5  → target=-1 (inverted, completed roll)
 
-    Computed as:  upright_linear × cos(2π·phase)
-        where  cos(2π·phase) = cmd[:, 0]
+    Uses L2 penalty so gradient is NON-ZERO at every orientation, including
+    when the robot is stuck horizontal (upright=0) and needs to tilt further.
+    The previous `upright × cos(phase)` = 0 whenever upright=0 — no gradient
+    at the exact stuck point.
 
-    This distinguishes a proper roll from a "lean-and-recover":
-    - Lean-and-recover: robot is UPRIGHT at phase=0.5  → reward = +1 × (-1) = -1  (penalised)
-    - Proper roll:      robot is INVERTED at phase=0.5 → reward = -1 × (-1) = +1  (rewarded)
+        reward = -(upright - target)² / 4   ∈ [-1, 0]
+
+    At phase=0.5:
+        Robot upright (+1):    -(+1 - (-1))²/4 = -1.0  (strong penalty)
+        Robot horizontal (0):  -(0  - (-1))²/4 = -0.25 (mild penalty, still pushes to tilt)
+        Robot inverted (-1):   -(-1 - (-1))²/4 =  0    (no penalty — correct)
     """
     asset: Entity = env.scene[asset_cfg.name]
     quat = asset.data.root_link_quat_w  # (num_envs, 4): [w, x, y, z]
@@ -2020,9 +2025,9 @@ def roll_phase_orientation(
     upright = 1.0 - 2.0 * (qx * qx + qy * qy)  # ∈ [-1, +1]
 
     cmd = env.command_manager.get_command(command_name)
-    expected_direction = cmd[:, 0]  # cos(2π·phase), ∈ [-1, +1]
+    target = cmd[:, 0]  # cos(2π·phase), ∈ [-1, +1]
 
-    return upright * expected_direction
+    return -((upright - target) ** 2) / 4.0  # ∈ [-1, 0]
 
 
 def roll_return_com_height(

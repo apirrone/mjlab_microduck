@@ -105,14 +105,13 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # ── Rewards: roll objectives ───────────────────────────────────────────────
 
-    # PRIMARY: phase-conditioned orientation.
-    # upright × cos(2π·phase) — rewards upright at phase 0/1, inverted at phase 0.5.
-    # Penalises "lean-and-recover": being upright at phase=0.5 gives reward = +1×(-1) = -1.
-    # Only a genuine roll (inverted at 0.5) gets +1×(-1)... wait, inverted=-1, cos(π)=-1,
-    # reward = (-1)×(-1) = +1.  Standing at 0.5: (+1)×(-1) = -1.
-    cfg.rewards["roll_phase_orientation"] = RewardTermCfg(
-        func=microduck_mdp.roll_phase_orientation,
-        weight=6.0,
+    # PRIMARY: L2 orientation tracking — penalises deviation from the target
+    # orientation at each phase.  Non-zero gradient everywhere, including when
+    # the robot is stuck horizontal (the critical failing point).
+    # reward = -(upright - cos(2π·phase))² / 4   ∈ [-1, 0]
+    cfg.rewards["roll_orientation_tracking"] = RewardTermCfg(
+        func=microduck_mdp.roll_orientation_tracking,
+        weight=8.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
             "command_name": "twist",
