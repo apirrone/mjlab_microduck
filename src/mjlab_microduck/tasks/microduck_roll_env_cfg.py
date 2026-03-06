@@ -246,7 +246,20 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         mode="reset",
     )
     cfg.events["foot_friction"].params["asset_cfg"].geom_names = foot_frictions_geom_names
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.13)
+    # More z clearance needed when robot initialises at 90°–180° forward pitch
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.13, 0.15)
+
+    # Curriculum reset: initialise at random forward pitch (0°–180°) with
+    # matching phase so roll_orientation_tracking immediately makes sense.
+    # Runs after reset_base so it only overrides the orientation, not position.
+    cfg.events["reset_roll_pitch"] = EventTermCfg(
+        func=microduck_mdp.reset_roll_pitch,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "max_pitch_fraction": 1.0,  # sample full 0°–180° arc
+        },
+    )
 
     if ENABLE_COM_RANDOMIZATION:
         cfg.events["randomize_com"] = EventTermCfg(

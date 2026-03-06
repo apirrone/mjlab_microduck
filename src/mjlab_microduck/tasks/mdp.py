@@ -1994,6 +1994,59 @@ def roll_upright_return(
     return return_weight * upright
 
 
+def reset_roll_pitch(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    max_pitch_fraction: float = 1.0,
+):
+    """Curriculum reset: initialise robot at a random forward pitch for roll training.
+
+    Sets BOTH the robot orientation AND the RollPhaseCommand phase consistently,
+    so the robot starts in a physically valid roll state and immediately receives
+    a correct target from roll_orientation_tracking.
+
+    Without this, the robot never discovers the inverted state through exploration
+    alone — the gradient from the L2 reward pushes toward it but isn't strong
+    enough to bridge the gap from horizontal to inverted.
+
+    Quaternion for pure forward pitch θ around Y-axis:
+        [cos(θ/2), 0, sin(θ/2), 0]   ([w, x, y, z] convention)
+
+    Phase matching:
+        upright(θ) = cos(θ)  and  target_upright = cos(2π·phase)
+        → phase = θ / (2π)   for θ ∈ [0, π]  gives phase ∈ [0, 0.5]
+
+    Args:
+        max_pitch_fraction: fraction of π to sample from.
+            0.5 = up to 90° (the stuck-point curriculum)
+            1.0 = full 0°–180° (full roll curriculum, recommended)
+    """
+    if len(env_ids) == 0:
+        return
+    env_ids_int = env_ids.to(env.device, dtype=torch.int)
+    n = len(env_ids_int)
+
+    # Sample random pitch in [0, max_pitch_fraction × π]
+    pitch = torch.rand(n, device=env.device) * (max_pitch_fraction * np.pi)
+
+    # Quaternion: pure forward pitch around Y-axis
+    half = pitch / 2.0
+    qw = torch.cos(half)
+    qy = torch.sin(half)
+    zeros = torch.zeros(n, device=env.device)
+    new_quat = torch.stack([qw, zeros, qy, zeros], dim=1)  # [w, x, y, z]
+
+    env.sim.data.qpos[env_ids_int, 3:7] = new_quat
+    env.sim.data.qvel[env_ids_int, :6] = 0.0
+
+    # Sync roll phase: phase = θ / (2π)  →  phase ∈ [0, 0.5] for θ ∈ [0, π]
+    matching_phase = pitch / (2.0 * np.pi)
+    command_terms = env.command_manager._terms
+    if "twist" in command_terms and hasattr(command_terms["twist"], "_roll_phase"):
+        command_terms["twist"]._roll_phase[env_ids] = matching_phase
+
+
 def roll_orientation_tracking(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
