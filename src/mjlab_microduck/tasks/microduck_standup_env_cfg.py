@@ -39,7 +39,7 @@ from mjlab.tasks.velocity import mdp as velocity_mdp
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
-from mjlab_microduck.robot.microduck_constants import MICRODUCK_ROBOT_CFG
+from mjlab_microduck.robot.microduck_constants import MICRODUCK_STANDUP_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
@@ -82,7 +82,7 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg = make_velocity_env_cfg()
 
-    cfg.scene.entities = {"robot": MICRODUCK_ROBOT_CFG}
+    cfg.scene.entities = {"robot": MICRODUCK_STANDUP_ROBOT_CFG}
     cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg)
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None

@@ -6,12 +6,34 @@ from mjlab.actuator import DelayedActuatorCfg, XmlPositionActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.utils.spec_config import CollisionCfg
 
-MICRODUCK_XML: Path = Path(os.path.dirname(__file__)) / "microduck" / "robot.xml"
+_ROBOT_DIR: Path = Path(os.path.dirname(__file__)) / "microduck"
+
+MICRODUCK_XML: Path = _ROBOT_DIR / "robot.xml"
+MICRODUCK_WALK_XML: Path = _ROBOT_DIR / "robot_walk.xml"
+MICRODUCK_STANDUP_XML: Path = _ROBOT_DIR / "robot_standup.xml"
+MICRODUCK_GROUND_PICK_XML: Path = _ROBOT_DIR / "robot_ground_pick.xml"
+
 assert MICRODUCK_XML.exists(), f"XML not found: {MICRODUCK_XML}"
+assert MICRODUCK_WALK_XML.exists(), f"XML not found: {MICRODUCK_WALK_XML}"
+assert MICRODUCK_STANDUP_XML.exists(), f"XML not found: {MICRODUCK_STANDUP_XML}"
+# robot_ground_pick.xml is optional — falls back to robot_standup.xml if absent
+_GROUND_PICK_XML = MICRODUCK_GROUND_PICK_XML if MICRODUCK_GROUND_PICK_XML.exists() else MICRODUCK_STANDUP_XML
 
 
 def get_spec() -> mujoco.MjSpec:
     return mujoco.MjSpec.from_file(str(MICRODUCK_XML))
+
+
+def get_walk_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(MICRODUCK_WALK_XML))
+
+
+def get_standup_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(MICRODUCK_STANDUP_XML))
+
+
+def get_ground_pick_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(_GROUND_PICK_XML))
 
 
 HOME_FRAME = EntityCfg.InitialStateCfg(
@@ -51,6 +73,36 @@ actuators = DelayedActuatorCfg(
 
 MICRODUCK_ROBOT_CFG = EntityCfg(
     spec_fn=get_spec,
+    init_state=HOME_FRAME,
+    collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
+MICRODUCK_WALK_ROBOT_CFG = EntityCfg(
+    spec_fn=get_walk_spec,
+    init_state=HOME_FRAME,
+    collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
+MICRODUCK_STANDUP_ROBOT_CFG = EntityCfg(
+    spec_fn=get_standup_spec,
+    init_state=HOME_FRAME,
+    collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
+MICRODUCK_GROUND_PICK_ROBOT_CFG = EntityCfg(
+    spec_fn=get_ground_pick_spec,
     init_state=HOME_FRAME,
     collisions=(FULL_COLLISION,),
     articulation=EntityArticulationInfoCfg(

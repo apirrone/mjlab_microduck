@@ -55,7 +55,7 @@ from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
-from mjlab_microduck.robot.microduck_constants import MICRODUCK_ROBOT_CFG
+from mjlab_microduck.robot.microduck_constants import MICRODUCK_GROUND_PICK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
@@ -92,7 +92,7 @@ def make_microduck_ground_pick_env_cfg(play: bool = False) -> ManagerBasedRlEnvC
     # ── Base config ───────────────────────────────────────────────────────────
     cfg = make_velocity_env_cfg()
 
-    cfg.scene.entities = {"robot": MICRODUCK_ROBOT_CFG}
+    cfg.scene.entities = {"robot": MICRODUCK_GROUND_PICK_ROBOT_CFG}
     cfg.scene.sensors  = (feet_ground_cfg, self_collision_cfg)
     cfg.viewer.body_name = "trunk_base"
 
