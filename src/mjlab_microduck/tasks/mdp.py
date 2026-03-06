@@ -1992,3 +1992,38 @@ def roll_upright_return(
     return_weight = torch.clamp(-cmd[:, 1], min=0.0)  # -sin, positive during return phase
 
     return return_weight * upright
+
+
+def roll_return_com_height(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    target_height_min: float = 0.08,
+    target_height_max: float = 0.11,
+) -> torch.Tensor:
+    """Reward reaching standing height during the return phase.
+
+    Return phase weight = max(0, -sin(2π·phase)).
+    Delegates to com_height_target for the height metric.
+    """
+    height_rew = com_height_target(env, asset_cfg, target_height_min, target_height_max)
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)
+    return return_weight * height_rew
+
+
+def roll_return_upward_velocity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    max_height: float = 0.08,
+) -> torch.Tensor:
+    """Reward upward CoM velocity during the return phase while still low.
+
+    Provides gradient to push the robot off the ground after the roll.
+    Return phase weight = max(0, -sin(2π·phase)).
+    """
+    vel_rew = com_upward_velocity(env, asset_cfg, max_height)
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)
+    return return_weight * vel_rew

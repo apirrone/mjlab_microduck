@@ -117,12 +117,46 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         },
     )
 
-    # Return phase: reward returning to standing pose.
-    # Weighted by max(0, -sin(2π·phase)) — peaks at phase=0.75.
+    # Return phase: reward reaching standing height (penalizes lying flat on ground).
+    # Weighted by max(0, -sin(2π·phase)).
+    cfg.rewards["roll_return_com_height"] = RewardTermCfg(
+        func=microduck_mdp.roll_return_com_height,
+        weight=6.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            "command_name": "twist",
+            "target_height_min": 0.08,
+            "target_height_max": 0.11,
+        },
+    )
+
+    # Return phase: reward upward CoM velocity while still low (get off the ground).
+    cfg.rewards["roll_return_upward_velocity"] = RewardTermCfg(
+        func=microduck_mdp.roll_return_upward_velocity,
+        weight=4.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            "command_name": "twist",
+            "max_height": 0.08,
+        },
+    )
+
+    # Return phase: reward being upright again after the roll.
+    # Also penalizes being inverted during return phase (-1 × return_weight).
+    cfg.rewards["roll_upright_return"] = RewardTermCfg(
+        func=microduck_mdp.roll_upright_return,
+        weight=5.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            "command_name": "twist",
+        },
+    )
+
+    # Return phase: reward returning to standing joint pose.
     _LEG_JOINTS = [0, 1, 2, 3, 4, 9, 10, 11, 12, 13]
     cfg.rewards["roll_return_pose_legs"] = RewardTermCfg(
         func=microduck_mdp.ground_pick_return_pose,
-        weight=4.0,
+        weight=3.0,
         params={
             "std": 0.3,
             "command_name": "twist",
@@ -133,7 +167,7 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     _NECK_JOINTS = [5, 6, 7, 8]
     cfg.rewards["roll_return_pose_neck"] = RewardTermCfg(
         func=microduck_mdp.ground_pick_return_pose,
-        weight=4.0,
+        weight=3.0,
         params={
             "std": 0.15,
             "command_name": "twist",
@@ -141,27 +175,18 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         },
     )
 
-    # Return phase: reward being upright again after the roll.
-    cfg.rewards["roll_upright_return"] = RewardTermCfg(
-        func=microduck_mdp.roll_upright_return,
-        weight=3.0,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
-            "command_name": "twist",
-        },
-    )
-
     # ── Rewards: stability ────────────────────────────────────────────────────
 
-    # Upright: very low weight during roll (robot must go inverted), peaks at return.
-    # We keep a small always-on upright to discourage random flopping.
+    # Small always-on upright to avoid random flopping, but low enough not to
+    # prevent the roll (robot must pass through inverted states).
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 0.1
+    cfg.rewards["upright"].weight = 0.3
 
-    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["body_ang_vel"].weight = -0.02  # very low — angular vel is required during roll
+    # body_ang_vel removed: a forward roll requires very high angular velocity
+    # (~5-10 rad/s); penalizing it would directly fight the roll motion.
+    del cfg.rewards["body_ang_vel"]
 
-    cfg.rewards["angular_momentum"].weight = -0.005  # minimal — needed during roll
+    cfg.rewards["angular_momentum"].weight = -0.005  # minimal
 
     cfg.rewards["soft_landing"].weight = -1e-5
 
