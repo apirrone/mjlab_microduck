@@ -1898,3 +1898,97 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
     def _update_metrics(self) -> None:
         pass  # No velocity tracking metrics for ground pick
+
+
+# ==============================================================================
+# Roll Task
+# ==============================================================================
+
+
+class RollPhaseCommand(UniformVelocityCommand):
+    """Phase-encoding command for the forward roll task.
+
+    Identical encoding to GroundPickPhaseCommand:
+        command = [cos(2π*phase), sin(2π*phase), 0]
+
+    Phase ∈ [0, 0.5]:  roll phase  (sin > 0) — robot should be rolling forward.
+    Phase ∈ [0.5, 1.0]: return phase (sin < 0) — robot should be returning to standing.
+
+    Period is 4 s (same as ground pick) — 2 s rolling, 2 s recovering.
+    Phase is randomized per environment on episode reset.
+    """
+
+    PERIOD: float = 4.0  # seconds per full cycle
+
+    def __init__(self, cfg, env: ManagerBasedRlEnv):
+        super().__init__(cfg, env)
+        self._roll_phase = torch.zeros(self.num_envs, device=self.device)
+
+    @property
+    def command(self) -> torch.Tensor:
+        return self.vel_command_b
+
+    def compute(self, dt: float) -> None:
+        self._roll_phase = (self._roll_phase + dt / self.PERIOD) % 1.0
+        self.vel_command_b[:, 0] = torch.cos(2 * torch.pi * self._roll_phase)
+        self.vel_command_b[:, 1] = torch.sin(2 * torch.pi * self._roll_phase)
+        self.vel_command_b[:, 2] = 0.0
+
+    def reset(self, env_ids: torch.Tensor | None) -> dict:
+        if env_ids is not None and len(env_ids) > 0:
+            self._roll_phase[env_ids] = torch.rand(len(env_ids), device=self.device)
+        return {}
+
+    def _resample_command(self, env_ids: torch.Tensor) -> None:
+        pass
+
+    def _update_command(self) -> None:
+        pass
+
+    def _update_metrics(self) -> None:
+        pass
+
+
+def roll_pitch_angular_velocity(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    max_ang_vel: float = 10.0,
+) -> torch.Tensor:
+    """Reward forward pitch angular velocity during the roll phase.
+
+    Roll phase weight = max(0, sin(2π·phase)) — peaks at phase=0.25.
+    Rewards positive y-axis angular velocity in world frame (trunk pitching
+    forward = rolling over).  Normalized to [0, 1] by `max_ang_vel`.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    # root_link_vel_w: (num_envs, 6) — [:3] linear, [3:] angular
+    pitch_vel = asset.data.root_link_vel_w[:, 4]  # y-axis angular velocity
+
+    cmd = env.command_manager.get_command(command_name)
+    roll_weight = torch.clamp(cmd[:, 1], min=0.0)  # sin component
+
+    normalized = torch.clamp(pitch_vel, min=0.0, max=max_ang_vel) / max_ang_vel
+    return roll_weight * normalized
+
+
+def roll_upright_return(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward being upright during the return phase of the forward roll.
+
+    Return phase weight = max(0, -sin(2π·phase)) — peaks at phase=0.75.
+    Linear upright metric: +1 fully upright, 0 horizontal, -1 inverted.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    quat = asset.data.root_link_quat_w  # (num_envs, 4): [w, x, y, z]
+    qx = quat[:, 1]
+    qy = quat[:, 2]
+    upright = 1.0 - 2.0 * (qx * qx + qy * qy)
+
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)  # -sin, positive during return phase
+
+    return return_weight * upright

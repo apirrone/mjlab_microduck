@@ -19,6 +19,10 @@ from .microduck_standup_env_cfg import (
     make_microduck_standup_env_cfg,
     MicroduckStandUpRlCfg,
 )
+from .microduck_roll_env_cfg import (
+    make_microduck_roll_env_cfg,
+    MicroduckRollRlCfg,
+)
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -38,6 +42,16 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 print("✓ StandUp task registered: Mjlab-StandUp-Flat-MicroDuck")
+
+# Roll task — episodic policy: stand → forward roll → stand
+register_mjlab_task(
+    task_id="Mjlab-Roll-Flat-MicroDuck",
+    env_cfg=make_microduck_roll_env_cfg(),
+    play_env_cfg=make_microduck_roll_env_cfg(play=True),
+    rl_cfg=MicroduckRollRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ Roll task registered: Mjlab-Roll-Flat-MicroDuck")
 
 # Ground pick task — episodic policy: crouch, touch ground with mouth, return to standing
 register_mjlab_task(

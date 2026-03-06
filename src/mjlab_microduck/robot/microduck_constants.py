@@ -94,6 +94,17 @@ MICRODUCK_GROUND_PICK_ROBOT_CFG = EntityCfg(
     ),
 )
 
+# Roll task uses robot_stand_up.xml (full body collisions needed for rolling contact)
+MICRODUCK_ROLL_ROBOT_CFG = EntityCfg(
+    spec_fn=get_standup_spec,
+    init_state=HOME_FRAME,
+    collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
 if __name__ == "__main__":
     import mujoco.viewer as viewer
     from mjlab.scene import Scene, SceneCfg
