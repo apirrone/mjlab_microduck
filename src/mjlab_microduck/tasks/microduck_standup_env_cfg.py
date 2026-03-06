@@ -2,8 +2,12 @@
 
 The robot is initialized lying on its back (body inverted 180° from upright)
 and must learn to right itself and reach a stable standing posture.
+
+Phase 2 (body control): once standing, the repurposed velocity command slot
+drives body pose control — [Δz (m), Δpitch (rad), Δroll (rad)].
 """
 
+import math
 from copy import deepcopy
 
 # Domain randomization toggles
@@ -19,6 +23,16 @@ MASS_INERTIA_RANDOMIZATION_RANGE = (0.95, 1.05)
 KP_RANDOMIZATION_RANGE = (0.85, 1.15)
 KD_RANDOMIZATION_RANGE = (0.9, 1.1)
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0
+
+# Body pose command control
+# Nominal standing CoM height (midpoint of [0.08, 0.11] m)
+BODY_CMD_NOMINAL_HEIGHT = 0.095
+# Normalization constants for the policy observation (must match training)
+BODY_CMD_MAX_Z = 0.025          # ±25 mm height offset
+BODY_CMD_MAX_ANGLE = math.radians(20)  # ±20° pitch / roll
+# Tracking reward std — tight to create strong gradients
+BODY_CMD_Z_STD = 0.01           # 10 mm
+BODY_CMD_ANGLE_STD = math.radians(5)   # 5°
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -127,13 +141,38 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.observations["policy"].enable_corruption = not play
 
     # === COMMANDS ===
-    # Always zero velocity — task is to stand up, not walk
+    # Repurpose the 3 velocity command slots as body pose control:
+    #   [Δz (m), Δpitch (rad), Δroll (rad)]
+    # Ranges start at zero; curriculum gradually expands them.
     command = cfg.commands["twist"]
-    command.rel_standing_envs = 1.0
+    command.rel_standing_envs = 0.0   # BodyPoseCommand never zeros the command
     command.rel_heading_envs = 0.0
-    command.resampling_time_range = (1.0e9, 1.0e9)
+    command.heading_command = False
+    command.ranges.heading = None
+    command.resampling_time_range = (4.0, 8.0)
     command.debug_vis = False
-    command.class_type = microduck_mdp.VelocityCommandCommandOnly
+    command.class_type = microduck_mdp.BodyPoseCommand
+    command.ranges.lin_vel_x = (0.0, 0.0)   # Δz:     expanded by curriculum
+    command.ranges.lin_vel_y = (0.0, 0.0)   # Δpitch: expanded by curriculum
+    command.ranges.ang_vel_z = (0.0, 0.0)   # Δroll:  expanded by curriculum
+
+    # Override policy command observation with normalized body pose cmd
+    cfg.observations["policy"].terms["command"] = ObservationTermCfg(
+        func=microduck_mdp.body_pose_cmd_obs,
+        params={
+            "command_name": "twist",
+            "max_z": BODY_CMD_MAX_Z,
+            "max_angle": BODY_CMD_MAX_ANGLE,
+        },
+    )
+    cfg.observations["critic"].terms["command"] = ObservationTermCfg(
+        func=microduck_mdp.body_pose_cmd_obs,
+        params={
+            "command_name": "twist",
+            "max_z": BODY_CMD_MAX_Z,
+            "max_angle": BODY_CMD_MAX_ANGLE,
+        },
+    )
 
     # === REWARDS ===
     cfg.rewards = {
@@ -157,12 +196,26 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
             },
         ),
         # Height reward: quadratic penalty below target, +1 when in standing range.
+        # Range is widened to accommodate ±BODY_CMD_MAX_Z body pose commands.
         "com_height_target": RewardTermCfg(
             func=microduck_mdp.com_height_target,
             weight=5.0,
             params={
-                "target_height_min": 0.08,
-                "target_height_max": 0.11,
+                "target_height_min": BODY_CMD_NOMINAL_HEIGHT - BODY_CMD_MAX_Z - 0.005,
+                "target_height_max": BODY_CMD_NOMINAL_HEIGHT + BODY_CMD_MAX_Z + 0.005,
+            },
+        ),
+        # Body pose tracking reward: Gaussian on z, pitch, roll vs commanded values.
+        # Weight starts at 0; curriculum kicks it in once the robot can stand reliably.
+        "body_pose_tracking": RewardTermCfg(
+            func=microduck_mdp.body_pose_tracking,
+            weight=0.0,
+            params={
+                "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+                "command_name": "twist",
+                "nominal_height": BODY_CMD_NOMINAL_HEIGHT,
+                "z_std": BODY_CMD_Z_STD,
+                "angle_std": BODY_CMD_ANGLE_STD,
             },
         ),
         # Pose reward only once standing (std is loose — don't over-constrain during
@@ -286,6 +339,32 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
                 {"step": 2000 * 24,  "weight": -0.6},
                 {"step": 2500 * 24,  "weight": -0.8},
                 {"step": 3000 * 24,  "weight": -1.0},
+            ],
+        },
+    )
+
+    # Body pose tracking weight — starts at 0, ramps up after the robot is standing
+    cfg.curriculum["body_pose_tracking_weight"] = CurriculumTermCfg(
+        func=velocity_mdp.reward_weight,
+        params={
+            "reward_name": "body_pose_tracking",
+            "weight_stages": [
+                {"step": 0,          "weight": 0.0},
+                {"step": 3000 * 24,  "weight": 2.0},
+                {"step": 5000 * 24,  "weight": 5.0},
+            ],
+        },
+    )
+
+    # Body pose command range — starts at 0, expanded by curriculum alongside weight
+    cfg.curriculum["body_pose_cmd_range"] = CurriculumTermCfg(
+        func=microduck_mdp.body_pose_cmd_range_curriculum,
+        params={
+            "command_name": "twist",
+            "range_stages": [
+                {"step": 0,          "max_z": 0.0,                     "max_angle": 0.0},
+                {"step": 3000 * 24,  "max_z": 0.010,                   "max_angle": math.radians(10)},
+                {"step": 5000 * 24,  "max_z": BODY_CMD_MAX_Z,          "max_angle": BODY_CMD_MAX_ANGLE},
             ],
         },
     )

@@ -1,5 +1,7 @@
 """MDP functions for microduck tasks"""
 
+import math
+
 import numpy as np
 import torch
 from typing import TYPE_CHECKING, Optional
@@ -1898,3 +1900,129 @@ class GroundPickPhaseCommand(UniformVelocityCommand):
 
     def _update_metrics(self) -> None:
         pass  # No velocity tracking metrics for ground pick
+
+
+class BodyPoseCommand(UniformVelocityCommand):
+    """Body pose command for standing control: [Δz (m), Δpitch (rad), Δroll (rad)].
+
+    Repurposes the 3-slot velocity command to control body height offset, pitch,
+    and roll while the robot is standing. The command is sampled uniformly from the
+    configured ranges and resampled at the configured interval.
+
+    Mapping:
+        vel_command_b[:, 0] = Δz      (height offset in meters, + = up)
+        vel_command_b[:, 1] = Δpitch  (pitch offset in radians, + = forward tilt)
+        vel_command_b[:, 2] = Δroll   (roll offset in radians, + = right lean)
+
+    Configure via UniformVelocityCommandCfg ranges:
+        ranges.lin_vel_x = (-max_z, max_z)
+        ranges.lin_vel_y = (-max_pitch, max_pitch)
+        ranges.ang_vel_z = (-max_roll, max_roll)
+
+    Set rel_standing_envs=0.0 and heading_command=False so the parent never zeros
+    or heading-adjusts the command.
+    """
+
+    def _update_metrics(self) -> None:
+        pass  # Body pose has no velocity tracking metrics
+
+    def _debug_vis_impl(self, visualizer: "DebugVisualizer") -> None:
+        pass  # No visualization needed
+
+
+def body_pose_cmd_obs(
+    env: ManagerBasedRlEnv,
+    command_name: str = "twist",
+    max_z: float = 0.025,
+    max_angle: float = math.radians(20),
+) -> torch.Tensor:
+    """Normalized body pose command observation: [Δz/max_z, Δpitch/max_angle, Δroll/max_angle].
+
+    Returns a 3D vector in [-1, 1] when commands are within their configured ranges,
+    preserving the same 3-slot obs shape as the original velocity command.
+    """
+    cmd = env.command_manager.get_command(command_name)  # (N, 3)
+    norm = torch.tensor([max_z, max_angle, max_angle], device=env.device)
+    return cmd[:, :3] / norm
+
+
+def body_pose_tracking(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+    nominal_height: float = 0.095,
+    z_std: float = 0.01,
+    angle_std: float = math.radians(5),
+) -> torch.Tensor:
+    """Gaussian reward for tracking commanded body pose (z height, pitch, roll).
+
+    Returns the mean of three independent Gaussian rewards:
+        - z:     actual CoM height vs (nominal_height + Δz_cmd)
+        - pitch: actual body pitch vs Δpitch_cmd  (ZYX Euler, + = forward tilt)
+        - roll:  actual body roll  vs Δroll_cmd   (ZYX Euler, + = right lean)
+
+    Args:
+        nominal_height: Nominal standing CoM height in meters.
+        z_std:          Std for height tracking Gaussian (meters).
+        angle_std:      Std for pitch/roll tracking Gaussians (radians).
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    cmd = env.command_manager.get_command(command_name)  # (N, 3)
+    dz_cmd = cmd[:, 0]
+    dpitch_cmd = cmd[:, 1]
+    droll_cmd = cmd[:, 2]
+
+    # Height tracking
+    z = asset.data.root_link_pos_w[:, 2]
+    z_reward = torch.exp(-((z - (nominal_height + dz_cmd)) / z_std) ** 2)
+
+    # Pitch and roll from quaternion (ZYX Euler angles)
+    quat = asset.data.root_link_quat_w  # (N, 4): [w, x, y, z]
+    qw, qx, qy, qz = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
+    roll = torch.atan2(2.0 * (qw * qx + qy * qz), 1.0 - 2.0 * (qx ** 2 + qy ** 2))
+    pitch = torch.asin(torch.clamp(2.0 * (qw * qy - qz * qx), -1.0, 1.0))
+
+    pitch_reward = torch.exp(-((pitch - dpitch_cmd) / angle_std) ** 2)
+    roll_reward = torch.exp(-((roll - droll_cmd) / angle_std) ** 2)
+
+    return (z_reward + pitch_reward + roll_reward) / 3.0
+
+
+def body_pose_cmd_range_curriculum(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    command_name: str,
+    range_stages: list[dict],
+) -> torch.Tensor:
+    """Update body pose command ranges based on training progress.
+
+    Args:
+        command_name: Name of the command term (e.g., "twist").
+        range_stages: List of dicts with 'step', 'max_z' (m), 'max_angle' (rad) keys.
+            Example: [
+                {"step": 0,          "max_z": 0.0,   "max_angle": 0.0},
+                {"step": 1000 * 24,  "max_z": 0.01,  "max_angle": 0.087},
+                {"step": 3000 * 24,  "max_z": 0.025, "max_angle": 0.349},
+            ]
+    """
+    del env_ids  # Unused
+
+    from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+    from typing import cast
+
+    command_term = env.command_manager.get_term(command_name)
+    assert command_term is not None, f"Command term '{command_name}' not found"
+    cfg = cast(UniformVelocityCommandCfg, command_term.cfg)
+
+    current_z = range_stages[0]["max_z"]
+    current_angle = range_stages[0]["max_angle"]
+    for stage in range_stages:
+        if env.common_step_counter >= stage["step"]:
+            current_z = stage["max_z"]
+            current_angle = stage["max_angle"]
+
+    cfg.ranges.lin_vel_x = (-current_z, current_z)
+    cfg.ranges.lin_vel_y = (-current_angle, current_angle)
+    cfg.ranges.ang_vel_z = (-current_angle, current_angle)
+
+    return torch.tensor([current_z, current_angle])
