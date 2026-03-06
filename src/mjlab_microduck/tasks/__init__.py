@@ -11,10 +11,6 @@ from .microduck_imitation_env_cfg import (
     make_microduck_imitation_env_cfg,
     MicroduckImitationRlCfg,
 )
-from .microduck_standing_env_cfg import (
-    make_microduck_standing_env_cfg,
-    MicroduckStandingRlCfg,
-)
 from .microduck_ground_pick_env_cfg import (
     make_microduck_ground_pick_env_cfg,
     MicroduckGroundPickRlCfg,
@@ -32,16 +28,6 @@ register_mjlab_task(
     rl_cfg=MicroduckRlCfg,
     runner_cls=VelocityOnPolicyRunner,
 )
-
-# Standing (balance) task - no walking, just robust standing
-register_mjlab_task(
-    task_id="Mjlab-Standing-Flat-MicroDuck",
-    env_cfg=make_microduck_standing_env_cfg(),
-    play_env_cfg=make_microduck_standing_env_cfg(play=True),
-    rl_cfg=MicroduckStandingRlCfg,
-    runner_cls=VelocityOnPolicyRunner,
-)
-print("✓ Standing task registered: Mjlab-Standing-Flat-MicroDuck")
 
 # Stand-up task — robot starts inverted (lying on back) and must stand up
 register_mjlab_task(
