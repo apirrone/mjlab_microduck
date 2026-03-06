@@ -105,11 +105,25 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # ── Rewards: roll objectives ───────────────────────────────────────────────
 
-    # Roll phase: reward positive pitch angular velocity (trunk rolling forward).
-    # Weighted by max(0, sin(2π·phase)) — peaks at phase=0.25.
+    # PRIMARY: phase-conditioned orientation.
+    # upright × cos(2π·phase) — rewards upright at phase 0/1, inverted at phase 0.5.
+    # Penalises "lean-and-recover": being upright at phase=0.5 gives reward = +1×(-1) = -1.
+    # Only a genuine roll (inverted at 0.5) gets +1×(-1)... wait, inverted=-1, cos(π)=-1,
+    # reward = (-1)×(-1) = +1.  Standing at 0.5: (+1)×(-1) = -1.
+    cfg.rewards["roll_phase_orientation"] = RewardTermCfg(
+        func=microduck_mdp.roll_phase_orientation,
+        weight=6.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
+            "command_name": "twist",
+        },
+    )
+
+    # Roll phase: forward pitch angular momentum helps initiate and sustain the roll.
+    # Lower weight than orientation — it's an auxiliary push signal.
     cfg.rewards["roll_pitch_momentum"] = RewardTermCfg(
         func=microduck_mdp.roll_pitch_angular_velocity,
-        weight=4.0,
+        weight=2.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
             "command_name": "twist",
@@ -117,11 +131,10 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         },
     )
 
-    # Return phase: reward reaching standing height (penalizes lying flat on ground).
-    # Weighted by max(0, -sin(2π·phase)).
+    # Return phase: reward reaching standing height.
     cfg.rewards["roll_return_com_height"] = RewardTermCfg(
         func=microduck_mdp.roll_return_com_height,
-        weight=6.0,
+        weight=5.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
             "command_name": "twist",
@@ -130,10 +143,10 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         },
     )
 
-    # Return phase: reward upward CoM velocity while still low (get off the ground).
+    # Return phase: upward CoM velocity while still low.
     cfg.rewards["roll_return_upward_velocity"] = RewardTermCfg(
         func=microduck_mdp.roll_return_upward_velocity,
-        weight=4.0,
+        weight=3.0,
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
             "command_name": "twist",
@@ -141,22 +154,11 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         },
     )
 
-    # Return phase: reward being upright again after the roll.
-    # Also penalizes being inverted during return phase (-1 × return_weight).
-    cfg.rewards["roll_upright_return"] = RewardTermCfg(
-        func=microduck_mdp.roll_upright_return,
-        weight=5.0,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=("trunk_base",)),
-            "command_name": "twist",
-        },
-    )
-
-    # Return phase: reward returning to standing joint pose.
+    # Return phase: return to standing joint pose.
     _LEG_JOINTS = [0, 1, 2, 3, 4, 9, 10, 11, 12, 13]
     cfg.rewards["roll_return_pose_legs"] = RewardTermCfg(
         func=microduck_mdp.ground_pick_return_pose,
-        weight=3.0,
+        weight=2.0,
         params={
             "std": 0.3,
             "command_name": "twist",
@@ -167,7 +169,7 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     _NECK_JOINTS = [5, 6, 7, 8]
     cfg.rewards["roll_return_pose_neck"] = RewardTermCfg(
         func=microduck_mdp.ground_pick_return_pose,
-        weight=3.0,
+        weight=2.0,
         params={
             "std": 0.15,
             "command_name": "twist",
@@ -177,10 +179,8 @@ def make_microduck_roll_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     # ── Rewards: stability ────────────────────────────────────────────────────
 
-    # Small always-on upright to avoid random flopping, but low enough not to
-    # prevent the roll (robot must pass through inverted states).
-    cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 0.3
+    # Remove always-on upright: roll_phase_orientation already handles all phases.
+    del cfg.rewards["upright"]
 
     # body_ang_vel removed: a forward roll requires very high angular velocity
     # (~5-10 rad/s); penalizing it would directly fight the roll motion.

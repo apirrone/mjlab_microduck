@@ -1994,6 +1994,37 @@ def roll_upright_return(
     return return_weight * upright
 
 
+def roll_phase_orientation(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Phase-conditioned orientation reward for the forward roll.
+
+    Rewards the trunk orientation matching what it should be at each phase:
+        Phase 0 / 1 (start / end): upright    → reward = +upright
+        Phase 0.5   (mid-roll):    inverted    → reward = +upright (inverted = -1, factor = -1)
+        In between:                smooth cosine interpolation
+
+    Computed as:  upright_linear × cos(2π·phase)
+        where  cos(2π·phase) = cmd[:, 0]
+
+    This distinguishes a proper roll from a "lean-and-recover":
+    - Lean-and-recover: robot is UPRIGHT at phase=0.5  → reward = +1 × (-1) = -1  (penalised)
+    - Proper roll:      robot is INVERTED at phase=0.5 → reward = -1 × (-1) = +1  (rewarded)
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    quat = asset.data.root_link_quat_w  # (num_envs, 4): [w, x, y, z]
+    qx = quat[:, 1]
+    qy = quat[:, 2]
+    upright = 1.0 - 2.0 * (qx * qx + qy * qy)  # ∈ [-1, +1]
+
+    cmd = env.command_manager.get_command(command_name)
+    expected_direction = cmd[:, 0]  # cos(2π·phase), ∈ [-1, +1]
+
+    return upright * expected_direction
+
+
 def roll_return_com_height(
     env: ManagerBasedRlEnv,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
