@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import math
 import pickle
 import time
 import numpy as np
@@ -11,6 +12,10 @@ import mujoco.viewer
 import onnxruntime as ort
 
 MICRODUCK_XML = "src/mjlab_microduck/robot/microduck/scene.xml"
+
+# Body pose command constants (must match training constants)
+BODY_CMD_MAX_Z = 0.025              # ±25 mm
+BODY_CMD_MAX_ANGLE = math.radians(20)  # ±20°
 
 # Default pose used by the policy (legs flexed, standing position)
 # This is the reference pose that:
@@ -35,8 +40,9 @@ DEFAULT_POSE = np.array([
 
 
 class PolicyInference:
-    def __init__(self, model, data, onnx_path, action_scale=1.0, use_imitation=False, reference_motion_path=None,
-                 delay_min_lag=0, delay_max_lag=0, standing_onnx_path=None, switch_threshold=0.05,
+    def __init__(self, model, data, walking_onnx_path=None, action_scale=1.0, use_imitation=False,
+                 reference_motion_path=None, delay_min_lag=0, delay_max_lag=0,
+                 standing_onnx_path=None, switch_threshold=0.05,
                  use_projected_gravity=False, ground_pick_onnx_path=None, ground_pick_period=4.0):
         self.model = model
         self.data = data
@@ -47,33 +53,39 @@ class PolicyInference:
         self.delay_max_lag = delay_max_lag
         self.switch_threshold = switch_threshold
 
-        # Load walking policy (primary ONNX model)
-        print(f"Loading walking policy from: {onnx_path}")
-        self.walking_session = ort.InferenceSession(onnx_path)
-        self.ort_session = self.walking_session  # Default to walking
+        # Load walking policy
+        self.walking_session = None
+        self.default_gait_period_from_onnx = None
+        if walking_onnx_path:
+            print(f"Loading walking policy from: {walking_onnx_path}")
+            self.walking_session = ort.InferenceSession(walking_onnx_path)
+            w_input_shape = self.walking_session.get_inputs()[0].shape
+            w_output_shape = self.walking_session.get_outputs()[0].shape
+            print(f"Walking policy input: {self.walking_session.get_inputs()[0].name}, shape: {w_input_shape}")
+            print(f"Walking policy output: {self.walking_session.get_outputs()[0].name}, shape: {w_output_shape}")
 
-        # Get input/output names from walking policy
-        self.input_name = self.walking_session.get_inputs()[0].name
-        self.output_name = self.walking_session.get_outputs()[0].name
+            # Try to read gait period from ONNX metadata
+            try:
+                model_metadata = self.walking_session.get_modelmeta()
+                if hasattr(model_metadata, 'custom_metadata_map') and 'gait_period' in model_metadata.custom_metadata_map:
+                    self.default_gait_period_from_onnx = float(model_metadata.custom_metadata_map['gait_period'])
+                    print(f"Found gait period in ONNX metadata: {self.default_gait_period_from_onnx:.4f}s")
+            except Exception as e:
+                print(f"Could not read gait period from ONNX metadata: {e}")
 
-        input_shape = self.walking_session.get_inputs()[0].shape
-        output_shape = self.walking_session.get_outputs()[0].shape
-        print(f"Walking policy input: {self.input_name}, shape: {input_shape}")
-        print(f"Walking policy output: {self.output_name}, shape: {output_shape}")
+        # Load standing policy
+        self.standing_session = None
+        if standing_onnx_path:
+            print(f"\nLoading standing policy from: {standing_onnx_path}")
+            self.standing_session = ort.InferenceSession(standing_onnx_path)
+            s_input_shape = self.standing_session.get_inputs()[0].shape
+            s_output_shape = self.standing_session.get_outputs()[0].shape
+            print(f"Standing policy input: {self.standing_session.get_inputs()[0].name}, shape: {s_input_shape}")
+            print(f"Standing policy output: {self.standing_session.get_outputs()[0].name}, shape: {s_output_shape}")
+            if self.walking_session:
+                print(f"Policy switching threshold: {switch_threshold} (vel command magnitude)")
 
-        # Try to read gait period from ONNX metadata
-        try:
-            model_metadata = self.walking_session.get_modelmeta()
-            if hasattr(model_metadata, 'custom_metadata_map') and 'gait_period' in model_metadata.custom_metadata_map:
-                self.default_gait_period_from_onnx = float(model_metadata.custom_metadata_map['gait_period'])
-                print(f"Found gait period in ONNX metadata: {self.default_gait_period_from_onnx:.4f}s")
-            else:
-                self.default_gait_period_from_onnx = None
-        except Exception as e:
-            print(f"Could not read gait period from ONNX metadata: {e}")
-            self.default_gait_period_from_onnx = None
-
-        # Load ground pick policy if provided
+        # Load ground pick policy
         self.ground_pick_session = None
         self.ground_pick_mode = False
         self.ground_pick_phase = 0.0
@@ -84,19 +96,21 @@ class PolicyInference:
             gp_input_shape = self.ground_pick_session.get_inputs()[0].shape
             print(f"Ground pick policy input shape: {gp_input_shape}")
 
-        # Load standing policy if provided
-        self.standing_session = None
-        if standing_onnx_path:
-            print(f"\nLoading standing policy from: {standing_onnx_path}")
-            self.standing_session = ort.InferenceSession(standing_onnx_path)
-            standing_input_shape = self.standing_session.get_inputs()[0].shape
-            standing_output_shape = self.standing_session.get_outputs()[0].shape
-            print(f"Standing policy input: {self.standing_session.get_inputs()[0].name}, shape: {standing_input_shape}")
-            print(f"Standing policy output: {self.standing_session.get_outputs()[0].name}, shape: {standing_output_shape}")
-            print(f"Policy switching threshold: {switch_threshold} (command magnitude)")
+        # Validate at least one policy loaded
+        if not self.walking_session and not self.standing_session:
+            raise ValueError("At least one of --walking or --standing must be provided")
 
-        # Track which policy is active
-        self.current_policy = "walking"
+        # Determine initial active session and policy
+        if self.walking_session:
+            self.current_policy = "walking"
+            self.ort_session = self.walking_session
+        else:
+            self.current_policy = "standing"
+            self.ort_session = self.standing_session
+
+        # Get input/output names from active session
+        self.input_name = self.ort_session.get_inputs()[0].name
+        self.output_name = self.ort_session.get_outputs()[0].name
 
         # Get sensor IDs and body IDs
         self.imu_ang_vel_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, "imu_ang_vel")
@@ -108,7 +122,7 @@ class PolicyInference:
         print(f"  trunk_base: id={self.trunk_base_id}")
 
         # Joint information
-        self.n_joints = model.nu  # Number of actuators
+        self.n_joints = model.nu
 
         # Default pose for the policy (flexed legs)
         self.default_pose = DEFAULT_POSE[:self.n_joints]
@@ -119,55 +133,57 @@ class PolicyInference:
         # Last action (for observation history)
         self.last_action = np.zeros(self.n_joints, dtype=np.float32)
 
-        # Command (lin_vel_x, lin_vel_y, ang_vel_z)
+        # Velocity command [lin_vel_x, lin_vel_y, ang_vel_z] — controls walking / policy switching
+        self.vel_cmd = np.zeros(3, dtype=np.float32)
+        # Body pose command [Δz (m), Δpitch (rad), Δroll (rad)] — physical units
+        self.body_cmd = np.zeros(3, dtype=np.float32)
+        # Normalized obs command (set by _update_command)
         self.command = np.zeros(3, dtype=np.float32)
+
+        # Body pose mode (like head mode but for standing body pose control)
+        self.body_pose_mode = False
+        self.body_cmd_step_z = 0.001              # 1 mm per keypress
+        self.body_cmd_step_angle = math.radians(1) # 1° per keypress
 
         # Head control mode
         self.head_mode = False
-        # Offsets added on top of policy output for neck joints [neck_pitch, head_pitch, head_yaw, head_roll]
         self.head_offset = np.zeros(4, dtype=np.float32)
-        self.head_max = 2.5  # max offset per joint (rad), matches training NECK_OFFSET_MAX_ANGLE
-        self.head_step = 0.1  # increment per key press (rad)
+        self.head_max = 2.5
+        self.head_step = 0.1
 
         # Imitation learning phase tracking
         self.imitation_phase = 0.0
-        self.gait_period = 0.5  # Fallback default
+        self.gait_period = 0.5
 
         if self.use_imitation:
             print(f"\nImitation mode enabled")
 
-            # Priority 1: Load from reference motion file if provided
             if reference_motion_path:
                 import pickle
                 try:
                     with open(reference_motion_path, 'rb') as f:
                         ref_data = pickle.load(f)
-                    # Get period from any motion (they should all have similar periods)
                     first_key = list(ref_data.keys())[0]
                     self.gait_period = ref_data[first_key]['period']
                     print(f"  Loaded gait period from reference motion file: {self.gait_period:.4f}s")
                     print(f"  Reference motion: {reference_motion_path}")
                 except Exception as e:
                     print(f"  Warning: Could not load reference motion: {e}")
-                    # Fall through to ONNX metadata
 
-            # Priority 2: Use ONNX metadata if available and no reference motion
             if not reference_motion_path and self.default_gait_period_from_onnx is not None:
                 self.gait_period = self.default_gait_period_from_onnx
                 print(f"  Using gait period from ONNX metadata: {self.gait_period:.4f}s")
 
-            # Priority 3: Fallback to default
             if reference_motion_path is None and self.default_gait_period_from_onnx is None:
                 print(f"  Warning: No gait period found in ONNX or reference motion")
                 print(f"  Using fallback default period: {self.gait_period:.4f}s")
 
-        # Action delay buffer (matches mjlab's DelayedActuatorCfg)
+        # Action delay buffer
         self.use_delay = self.delay_max_lag > 0
         if self.use_delay:
             buffer_size = self.delay_max_lag + 1
             self.action_buffer = [np.zeros(self.n_joints, dtype=np.float32) for _ in range(buffer_size)]
             self.buffer_index = 0
-            # Sample a fixed lag for single-environment inference (matches mjlab behavior)
             self.current_lag = np.random.randint(self.delay_min_lag, self.delay_max_lag + 1)
             print(f"\nActuator delay enabled:")
             print(f"  Min lag: {self.delay_min_lag} timesteps")
@@ -178,94 +194,103 @@ class PolicyInference:
             self.action_buffer = None
             self.current_lag = 0
 
+    def _update_command(self):
+        """Update self.command (fed into obs) based on current policy and commands."""
+        if self.current_policy == "walking":
+            self.command = self.vel_cmd.copy()
+        elif self.current_policy == "standing":
+            # Normalize body pose cmd to match training's body_pose_cmd_obs
+            self.command = np.array([
+                self.body_cmd[0] / BODY_CMD_MAX_Z,
+                self.body_cmd[1] / BODY_CMD_MAX_ANGLE,
+                self.body_cmd[2] / BODY_CMD_MAX_ANGLE,
+            ], dtype=np.float32)
+        # ground_pick: command is set directly by update_ground_pick_phase
+
+    def _update_policy_session(self):
+        """Switch between walking and standing sessions based on vel_cmd magnitude."""
+        if not (self.walking_session and self.standing_session):
+            return  # Only one policy loaded, no switching
+        if self.ground_pick_mode:
+            return  # Don't switch during ground pick
+
+        magnitude = float(np.linalg.norm(self.vel_cmd))
+        new_policy = "standing" if magnitude <= self.switch_threshold else "walking"
+        if new_policy != self.current_policy:
+            self.current_policy = new_policy
+            self.ort_session = self.standing_session if new_policy == "standing" else self.walking_session
+            print(f"Switched to {self.current_policy} policy (vel magnitude: {magnitude:.3f})")
+            self._update_command()
+
+    def set_vel_cmd(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
+        """Set velocity command (used for walking / policy switching)."""
+        self.vel_cmd = np.array([lin_vel_x, lin_vel_y, ang_vel_z], dtype=np.float32)
+        self._update_policy_session()
+        self._update_command()
+        print(f"Vel cmd: [{lin_vel_x:.2f}, {lin_vel_y:.2f}, {ang_vel_z:.2f}] [{self.current_policy}]")
+
+    def toggle_body_pose_mode(self):
+        """Toggle body pose control mode on/off."""
+        self.body_pose_mode = not self.body_pose_mode
+        if self.body_pose_mode:
+            print("Body pose mode: ON")
+            print(f"  UP/DOWN: Δz ±{self.body_cmd_step_z*1000:.0f}mm  (max ±{BODY_CMD_MAX_Z*1000:.0f}mm)")
+            print(f"  LEFT/RIGHT: Δpitch ±1°  (max ±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°)")
+            print(f"  A/E: Δroll ±1°  (max ±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°)")
+            print(f"  SPACE: reset body pose to zero")
+            print(f"  Current: z={self.body_cmd[0]*1000:.1f}mm  pitch={math.degrees(self.body_cmd[1]):.1f}°  roll={math.degrees(self.body_cmd[2]):.1f}°")
+        else:
+            print("Body pose mode: OFF")
+
+    def _print_body_cmd(self):
+        print(f"Body cmd: z={self.body_cmd[0]*1000:.1f}mm  pitch={math.degrees(self.body_cmd[1]):.1f}°  roll={math.degrees(self.body_cmd[2]):.1f}°")
+
     def quat_rotate_inverse(self, quat, vec):
-        """Rotate a vector by the inverse of a quaternion [w, x, y, z].
-
-        Uses the formula from PyTorch's quat_apply_inverse:
-        result = vec - w * t + xyz × t, where t = xyz × vec * 2
-        """
+        """Rotate a vector by the inverse of a quaternion [w, x, y, z]."""
         w = quat[0]
-        xyz = quat[1:4]  # [x, y, z]
-
-        # t = xyz × vec * 2
+        xyz = quat[1:4]
         t = np.cross(xyz, vec) * 2
-
-        # result = vec - w * t + xyz × t
         return vec - w * t + np.cross(xyz, t)
 
     def get_raw_accelerometer(self):
-        """Get raw accelerometer reading from MuJoCo sensor.
-
-        Returns normalized raw accelerometer which includes gravity + linear acceleration.
-        This matches what the real BNO055 accelerometer measures.
-        Reads from the 'imu_accel' sensor in the MuJoCo model.
-        """
-        # Find the accelerometer sensor and read from sensordata
+        """Get raw accelerometer reading from MuJoCo sensor."""
         sensor_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SENSOR, "imu_accel")
         if sensor_id < 0:
             raise ValueError("Sensor 'imu_accel' not found in model")
 
         sensor_adr = self.model.sensor_adr[sensor_id]
-
-        # Read accelerometer data (specific force measured by sensor)
         accel_raw = self.data.sensordata[sensor_adr:sensor_adr+3].copy().astype(np.float32)
-
-        # MuJoCo accelerometer measures specific force (like real sensor)
-        # Negate to match convention: when at rest upright, should point down
         accel_negated = -accel_raw
-
-        # Normalize
         mag = np.linalg.norm(accel_negated)
         if mag > 0.1:
             return accel_negated / mag
         else:
-            # Fallback to projected gravity
             quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
             world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
             return self.quat_rotate_inverse(quat, world_gravity)
 
     def get_projected_gravity(self):
-        """Get projected gravity in body frame.
-
-        Returns the gravity vector projected into the robot's body frame,
-        representing pure orientation without linear acceleration.
-        """
+        """Get projected gravity in body frame."""
         quat = self.data.xquat[self.trunk_base_id].copy().astype(np.float32)
         world_gravity = np.array([0.0, 0.0, -1.0], dtype=np.float32)
         return self.quat_rotate_inverse(quat, world_gravity)
 
     def get_base_ang_vel(self):
-        """Get base angular velocity from IMU gyro sensor.
-
-        This matches mdp.builtin_sensor with sensor_name="robot/imu_ang_vel".
-        """
+        """Get base angular velocity from IMU gyro sensor."""
         sensor_adr = self.model.sensor_adr[self.imu_ang_vel_id]
         return self.data.sensordata[sensor_adr:sensor_adr + 3].copy().astype(np.float32)
 
     def get_joint_pos_relative(self):
-        """Get joint positions relative to default pose.
-
-        Returns: current_pos - default_pose
-        This matches mdp.joint_pos_rel.
-        """
-        # Skip freejoint (7 qpos DOFs: x, y, z, qw, qx, qy, qz)
+        """Get joint positions relative to default pose."""
         current_pos = self.data.qpos[7:7 + self.n_joints].copy().astype(np.float32)
         return current_pos - self.default_pose
 
     def get_joint_vel(self):
-        """Get joint velocities relative to default (which is zero).
-
-        This matches mdp.joint_vel_rel.
-        """
-        # Skip freejoint (6 qvel DOFs: vx, vy, vz, wx, wy, wz)
-        # Default joint vel is 0, so relative vel = absolute vel
+        """Get joint velocities."""
         return self.data.qvel[6:6 + self.n_joints].copy().astype(np.float32)
 
     def get_imitation_phase_obs(self):
-        """Get imitation phase observation as [cos(2π*phase), sin(2π*phase)].
-
-        This matches ImitationCommand.phase encoding.
-        """
+        """Get imitation phase observation as [cos(2π*phase), sin(2π*phase)]."""
         phase_rad = self.imitation_phase * 2 * np.pi
         return np.array([np.cos(phase_rad), np.sin(phase_rad)], dtype=np.float32)
 
@@ -273,72 +298,50 @@ class PolicyInference:
         """Update the gait phase based on elapsed time."""
         if self.use_imitation:
             self.imitation_phase += dt / self.gait_period
-            self.imitation_phase = self.imitation_phase % 1.0  # Keep in [0, 1]
+            self.imitation_phase = self.imitation_phase % 1.0
 
     def get_observations(self):
         """Collect observations matching policy input.
 
-        Order for velocity task (no imitation):
+        Order for velocity/standing task (no imitation):
         1. base_ang_vel (3D)
         2. raw_accelerometer OR projected_gravity (3D)
         3. joint_pos (14D) - relative to default
-        4. joint_vel (14D) - relative to default (zero)
+        4. joint_vel (14D)
         5. actions (14D) - last action
-        6. command (3D) - velocity command
+        6. command (3D) - vel cmd (walking) or normalized body pose cmd (standing)
         Total: 51D
 
         Order for imitation task (use_imitation=True):
-        1. command (3D) - velocity command
-        2. phase (2D) - [cos(2π*phase), sin(2π*phase)]
+        1. command (3D)
+        2. phase (2D)
         3. base_ang_vel (3D)
         4. raw_accelerometer OR projected_gravity (3D)
-        5. joint_pos (14D) - relative to default
-        6. joint_vel (14D) - relative to default (zero)
-        7. actions (14D) - last action
+        5. joint_pos (14D)
+        6. joint_vel (14D)
+        7. actions (14D)
         Total: 53D
         """
         obs = []
 
         if self.use_imitation:
-            # Imitation task: command and phase come first
-            # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
+            obs.append(self.get_imitation_phase_obs())
 
-            # Imitation phase [cos, sin] - 2D
-            phase_obs = self.get_imitation_phase_obs()
-            obs.append(phase_obs)
+        obs.append(self.get_base_ang_vel())
 
-        # Base angular velocity from sensor (NO delay, NO noise) - 3D
-        ang_vel = self.get_base_ang_vel()
-        obs.append(ang_vel)
-
-        # Gravity/accelerometer observation - 3D
         if self.use_projected_gravity:
-            # Use projected gravity (orientation only)
-            gravity = self.get_projected_gravity()
-            obs.append(gravity)
+            obs.append(self.get_projected_gravity())
         else:
-            # Use raw accelerometer (includes linear acceleration)
-            raw_accel = self.get_raw_accelerometer()
-            obs.append(raw_accel)
+            obs.append(self.get_raw_accelerometer())
 
-        # Joint positions (relative to default pose, NO noise) - n_joints
-        joint_pos_rel = self.get_joint_pos_relative()
-        obs.append(joint_pos_rel)
-
-        # Joint velocities (relative to zero, NO noise) - n_joints
-        joint_vel = self.get_joint_vel()
-        obs.append(joint_vel)
-
-        # Last action - n_joints
+        obs.append(self.get_joint_pos_relative())
+        obs.append(self.get_joint_vel())
         obs.append(self.last_action)
 
         if not self.use_imitation:
-            # Velocity task: command comes last
-            # Command (lin_vel_x, lin_vel_y, ang_vel_z) - 3D
             obs.append(self.command)
 
-        # Concatenate all observations
         return np.concatenate(obs).astype(np.float32)
 
     def trigger_ground_pick(self):
@@ -356,19 +359,24 @@ class PolicyInference:
         print(f"Ground pick: started (period={self.ground_pick_period:.1f}s)")
 
     def _end_ground_pick(self):
-        """Switch back to walking after a ground pick cycle completes."""
+        """Switch back after a ground pick cycle completes."""
         self.ground_pick_mode = False
-        self.command = np.zeros(3, dtype=np.float32)
-        self.ort_session = self.walking_session
-        self.current_policy = "walking"
-        print("Ground pick: done → back to walking")
+        self.vel_cmd = np.zeros(3, dtype=np.float32)
+        if self.walking_session:
+            self.current_policy = "walking"
+            self.ort_session = self.walking_session
+        else:
+            self.current_policy = "standing"
+            self.ort_session = self.standing_session
+        self._update_command()
+        print(f"Ground pick: done → back to {self.current_policy}")
 
     def update_ground_pick_phase(self, dt: float):
         """Advance the ground pick phase; auto-exit when one full cycle completes."""
         if not self.ground_pick_mode:
             return
         new_phase = self.ground_pick_phase + dt / self.ground_pick_period
-        if new_phase >= 0.7: # with 1.0 it goes down again before switching back to walking somehow
+        if new_phase >= 0.7:
             self._end_ground_pick()
             return
         self.ground_pick_phase = new_phase
@@ -383,120 +391,66 @@ class PolicyInference:
             print("Head mode: ON")
             print(f"  Z/S: neck_pitch  |  UP/DOWN: head_pitch  |  LEFT/RIGHT: head_yaw  |  A/E: head_roll  |  SPACE: reset  (max ±{self.head_max:.2f} rad)")
         else:
-            print("Head mode: OFF  (arrows and A/E back to velocity control)")
-
-    def set_command(self, lin_vel_x=0.0, lin_vel_y=0.0, ang_vel_z=0.0):
-        """Set velocity command and switch policy if needed."""
-        self.command = np.array([lin_vel_x, lin_vel_y, ang_vel_z], dtype=np.float32)
-
-        # Calculate command magnitude
-        command_magnitude = np.sqrt(lin_vel_x**2 + lin_vel_y**2 + ang_vel_z**2)
-
-        # Switch policy based on command magnitude if standing policy is available
-        previous_policy = self.current_policy
-        if self.standing_session is not None:
-            if command_magnitude <= self.switch_threshold:
-                self.current_policy = "standing"
-                self.ort_session = self.standing_session
-            else:
-                self.current_policy = "walking"
-                self.ort_session = self.walking_session
-
-            # Print when policy switches
-            if previous_policy != self.current_policy:
-                print(f"Switched to {self.current_policy} policy (magnitude: {command_magnitude:.3f})")
-
-        print(f"Command: lin_vel_x={lin_vel_x:.2f}, lin_vel_y={lin_vel_y:.2f}, ang_vel_z={ang_vel_z:.2f} [{self.current_policy}]")
+            print("Head mode: OFF")
 
     def infer(self):
         """Run policy inference and return action."""
-        # Get observations
         obs = self.get_observations()
-
-        # Add batch dimension
         obs_batch = obs.reshape(1, -1)
-
-        # Run inference with active policy
         action = self.ort_session.run([self.output_name], {self.input_name: obs_batch})[0]
-
-        # Remove batch dimension
         action = action.squeeze(0).astype(np.float32)
-
-        # Store for next step
         self.last_action = action.copy()
-
         return action
 
     def apply_action(self, action):
-        """Apply action to MuJoCo controls with optional delay.
-
-        Motor targets = default_pose + action * action_scale
-
-        If delay is enabled, the action is buffered and a delayed action
-        from T-lag timesteps ago is applied instead (matching mjlab's DelayedActuatorCfg).
-        """
+        """Apply action to MuJoCo controls with optional delay."""
         if self.use_delay:
-            # Add current action to circular buffer
             self.action_buffer[self.buffer_index] = action.copy()
-
-            # Calculate index for delayed action (T - lag timesteps ago)
-            # Buffer stores most recent actions in order: [t-2, t-1, t]
-            # If buffer_index=2 and lag=1, we want action at index 1 (t-1)
-            # If buffer_index=2 and lag=2, we want action at index 0 (t-2)
             delayed_index = (self.buffer_index - self.current_lag) % len(self.action_buffer)
             delayed_action = self.action_buffer[delayed_index]
-
-            # Advance buffer index (circular)
             self.buffer_index = (self.buffer_index + 1) % len(self.action_buffer)
-
-            # Use delayed action
             target_positions = self.default_pose + delayed_action * self.action_scale
         else:
-            # No delay: use current action directly
-            # target_positions = self.default_pose# + action * self.action_scale
             target_positions = self.default_pose + action * self.action_scale
-    
-        # Set control targets
-        self.data.ctrl[:] = target_positions
 
-        # Add head offset on top of policy output (neck/head joints 5–8)
+        self.data.ctrl[:] = target_positions
         self.data.ctrl[5:9] += self.head_offset
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run ONNX policy in MuJoCo")
-    parser.add_argument("onnx_path", type=str, help="Path to ONNX policy file (walking policy)")
-    parser.add_argument("-s", "--standing", type=str, default=None, help="Path to standing policy ONNX file (optional)")
-    parser.add_argument("--lin-vel-x", type=float, default=0.0, help="Linear velocity X command (m/s)")
-    parser.add_argument("--lin-vel-y", type=float, default=0.0, help="Linear velocity Y command (m/s)")
-    parser.add_argument("--ang-vel-z", type=float, default=0.0, help="Angular velocity Z command (rad/s)")
+    parser.add_argument("--walking", type=str, default=None, help="Path to walking policy ONNX file")
+    parser.add_argument("--standing", "-s", type=str, default=None, help="Path to standing policy ONNX file")
+    parser.add_argument("--ground-pick", type=str, default=None, help="Path to ground pick policy ONNX file (press G to activate)")
+    parser.add_argument("--lin-vel-x", type=float, default=0.0, help="Initial linear velocity X command (m/s)")
+    parser.add_argument("--lin-vel-y", type=float, default=0.0, help="Initial linear velocity Y command (m/s)")
+    parser.add_argument("--ang-vel-z", type=float, default=0.0, help="Initial angular velocity Z command (rad/s)")
     parser.add_argument("--action-scale", type=float, default=1.0, help="Action scale (default: 1.0)")
     parser.add_argument("--imitation", action="store_true", help="Enable imitation mode (adds phase observation)")
     parser.add_argument("--reference-motion", type=str, default=None, help="Path to reference motion .pkl file (for imitation)")
-    parser.add_argument("--raw-accelerometer", action="store_true", help="Use raw accelerometer instead of projected gravity (default: projected gravity)")
-    parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX (e.g., --delay 1 2 for mjlab default) or --delay LAG for fixed delay")
+    parser.add_argument("--raw-accelerometer", action="store_true", help="Use raw accelerometer instead of projected gravity")
+    parser.add_argument("--delay", type=int, nargs='*', default=None, help="Enable actuator delay: --delay MIN MAX or --delay LAG")
     parser.add_argument("--debug", action="store_true", help="Print observations and actions")
     parser.add_argument("--save-csv", type=str, default=None, help="Save observations and actions to CSV file")
     parser.add_argument("--record", type=str, default=None, help="Enable recording mode: save observations to pickle file on Ctrl+C")
-    parser.add_argument("--switch-threshold", type=float, default=0.05, help="Command magnitude threshold for switching between standing and walking policy (default: 0.05)")
-    parser.add_argument("--ground-pick", type=str, default=None, help="Path to ground pick policy ONNX file (press G to activate)")
+    parser.add_argument("--switch-threshold", type=float, default=0.05, help="Vel command magnitude threshold for walking/standing switch (default: 0.05)")
     parser.add_argument("--ground-pick-period", type=float, default=4.0, help="Ground pick phase period in seconds (default: 4.0)")
     args = parser.parse_args()
+
+    if not args.walking and not args.standing:
+        parser.error("At least one of --walking or --standing must be provided")
 
     # Parse delay arguments
     delay_min_lag = 0
     delay_max_lag = 0
     if args.delay is not None:
         if len(args.delay) == 0:
-            # --delay with no arguments: use mjlab default (1-2 timesteps)
             delay_min_lag = 1
             delay_max_lag = 2
         elif len(args.delay) == 1:
-            # --delay LAG: fixed delay
             delay_min_lag = args.delay[0]
             delay_max_lag = args.delay[0]
         elif len(args.delay) == 2:
-            # --delay MIN MAX: random delay in range
             delay_min_lag = args.delay[0]
             delay_max_lag = args.delay[1]
         else:
@@ -506,16 +460,13 @@ def main():
     # Load MuJoCo model
     print(f"Loading MuJoCo model from: {MICRODUCK_XML}")
     model = mujoco.MjModel.from_xml_path(MICRODUCK_XML)
-
-    # Override timestep to match mjlab (0.005s instead of XML's 0.002s)
-    # mjlab velocity environments use timestep=0.005 for performance/stability
     model.opt.timestep = 0.005
-
     data = mujoco.MjData(model)
 
     # Initialize policy
     policy = PolicyInference(
-        model, data, args.onnx_path,
+        model, data,
+        walking_onnx_path=args.walking,
         action_scale=args.action_scale,
         use_imitation=args.imitation,
         reference_motion_path=args.reference_motion,
@@ -527,35 +478,25 @@ def main():
         ground_pick_onnx_path=args.ground_pick,
         ground_pick_period=args.ground_pick_period,
     )
-    policy.set_command(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
+    policy.set_vel_cmd(args.lin_vel_x, args.lin_vel_y, args.ang_vel_z)
 
     # Set initial position to default pose
     freejoint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "trunk_base_freejoint")
     qpos_adr = model.jnt_qposadr[freejoint_id]
-
-    # Set base position (match training config: z=0.12-0.13)
-    data.qpos[qpos_adr + 0] = 0.0  # x
-    data.qpos[qpos_adr + 1] = 0.0  # y
-    data.qpos[qpos_adr + 2] = 0.125  # z (height) - middle of training range
-    data.qpos[qpos_adr + 3:qpos_adr + 7] = [1, 0, 0, 0]  # identity quaternion
-
-    # Set joint positions to default pose (flexed legs)
+    data.qpos[qpos_adr + 0] = 0.0
+    data.qpos[qpos_adr + 1] = 0.0
+    data.qpos[qpos_adr + 2] = 0.125
+    data.qpos[qpos_adr + 3:qpos_adr + 7] = [1, 0, 0, 0]
     data.qpos[7:7 + policy.n_joints] = policy.default_pose
-
-    # Set controls to default pose (important for initial state)
     data.ctrl[:] = policy.default_pose
-
-    # Forward kinematics
     mujoco.mj_forward(model, data)
 
     # Verify observation size
     test_obs = policy.get_observations()
     if policy.use_imitation:
-        # Imitation task: command(3) + phase(2) + ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action
         expected_obs_size = 3 + 2 + 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints
         breakdown = f"3(command) + 2(phase) + 3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action)"
     else:
-        # Velocity task: ang_vel(3) + proj_grav(3) + joint_pos + joint_vel + last_action + command(3)
         expected_obs_size = 3 + 3 + policy.n_joints + policy.n_joints + policy.n_joints + 3
         breakdown = f"3(ang_vel) + 3(proj_grav) + {policy.n_joints}(joint_pos) + {policy.n_joints}(joint_vel) + {policy.n_joints}(last_action) + 3(command)"
 
@@ -567,43 +508,37 @@ def main():
         print()
 
     print("\n" + "="*80)
-    print("MicroDuck Policy Inference (NO delays, NO noise for sim2sim)")
+    print("MicroDuck Policy Inference")
     print("="*80)
     print(f"Control frequency: 50 Hz (decimation: 4)")
     print(f"Simulation timestep: {model.opt.timestep}s")
     print(f"Observation size: {test_obs.size} (expected: {expected_obs_size})")
     if policy.use_imitation:
         print(f"Imitation mode: ENABLED (gait period: {policy.gait_period:.3f}s)")
-    if policy.standing_session is not None:
-        print(f"Dual-policy mode: ENABLED")
-        print(f"  Standing/Walking switch threshold: {policy.switch_threshold} (command magnitude)")
-        print(f"  Initial policy: {policy.current_policy}")
+    if policy.walking_session:
+        print(f"Walking policy: loaded")
+    if policy.standing_session:
+        print(f"Standing policy: loaded  (body pose: z=±{BODY_CMD_MAX_Z*1000:.0f}mm, pitch/roll=±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°)")
+    if policy.walking_session and policy.standing_session:
+        print(f"  Switch threshold: {policy.switch_threshold} (vel cmd magnitude)")
+    if policy.ground_pick_session:
+        print(f"Ground pick policy: loaded  (press G)")
+    print(f"Active policy: {policy.current_policy}")
     print("Close viewer window to exit")
     print()
 
-    # Control loop matching mjlab timing
-    # Simulation runs at model.opt.timestep (0.005s = 200Hz)
-    # Control runs every 4 steps (0.02s = 50Hz)
     decimation = 4
     control_step_count = 0
-    control_dt = decimation * model.opt.timestep  # Time per control step (0.02s)
+    control_dt = decimation * model.opt.timestep
 
-    # Data collection for CSV
     csv_data = [] if args.save_csv else None
-
-    # Data collection for recording (pickle)
     recorded_observations = [] if args.record else None
-
-    # Policy control for recording mode (start disabled, enable after 1s)
-    policy_enabled = not args.record  # Disabled if recording, enabled otherwise
+    policy_enabled = not args.record
     policy_enable_time = None
-
-    # Save original kp gains for restoring after standby
     original_kp = None
     if args.record:
         original_kp = model.actuator_gainprm[:, 0].copy()
 
-    # Setup keyboard listener using pynput
     try:
         from pynput import keyboard as pynput_keyboard
 
@@ -613,49 +548,79 @@ def main():
                     if policy.head_mode:
                         policy.head_offset[1] = np.clip(policy.head_offset[1] + policy.head_step, -policy.head_max, policy.head_max)
                         print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_pose_mode:
+                        policy.body_cmd[0] = np.clip(policy.body_cmd[0] + policy.body_cmd_step_z, -BODY_CMD_MAX_Z, BODY_CMD_MAX_Z)
+                        policy._update_command()
+                        policy._print_body_cmd()
                     else:
-                        policy.set_command(0.5, 0.0, 0.0)
+                        policy.set_vel_cmd(0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
                     if policy.head_mode:
                         policy.head_offset[1] = np.clip(policy.head_offset[1] - policy.head_step, -policy.head_max, policy.head_max)
                         print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_pose_mode:
+                        policy.body_cmd[0] = np.clip(policy.body_cmd[0] - policy.body_cmd_step_z, -BODY_CMD_MAX_Z, BODY_CMD_MAX_Z)
+                        policy._update_command()
+                        policy._print_body_cmd()
                     else:
-                        policy.set_command(-0.5, 0.0, 0.0)
+                        policy.set_vel_cmd(-0.5, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
                     if policy.head_mode:
                         policy.head_offset[2] = np.clip(policy.head_offset[2] - policy.head_step, -policy.head_max, policy.head_max)
                         print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_pose_mode:
+                        policy.body_cmd[1] = np.clip(policy.body_cmd[1] - policy.body_cmd_step_angle, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE)
+                        policy._update_command()
+                        policy._print_body_cmd()
                     else:
-                        policy.set_command(0.0, -0.5, 0.0)
+                        policy.set_vel_cmd(0.0, -0.5, 0.0)
                 elif key == pynput_keyboard.Key.left:
                     if policy.head_mode:
                         policy.head_offset[2] = np.clip(policy.head_offset[2] + policy.head_step, -policy.head_max, policy.head_max)
                         print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                    elif policy.body_pose_mode:
+                        policy.body_cmd[1] = np.clip(policy.body_cmd[1] + policy.body_cmd_step_angle, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE)
+                        policy._update_command()
+                        policy._print_body_cmd()
                     else:
-                        policy.set_command(0.0, 0.5, 0.0)
+                        policy.set_vel_cmd(0.0, 0.5, 0.0)
                 elif key == pynput_keyboard.Key.space:
                     if policy.head_mode:
                         policy.head_offset[:] = 0.0
                         print("Head offset reset to zero")
+                    elif policy.body_pose_mode:
+                        policy.body_cmd[:] = 0.0
+                        policy._update_command()
+                        print("Body pose cmd reset to zero")
                     else:
-                        policy.set_command(0.0, 0.0, 0.0)
+                        policy.set_vel_cmd(0.0, 0.0, 0.0)
                 elif hasattr(key, 'char'):
                     if key.char == 'g' or key.char == 'G':
                         policy.trigger_ground_pick()
                     elif key.char == 'h' or key.char == 'H':
                         policy.toggle_head_mode()
+                    elif key.char == 'b' or key.char == 'B':
+                        policy.toggle_body_pose_mode()
                     elif key.char == 'a' or key.char == 'A':
                         if policy.head_mode:
                             policy.head_offset[3] = np.clip(policy.head_offset[3] + policy.head_step, -policy.head_max, policy.head_max)
                             print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        elif policy.body_pose_mode:
+                            policy.body_cmd[2] = np.clip(policy.body_cmd[2] + policy.body_cmd_step_angle, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE)
+                            policy._update_command()
+                            policy._print_body_cmd()
                         else:
-                            policy.set_command(0.0, 0.0, 4.0)
+                            policy.set_vel_cmd(0.0, 0.0, 4.0)
                     elif key.char == 'e' or key.char == 'E':
                         if policy.head_mode:
                             policy.head_offset[3] = np.clip(policy.head_offset[3] - policy.head_step, -policy.head_max, policy.head_max)
                             print(f"Head offset: neck={policy.head_offset[0]:.2f} pitch={policy.head_offset[1]:.2f} yaw={policy.head_offset[2]:.2f} roll={policy.head_offset[3]:.2f}")
+                        elif policy.body_pose_mode:
+                            policy.body_cmd[2] = np.clip(policy.body_cmd[2] - policy.body_cmd_step_angle, -BODY_CMD_MAX_ANGLE, BODY_CMD_MAX_ANGLE)
+                            policy._update_command()
+                            policy._print_body_cmd()
                         else:
-                            policy.set_command(0.0, 0.0, -4.0)
+                            policy.set_vel_cmd(0.0, 0.0, -4.0)
                     elif key.char == 'z' or key.char == 'Z':
                         if policy.head_mode:
                             policy.head_offset[0] = np.clip(policy.head_offset[0] + policy.head_step, -policy.head_max, policy.head_max)
@@ -670,25 +635,28 @@ def main():
         listener = pynput_keyboard.Listener(on_press=on_press)
         listener.start()
 
-        print("\nKeyboard controls enabled:")
+        print("\nKeyboard controls:")
         print("  [ Velocity mode (default) ]")
-        print("  UP/DOWN arrow:   lin_vel_x ±0.5")
+        print("  UP/DOWN arrow:    lin_vel_x ±0.5")
         print("  LEFT/RIGHT arrow: lin_vel_y ±0.5")
-        print("  A / E:           ang_vel_z ±4.0")
-        print("  SPACE:           stop (all velocities = 0)")
-        print("  G:               toggle ground pick mode (requires --ground-pick)")
+        print("  A / E:            ang_vel_z ±4.0")
+        print("  SPACE:            stop (zero velocity)")
+        print("  G:                trigger ground pick (requires --ground-pick)")
+        print("  [ Body pose mode — press B to toggle (requires --standing) ]")
+        print(f"  UP/DOWN arrow:    Δz ±1mm  (max ±{BODY_CMD_MAX_Z*1000:.0f}mm)")
+        print(f"  LEFT/RIGHT arrow: Δpitch ±1°  (max ±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°)")
+        print(f"  A / E:            Δroll ±1°  (max ±{math.degrees(BODY_CMD_MAX_ANGLE):.0f}°)")
+        print("  SPACE:            reset body pose to zero")
         print("  [ Head mode — press H to toggle ]")
-        print("  Z / S:           neck_pitch ±2.5 rad (max)")
-        print("  UP/DOWN arrow:   head_pitch ±2.5 rad (max)")
-        print("  LEFT/RIGHT arrow: head_yaw ±2.5 rad (max)")
-        print("  A / E:           head_roll ±2.5 rad (max)")
-        print("  SPACE:           reset head offset to zero")
+        print("  Z / S:            neck_pitch ±step")
+        print("  UP/DOWN arrow:    head_pitch ±step")
+        print("  LEFT/RIGHT arrow: head_yaw ±step")
+        print("  A / E:            head_roll ±step")
+        print("  SPACE:            reset head offset to zero")
         print("\nNote: Keyboard listener captures keys system-wide")
 
     except ImportError:
-        print("\nKeyboard control unavailable:")
-        print("  pynput not found. Install with: pip install pynput")
-        print("  Or use command-line arguments: --lin-vel-x 0.5 --ang-vel-z 0.5")
+        print("\nKeyboard control unavailable: pynput not found. Install with: pip install pynput")
     except Exception as e:
         print(f"\nCould not enable keyboard controls: {e}")
         import traceback
@@ -698,111 +666,79 @@ def main():
         viewer.sync()
         start_time = time.time()
 
-        # Set policy enable time for recording mode
         if args.record:
-            policy_enable_time = start_time + 1.0  # Enable after 1 second
+            policy_enable_time = start_time + 1.0
             print("Recording mode: policy will be enabled after 1 second standby")
-
-            # Set kp to 2.0 during standby to prevent falling (sim2real gap workaround)
-            # Note: Real robot is stable at kp=0.28, but sim needs higher kp to hold position
             for i in range(model.nu):
-                model.actuator_gainprm[i, 0] = 2.0  # kp
-                model.actuator_biasprm[i, 1] = -2.0  # bias = -kp
-            print("  Standby mode: kp set to 2.0 to prevent falling (sim needs this, real doesn't)")
+                model.actuator_gainprm[i, 0] = 2.0
+                model.actuator_biasprm[i, 1] = -2.0
+            print("  Standby mode: kp set to 2.0")
 
         try:
-            # Track previous step time for accurate phase updates
             prev_step_time = time.time()
 
             while viewer.is_running():
                 step_start = time.time()
 
-                # Enable policy after 1 second in recording mode
                 if not policy_enabled and policy_enable_time is not None:
                     if step_start >= policy_enable_time:
                         policy_enabled = True
-
-                        # Restore original kp gains (back to training kp=0.28)
                         if original_kp is not None:
                             for i in range(model.nu):
                                 kp = original_kp[i]
                                 model.actuator_gainprm[i, 0] = kp
                                 model.actuator_biasprm[i, 1] = -kp
-                            print("✓ Policy inference enabled (after 1s standby)")
+                            print("Policy inference enabled (after 1s standby)")
                             print(f"  Restored original kp gains (range: [{original_kp.min():.2f}, {original_kp.max():.2f}])")
 
-                # Calculate actual elapsed time since last step
                 actual_dt = step_start - prev_step_time
                 prev_step_time = step_start
 
-                # Update phase for imitation learning using actual elapsed time
-                # This ensures phase stays synchronized even if control loop runs faster/slower than target
                 policy.update_phase(actual_dt)
                 policy.update_ground_pick_phase(actual_dt)
 
-                # Control loop: run inference and apply action (or hold default position during standby)
                 if policy_enabled:
                     action = policy.infer()
                 else:
-                    # During standby, use zero actions (hold default position)
                     action = np.zeros(policy.n_joints, dtype=np.float32)
                 policy.apply_action(action)
 
                 control_step_count += 1
 
-                # Save data for CSV if requested
                 if csv_data is not None:
                     obs = policy.get_observations()
-
-                    # Create row: step, time, obs(51), action(14)
-                    row = {
-                        'step': control_step_count,
-                        'time': control_step_count * control_dt,
-                    }
-
-                    # Add observations
+                    row = {'step': control_step_count, 'time': control_step_count * control_dt}
                     for i in range(obs.size):
                         row[f'obs_{i}'] = obs[i]
-
-                    # Add actions
                     for i in range(action.size):
                         row[f'action_{i}'] = action[i]
-
                     csv_data.append(row)
 
-                # Record observations if requested
                 if recorded_observations is not None:
                     obs = policy.get_observations()
                     timestamp = time.time() - start_time
-                    recorded_observations.append({
-                        'timestamp': timestamp,
-                        'observation': obs.tolist()
-                    })
+                    recorded_observations.append({'timestamp': timestamp, 'observation': obs.tolist()})
 
-                # Debug: print observations and actions
                 if args.debug:
-                    # Print every step for first 10 steps, then every 50
                     should_print = control_step_count <= 10 or control_step_count % 50 == 0
-
                     if should_print:
                         obs = policy.get_observations()
                         pos = data.qpos[qpos_adr:qpos_adr + 3]
                         quat = data.qpos[qpos_adr + 3:qpos_adr + 7]
-                        # Use root link position (matches reward calculation)
                         com_height = pos[2]
-    
+
                         print(f"\n{'='*70}")
                         print(f"Step {control_step_count} DEBUG:")
                         print(f"{'='*70}")
                         if policy.use_imitation:
                             print(f"Imitation phase: {policy.imitation_phase:.4f} (period: {policy.gait_period:.3f}s)")
+                        print(f"Active policy: {policy.current_policy}")
                         print(f"Base state:")
                         print(f"  Position: [{pos[0]:7.4f}, {pos[1]:7.4f}, {pos[2]:7.4f}]")
-                        print(f"  CoM height (root link): {com_height:7.4f}")
+                        print(f"  CoM height: {com_height:7.4f}")
                         print(f"  Quaternion: [{quat[0]:7.4f}, {quat[1]:7.4f}, {quat[2]:7.4f}, {quat[3]:7.4f}]")
                         print(f"\nObservation (shape {obs.shape}, total {obs.size}):")
                         if policy.use_imitation:
-                            # Imitation order: command, phase, ang_vel, proj_grav, joint_pos, joint_vel, last_action
                             print(f"  Command [0:3]:        {obs[0:3]}")
                             print(f"  Phase [3:5]:          {obs[3:5]} (cos, sin)")
                             print(f"  Ang vel [5:8]:        {obs[5:8]}")
@@ -812,7 +748,6 @@ def main():
                             print(f"  Joint vel [{joint_start+policy.n_joints}:{joint_start+2*policy.n_joints}]:    {obs[joint_start+policy.n_joints:joint_start+2*policy.n_joints]}")
                             print(f"  Last action [{joint_start+2*policy.n_joints}:{joint_start+3*policy.n_joints}]:  {obs[joint_start+2*policy.n_joints:joint_start+3*policy.n_joints]}")
                         else:
-                            # Velocity order: ang_vel, proj_grav, joint_pos, joint_vel, last_action, command
                             print(f"  Ang vel [0:3]:        {obs[0:3]}")
                             print(f"  Proj grav [3:6]:      {obs[3:6]}")
                             print(f"  Joint pos [6:{6+policy.n_joints}]:     {obs[6:6+policy.n_joints]}")
@@ -820,6 +755,8 @@ def main():
                             print(f"  Last action [{6+2*policy.n_joints}:{6+3*policy.n_joints}]:  {obs[6+2*policy.n_joints:6+3*policy.n_joints]}")
                             cmd_end = 6+3*policy.n_joints+3
                             print(f"  Command [{6+3*policy.n_joints}:{cmd_end}]:      {obs[6+3*policy.n_joints:cmd_end]}")
+                        if policy.current_policy == "standing":
+                            print(f"  Body cmd (raw): z={policy.body_cmd[0]*1000:.1f}mm  pitch={math.degrees(policy.body_cmd[1]):.1f}°  roll={math.degrees(policy.body_cmd[2]):.1f}°")
                         print(f"\nAction output:")
                         print(f"  Raw action: {action}")
                         print(f"  Action min/max: [{action.min():.4f}, {action.max():.4f}]")
@@ -828,14 +765,11 @@ def main():
                         print(f"  Applied ctrl (first 5): {data.ctrl[:5]}")
                         print(f"  Applied ctrl (last 5):  {data.ctrl[-5:]}")
 
-                # Step simulation 'decimation' times (matches mjlab env.step behavior)
                 for _ in range(decimation):
                     mujoco.mj_step(model, data)
 
-                # Sync viewer
                 viewer.sync()
 
-                # Sleep to maintain real-time pacing
                 elapsed = time.time() - step_start
                 sleep_time = control_dt - elapsed
                 if sleep_time > 0:
@@ -846,29 +780,22 @@ def main():
 
     print("\nInference stopped.")
 
-    # Save CSV if requested
     if csv_data is not None and len(csv_data) > 0:
         print(f"\nSaving {len(csv_data)} steps to: {args.save_csv}")
-
         with open(args.save_csv, 'w', newline='') as csvfile:
             fieldnames = csv_data[0].keys()
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
             writer.writeheader()
             writer.writerows(csv_data)
-
         print(f"CSV file saved successfully!")
         print(f"  Columns: {len(fieldnames)}")
         print(f"  Rows: {len(csv_data)}")
 
-    # Save recorded observations if requested
     if recorded_observations is not None and len(recorded_observations) > 0:
         print(f"\nSaving {len(recorded_observations)} recorded observations to: {args.record}")
-
         with open(args.record, 'wb') as f:
             pickle.dump(recorded_observations, f)
-
-        print(f"✓ Recorded observations saved to {args.record}")
+        print(f"Recorded observations saved to {args.record}")
         print(f"  Observations: {len(recorded_observations)}")
         print(f"  Duration: {recorded_observations[-1]['timestamp']:.2f}s")
 

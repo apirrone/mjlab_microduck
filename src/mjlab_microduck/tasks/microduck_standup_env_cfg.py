@@ -55,9 +55,10 @@ from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.robot.microduck_constants import MICRODUCK_STANDUP_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
+from mjlab_microduck.tasks.microduck_velocity_env_cfg import MICRODUCK_ROUGH_TERRAINS_CFG
 
 
-def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def make_microduck_standup_env_cfg(play: bool = False, rough: bool = False) -> ManagerBasedRlEnvCfg:
     """Create Microduck stand-up environment configuration.
 
     The robot starts lying on its back (upside down) and must learn to
@@ -98,8 +99,16 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg.scene.entities = {"robot": MICRODUCK_STANDUP_ROBOT_CFG}
     cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg)
-    cfg.scene.terrain.terrain_type = "plane"
-    cfg.scene.terrain.terrain_generator = None
+    if not rough:
+        cfg.scene.terrain.terrain_type = "plane"
+        cfg.scene.terrain.terrain_generator = None
+    else:
+        cfg.scene.terrain.terrain_type = "generator"
+        cfg.scene.terrain.terrain_generator = MICRODUCK_ROUGH_TERRAINS_CFG
+        if play:
+            cfg.scene.terrain.terrain_generator.curriculum = False
+            cfg.scene.terrain.terrain_generator.num_cols = 5
+            cfg.scene.terrain.terrain_generator.num_rows = 5
     cfg.viewer.body_name = "trunk_base"
 
     cfg.episode_length_s = 20.0
@@ -325,7 +334,8 @@ def make_microduck_standup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         )
 
     # === CURRICULUM ===
-    del cfg.curriculum["terrain_levels"]
+    if not rough:
+        del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
