@@ -57,6 +57,7 @@ from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from mjlab_microduck.robot.microduck_constants import MICRODUCK_GROUND_PICK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
+from mjlab_microduck.tasks.microduck_velocity_env_cfg import MICRODUCK_ROUGH_TERRAINS_CFG
 
 
 def make_microduck_ground_pick_env_cfg(play: bool = False, rough: bool = False) -> ManagerBasedRlEnvCfg:
@@ -318,10 +319,13 @@ def make_microduck_ground_pick_env_cfg(play: bool = False, rough: bool = False) 
     if not rough:
         cfg.scene.terrain.terrain_type = "plane"
         cfg.scene.terrain.terrain_generator = None
-    elif play and cfg.scene.terrain.terrain_generator is not None:
-        cfg.scene.terrain.terrain_generator.curriculum = False
-        cfg.scene.terrain.terrain_generator.num_cols = 5
-        cfg.scene.terrain.terrain_generator.num_rows = 5
+    else:
+        cfg.scene.terrain.terrain_type = "generator"
+        cfg.scene.terrain.terrain_generator = MICRODUCK_ROUGH_TERRAINS_CFG
+        if play:
+            cfg.scene.terrain.terrain_generator.curriculum = False
+            cfg.scene.terrain.terrain_generator.num_cols = 5
+            cfg.scene.terrain.terrain_generator.num_rows = 5
 
     # ── Curriculum ────────────────────────────────────────────────────────────
     # Remove base curriculum terms not applicable here
