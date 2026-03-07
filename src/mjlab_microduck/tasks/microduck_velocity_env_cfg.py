@@ -70,29 +70,24 @@ MICRODUCK_ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
     num_rows=10,
     num_cols=20,
     sub_terrains={
-        "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.3),
+        "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.4),
         "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
-            proportion=0.2,
+            proportion=0.3,
             step_height_range=(0.0, 0.015),  # max 1.5 cm (vs 10 cm default)
             step_width=0.15,
             platform_width=2.0,
             border_width=1.0,
         ),
         "pyramid_stairs_inv": terrain_gen.BoxInvertedPyramidStairsTerrainCfg(
-            proportion=0.2,
+            proportion=0.3,
             step_height_range=(0.0, 0.015),  # max 1.5 cm
             step_width=0.15,
             platform_width=2.0,
             border_width=1.0,
         ),
-        # Uneven cobblestone-like ground: random per-cell height offsets.
-        # grid_width ~= robot footprint; grid_height_range kept to ≤1 cm.
-        "random_grid": terrain_gen.BoxRandomGridTerrainCfg(
-            proportion=0.3,
-            grid_width=0.12,  # must not divide evenly into terrain size (8.0m)
-            grid_height_range=(0.0, 0.010),  # max 1 cm
-            platform_width=1.5,
-        ),
+        # NOTE: BoxRandomGridTerrainCfg was attempted but generates ~4000 geoms/tile
+        # (66×66 cells at 0.12m grid), overflowing mujoco-warp's model limits.
+        # Same root cause as the disabled heightfield terrains in mjlab's config.
     },
     add_lights=False,
 )
