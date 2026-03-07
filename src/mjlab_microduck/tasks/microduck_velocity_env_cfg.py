@@ -36,6 +36,9 @@ IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0  # ±2° IMU mounting error
 BASE_ORIENTATION_MAX_PITCH_DEG = 10.0  # ±10° forward/backward tilt at episode start
 BASE_ORIENTATION_MAX_ROLL_DEG = 5.0  # ±5° side-to-side tilt at episode start
 
+import mjlab.terrains as terrain_gen
+from mjlab.terrains.terrain_generator import TerrainGeneratorCfg
+
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.manager_term_config import (
@@ -59,9 +62,45 @@ from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab_microduck.robot.microduck_constants import MICRODUCK_WALK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
 
+# Microduck-specific rough terrain: much gentler than the default ROUGH_TERRAINS_CFG.
+# The robot can only lift its feet ~1-2 cm, so steps are capped at 1.5 cm.
+MICRODUCK_ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
+    size=(8.0, 8.0),
+    border_width=20.0,
+    num_rows=10,
+    num_cols=20,
+    sub_terrains={
+        "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.3),
+        "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
+            proportion=0.2,
+            step_height_range=(0.0, 0.015),  # max 1.5 cm (vs 10 cm default)
+            step_width=0.15,
+            platform_width=2.0,
+            border_width=1.0,
+        ),
+        "pyramid_stairs_inv": terrain_gen.BoxInvertedPyramidStairsTerrainCfg(
+            proportion=0.2,
+            step_height_range=(0.0, 0.015),  # max 1.5 cm
+            step_width=0.15,
+            platform_width=2.0,
+            border_width=1.0,
+        ),
+        # Uneven cobblestone-like ground: random per-cell height offsets.
+        # grid_width ~= robot footprint; grid_height_range kept to ≤1 cm.
+        "random_grid": terrain_gen.BoxRandomGridTerrainCfg(
+            proportion=0.3,
+            grid_width=0.12,  # must not divide evenly into terrain size (8.0m)
+            grid_height_range=(0.0, 0.010),  # max 1 cm
+            platform_width=1.5,
+        ),
+    },
+    add_lights=False,
+)
+
 
 def make_microduck_velocity_env_cfg(
-    play: bool = False
+    play: bool = False,
+    rough: bool = False,
 ) -> ManagerBasedRlEnvCfg:
     """Create Microduck velocity tracking environment configuration."""
 
@@ -487,8 +526,16 @@ def make_microduck_velocity_env_cfg(
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
     # Terrain
-    cfg.scene.terrain.terrain_type = "plane"
-    cfg.scene.terrain.terrain_generator = None
+    if not rough:
+        cfg.scene.terrain.terrain_type = "plane"
+        cfg.scene.terrain.terrain_generator = None
+    else:
+        cfg.scene.terrain.terrain_type = "generator"
+        cfg.scene.terrain.terrain_generator = MICRODUCK_ROUGH_TERRAINS_CFG
+        if play:
+            cfg.scene.terrain.terrain_generator.curriculum = False
+            cfg.scene.terrain.terrain_generator.num_cols = 5
+            cfg.scene.terrain.terrain_generator.num_rows = 5
 
     # Add action rate curriculum
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
@@ -609,7 +656,8 @@ def make_microduck_velocity_env_cfg(
         )
 
     # Disable default curriculum
-    del cfg.curriculum["terrain_levels"]
+    if not rough:
+        del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
     return cfg
