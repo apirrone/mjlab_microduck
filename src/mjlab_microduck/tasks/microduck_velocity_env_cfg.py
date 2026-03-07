@@ -61,7 +61,8 @@ from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
 def make_microduck_velocity_env_cfg(
-    play: bool = False
+    play: bool = False,
+    rough: bool = False,
 ) -> ManagerBasedRlEnvCfg:
     """Create Microduck velocity tracking environment configuration."""
 
@@ -487,8 +488,13 @@ def make_microduck_velocity_env_cfg(
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
     # Terrain
-    cfg.scene.terrain.terrain_type = "plane"
-    cfg.scene.terrain.terrain_generator = None
+    if not rough:
+        cfg.scene.terrain.terrain_type = "plane"
+        cfg.scene.terrain.terrain_generator = None
+    elif play and cfg.scene.terrain.terrain_generator is not None:
+        cfg.scene.terrain.terrain_generator.curriculum = False
+        cfg.scene.terrain.terrain_generator.num_cols = 5
+        cfg.scene.terrain.terrain_generator.num_rows = 5
 
     # Add action rate curriculum
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
@@ -609,7 +615,8 @@ def make_microduck_velocity_env_cfg(
         )
 
     # Disable default curriculum
-    del cfg.curriculum["terrain_levels"]
+    if not rough:
+        del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
     return cfg

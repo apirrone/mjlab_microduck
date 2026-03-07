@@ -59,7 +59,7 @@ from mjlab_microduck.robot.microduck_constants import MICRODUCK_GROUND_PICK_ROBO
 from mjlab_microduck.tasks import mdp as microduck_mdp
 
 
-def make_microduck_ground_pick_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def make_microduck_ground_pick_env_cfg(play: bool = False, rough: bool = False) -> ManagerBasedRlEnvCfg:
     """Create Microduck ground pick environment configuration."""
 
     site_names = ["left_foot", "right_foot"]
@@ -315,12 +315,18 @@ def make_microduck_ground_pick_env_cfg(play: bool = False) -> ManagerBasedRlEnvC
         )
 
     # ── Terrain ───────────────────────────────────────────────────────────────
-    cfg.scene.terrain.terrain_type = "plane"
-    cfg.scene.terrain.terrain_generator = None
+    if not rough:
+        cfg.scene.terrain.terrain_type = "plane"
+        cfg.scene.terrain.terrain_generator = None
+    elif play and cfg.scene.terrain.terrain_generator is not None:
+        cfg.scene.terrain.terrain_generator.curriculum = False
+        cfg.scene.terrain.terrain_generator.num_cols = 5
+        cfg.scene.terrain.terrain_generator.num_rows = 5
 
     # ── Curriculum ────────────────────────────────────────────────────────────
     # Remove base curriculum terms not applicable here
-    del cfg.curriculum["terrain_levels"]
+    if not rough:
+        del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
     # Gradually increase action rate penalty (same schedule as velocity env)

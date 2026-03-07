@@ -29,6 +29,14 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 
+register_mjlab_task(
+    task_id="Mjlab-Velocity-Rough-MicroDuck",
+    env_cfg=make_microduck_velocity_env_cfg(rough=True),
+    play_env_cfg=make_microduck_velocity_env_cfg(play=True, rough=True),
+    rl_cfg=MicroduckRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+
 # Stand-up task — robot starts inverted (lying on back) and must stand up
 register_mjlab_task(
     task_id="Mjlab-StandUp-Flat-MicroDuck",
@@ -39,6 +47,15 @@ register_mjlab_task(
 )
 print("✓ StandUp task registered: Mjlab-StandUp-Flat-MicroDuck")
 
+register_mjlab_task(
+    task_id="Mjlab-StandUp-Rough-MicroDuck",
+    env_cfg=make_microduck_standup_env_cfg(rough=True),
+    play_env_cfg=make_microduck_standup_env_cfg(play=True, rough=True),
+    rl_cfg=MicroduckStandUpRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ StandUp task registered: Mjlab-StandUp-Rough-MicroDuck")
+
 # Ground pick task — episodic policy: crouch, touch ground with mouth, return to standing
 register_mjlab_task(
     task_id="Mjlab-GroundPick-Flat-MicroDuck",
@@ -48,6 +65,15 @@ register_mjlab_task(
     runner_cls=VelocityOnPolicyRunner,
 )
 print("✓ Ground pick task registered: Mjlab-GroundPick-Flat-MicroDuck")
+
+register_mjlab_task(
+    task_id="Mjlab-GroundPick-Rough-MicroDuck",
+    env_cfg=make_microduck_ground_pick_env_cfg(rough=True),
+    play_env_cfg=make_microduck_ground_pick_env_cfg(play=True, rough=True),
+    rl_cfg=MicroduckGroundPickRlCfg,
+    runner_cls=VelocityOnPolicyRunner,
+)
+print("✓ Ground pick task registered: Mjlab-GroundPick-Rough-MicroDuck")
 
 # Imitation motion tracking task
 # Uses frame-based reference motions (reference_motion.pkl)
