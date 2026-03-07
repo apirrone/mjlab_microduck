@@ -73,14 +73,14 @@ MICRODUCK_ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
         "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.4),
         "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
             proportion=0.3,
-            step_height_range=(0.0, 0.015),  # max 1.5 cm (vs 10 cm default)
+            step_height_range=(0.005, 0.015),  # min 5mm to avoid zero-thickness boxes
             step_width=0.15,
             platform_width=2.0,
             border_width=1.0,
         ),
         "pyramid_stairs_inv": terrain_gen.BoxInvertedPyramidStairsTerrainCfg(
             proportion=0.3,
-            step_height_range=(0.0, 0.015),  # max 1.5 cm
+            step_height_range=(0.005, 0.015),  # min 5mm to avoid zero-thickness boxes
             step_width=0.15,
             platform_width=2.0,
             border_width=1.0,
