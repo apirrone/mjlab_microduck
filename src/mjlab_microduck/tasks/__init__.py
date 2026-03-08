@@ -37,6 +37,10 @@ from .microduck_standup_env_cfg import (
     make_microduck_standup_env_cfg,
     MicroduckStandUpRlCfg,
 )
+from .microduck_jump_env_cfg import (
+    make_microduck_jump_env_cfg,
+    MicroduckJumpRlCfg,
+)
 
 # Standard velocity task (no imitation)
 register_mjlab_task(
@@ -73,6 +77,16 @@ register_mjlab_task(
     runner_cls=MicroduckOnPolicyRunner,
 )
 print("✓ StandUp task registered: Mjlab-StandUp-Rough-MicroDuck")
+
+# Jump task — episodic policy: crouch to preload, jump, land, return to standing
+register_mjlab_task(
+    task_id="Mjlab-Jump-Flat-MicroDuck",
+    env_cfg=make_microduck_jump_env_cfg(),
+    play_env_cfg=make_microduck_jump_env_cfg(play=True),
+    rl_cfg=MicroduckJumpRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
+print("✓ Jump task registered: Mjlab-Jump-Flat-MicroDuck")
 
 # Ground pick task — episodic policy: crouch, touch ground with mouth, return to standing
 register_mjlab_task(

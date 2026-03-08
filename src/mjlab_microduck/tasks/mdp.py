@@ -1988,6 +1988,74 @@ def body_pose_tracking(
     return (z_reward + pitch_reward + roll_reward) / 3.0
 
 
+# ==============================================================================
+# Jump Rewards and Command
+# ==============================================================================
+
+
+def jump_crouch_reward(
+    env: ManagerBasedRlEnv,
+    command_name: str = "twist",
+    nominal_height: float = 0.095,
+    target_depth: float = 0.015,
+    std: float = 0.010,
+) -> torch.Tensor:
+    """Reward for crouching below nominal height during the approach phase.
+
+    The robot should preload the jump by crouching to nominal_height - target_depth.
+    Weighted by max(0, sin(2π*phase)) — active only during the first half-cycle.
+
+    Args:
+        nominal_height: Standing COM height (m).
+        target_depth: How far below nominal to target (m). Default 15 mm.
+        std: Gaussian std for the height reward (m).
+    """
+    robot = env.scene["robot"]
+    com_z = robot.data.root_link_pos_w[:, 2]
+    target_z = nominal_height - target_depth
+    crouch_reward = torch.exp(-((com_z - target_z) / std) ** 2)
+    cmd = env.command_manager.get_command(command_name)
+    approach_weight = torch.clamp(cmd[:, 1], min=0.0)
+    return approach_weight * crouch_reward
+
+
+def jump_height_reward(
+    env: ManagerBasedRlEnv,
+    command_name: str = "twist",
+    target_height: float = 0.105,
+    std: float = 0.010,
+) -> torch.Tensor:
+    """Reward for reaching target height above nominal during the jump phase.
+
+    The target is set above nominal standing height so the robot must actually
+    leave the ground to score well.
+    Weighted by max(0, -sin(2π*phase)) — active only during the second half-cycle.
+
+    Args:
+        target_height: Target COM height (m). Should be > nominal to require liftoff.
+        std: Gaussian std for the height reward (m).
+    """
+    robot = env.scene["robot"]
+    com_z = robot.data.root_link_pos_w[:, 2]
+    height_reward = torch.exp(-((com_z - target_height) / std) ** 2)
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)
+    return return_weight * height_reward
+
+
+class JumpPhaseCommand(GroundPickPhaseCommand):
+    """Phase-encoding command for the jump task.
+
+    Same cyclic encoding as GroundPickPhaseCommand but with a 2-second period:
+        command = [cos(2π*phase), sin(2π*phase), 0]
+
+    Phase [0, 0.5] (sin > 0): crouch/preload phase.
+    Phase [0.5, 1] (sin < 0): jump, land, and recover phase.
+    """
+
+    PERIOD: float = 2.0
+
+
 def body_pose_cmd_range_curriculum(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
