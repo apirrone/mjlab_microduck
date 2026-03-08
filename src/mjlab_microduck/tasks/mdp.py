@@ -2024,7 +2024,7 @@ def jump_airborne_reward(
     is fully airborne.  Weighted by max(0, -sin(2π*phase)).
     """
     sensor = env.scene[feet_sensor_name]
-    feet_in_air = ~sensor.data.found[:, 0]  # True when no foot touches terrain
+    feet_in_air = ~sensor.data.found[:, 0].bool()  # True when no foot touches terrain
     cmd = env.command_manager.get_command(command_name)
     return_weight = torch.clamp(-cmd[:, 1], min=0.0)
     return return_weight * feet_in_air.float()
