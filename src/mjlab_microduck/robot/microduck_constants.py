@@ -11,10 +11,12 @@ _ROBOT_DIR: Path = Path(os.path.dirname(__file__)) / "microduck"
 MICRODUCK_WALK_XML: Path = _ROBOT_DIR / "robot_walk.xml"
 MICRODUCK_STANDUP_XML: Path = _ROBOT_DIR / "robot_standup.xml"
 MICRODUCK_GROUND_PICK_XML: Path = _ROBOT_DIR / "robot_ground_pick.xml"
+MICRODUCK_JUMP_XML: Path = _ROBOT_DIR / "robot_jump.xml"
 
 assert MICRODUCK_WALK_XML.exists(), f"XML not found: {MICRODUCK_WALK_XML}"
 assert MICRODUCK_STANDUP_XML.exists(), f"XML not found: {MICRODUCK_STANDUP_XML}"
 assert MICRODUCK_GROUND_PICK_XML.exists(), f"XML not found: {MICRODUCK_GROUND_PICK_XML}"
+assert MICRODUCK_JUMP_XML.exists(), f"XML not found: {MICRODUCK_JUMP_XML}"
 
 
 def get_walk_spec() -> mujoco.MjSpec:
@@ -27,6 +29,10 @@ def get_standup_spec() -> mujoco.MjSpec:
 
 def get_ground_pick_spec() -> mujoco.MjSpec:
     return mujoco.MjSpec.from_file(str(MICRODUCK_GROUND_PICK_XML))
+
+
+def get_jump_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(MICRODUCK_JUMP_XML))
 
 
 HOME_FRAME = EntityCfg.InitialStateCfg(
@@ -86,6 +92,16 @@ MICRODUCK_STANDUP_ROBOT_CFG = EntityCfg(
 
 MICRODUCK_GROUND_PICK_ROBOT_CFG = EntityCfg(
     spec_fn=get_ground_pick_spec,
+    init_state=HOME_FRAME,
+    collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
+MICRODUCK_JUMP_ROBOT_CFG = EntityCfg(
+    spec_fn=get_jump_spec,
     init_state=HOME_FRAME,
     collisions=(FULL_COLLISION,),
     articulation=EntityArticulationInfoCfg(
