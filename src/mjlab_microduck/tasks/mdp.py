@@ -2017,17 +2017,27 @@ def jump_airborne_reward(
     env: ManagerBasedRlEnv,
     feet_sensor_name: str,
     command_name: str = "twist",
+    force_threshold: float = 1.0,
 ) -> torch.Tensor:
     """Reward for both feet being off the ground during the jump phase.
 
-    Uses the feet_ground_contact sensor — when no contact is found, the robot
-    is fully airborne.  Weighted by max(0, -sin(2π*phase)).
+    Uses the net contact force from the feet sensor rather than the binary
+    'found' flag.  The net force approaches zero only when both feet are
+    simultaneously airborne; a single foot still on the ground keeps the
+    force well above the threshold (~half the robot weight).
+
+    Args:
+        force_threshold: Net contact force magnitude (N) below which the robot
+            is considered fully airborne. Default 1 N is well below half the
+            robot weight (~1.5 N) so one-foot lifts don't trigger the reward.
     """
     sensor = env.scene[feet_sensor_name]
-    feet_in_air = ~sensor.data.found[:, 0].bool()  # True when no foot touches terrain
+    # data.force: (num_envs, num_slots, 3)
+    net_force = sensor.data.force[:, 0, :].norm(dim=-1)  # (num_envs,)
+    both_airborne = net_force < force_threshold
     cmd = env.command_manager.get_command(command_name)
     return_weight = torch.clamp(-cmd[:, 1], min=0.0)
-    return return_weight * feet_in_air.float()
+    return return_weight * both_airborne.float()
 
 
 def jump_crouch_reward(

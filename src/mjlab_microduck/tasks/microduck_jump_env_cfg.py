@@ -166,12 +166,17 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
     # Airborne reward: both feet off the ground during jump phase.
     # This is the primary jump signal — COM height alone can be gamed by
     # straightening legs without leaving the ground.
+    # Robot weighs ~800 g → weight ≈ 7.8 N.
+    # One foot on ground → net force ≈ 3.9 N.
+    # Both airborne → net force ≈ 0 N.
+    # Threshold of 2 N sits comfortably between the two cases.
     cfg.rewards["jump_airborne"] = RewardTermCfg(
         func=microduck_mdp.jump_airborne_reward,
         weight=4.0,
         params={
             "feet_sensor_name": feet_ground_cfg.name,
             "command_name": "twist",
+            "force_threshold": 2.0,
         },
     )
 
