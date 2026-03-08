@@ -63,7 +63,7 @@ from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
-from mjlab_microduck.robot.microduck_constants import MICRODUCK_JUMP_ROBOT_CFG
+from mjlab_microduck.robot.microduck_constants import MICRODUCK_GROUND_PICK_ROBOT_CFG
 from mjlab_microduck.tasks import mdp as microduck_mdp
 from mjlab_microduck.tasks.microduck_velocity_env_cfg import MICRODUCK_ROUGH_TERRAINS_CFG
 
@@ -101,7 +101,7 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
     # ── Base config ───────────────────────────────────────────────────────────
     cfg = make_velocity_env_cfg()
 
-    cfg.scene.entities = {"robot": MICRODUCK_JUMP_ROBOT_CFG}
+    cfg.scene.entities = {"robot": MICRODUCK_GROUND_PICK_ROBOT_CFG}
     cfg.scene.sensors  = (feet_ground_cfg, self_collision_cfg)
     cfg.viewer.body_name = "trunk_base"
 
@@ -163,6 +163,17 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         },
     )
 
+    # Upward velocity during jump phase — direct incentive for explosive extension.
+    # A ~5 mm jump peaks at roughly 0.3 m/s; reward saturates at 0.5 m/s.
+    cfg.rewards["jump_velocity"] = RewardTermCfg(
+        func=microduck_mdp.jump_velocity_reward,
+        weight=4.0,
+        params={
+            "command_name": "twist",
+            "max_vel": 0.5,
+        },
+    )
+
     # Airborne reward: both feet off the ground during jump phase.
     # This is the primary jump signal — COM height alone can be gamed by
     # straightening legs without leaving the ground.
@@ -207,8 +218,9 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
 
     # ── Rewards: regularisation ───────────────────────────────────────────────
 
+    # Nearly off — the explosive joint extension IS a large action delta.
     cfg.rewards["action_rate_l2"] = RewardTermCfg(
-        func=mdp.action_rate_l2, weight=-0.1
+        func=mdp.action_rate_l2, weight=-0.01
     )
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
@@ -349,15 +361,13 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
-    # Very relaxed — fast joint extension is the core of the jump.
+    # No curriculum ramp — keep action rate penalty flat and tiny throughout.
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
         func=mdp.reward_weight,
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
-                {"step": 0,          "weight": -0.05},
-                {"step": 500 * 24,   "weight": -0.1},
-                {"step": 1000 * 24,  "weight": -0.15},
+                {"step": 0, "weight": -0.01},
             ],
         },
     )

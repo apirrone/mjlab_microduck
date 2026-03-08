@@ -25,7 +25,7 @@
     <default class="chosen_actuator">
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.048" frictionloss="0.006" armature="0.002"/>
-      <position kp="1.0" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/>
+      <position kp="0.52" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->

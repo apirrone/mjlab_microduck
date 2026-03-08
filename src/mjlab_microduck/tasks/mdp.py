@@ -2040,6 +2040,29 @@ def jump_airborne_reward(
     return return_weight * both_airborne.float()
 
 
+def jump_velocity_reward(
+    env: ManagerBasedRlEnv,
+    command_name: str = "twist",
+    max_vel: float = 0.5,
+) -> torch.Tensor:
+    """Reward for upward trunk velocity during the jump phase.
+
+    Directly incentivises the explosive leg extension — the robot must push
+    hard and fast to generate significant upward velocity.
+    Clamped to [0, 1] so only upward motion is rewarded.
+
+    Args:
+        max_vel: Upward velocity (m/s) that saturates the reward at 1.0.
+            For a tiny jump (~5 mm clearance) peak velocity is ~0.3–0.5 m/s.
+    """
+    robot = env.scene["robot"]
+    vel_z = robot.data.root_link_vel_w[:, 2]
+    reward = torch.clamp(vel_z / max_vel, min=0.0, max=1.0)
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)
+    return return_weight * reward
+
+
 def jump_crouch_reward(
     env: ManagerBasedRlEnv,
     command_name: str = "twist",
