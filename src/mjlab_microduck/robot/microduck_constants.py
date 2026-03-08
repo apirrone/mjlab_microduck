@@ -9,7 +9,7 @@ from mjlab.utils.spec_config import CollisionCfg
 _ROBOT_DIR: Path = Path(os.path.dirname(__file__)) / "microduck"
 
 MICRODUCK_WALK_XML: Path = _ROBOT_DIR / "robot_walk.xml"
-MICRODUCK_STANDUP_XML: Path = _ROBOT_DIR / "robot_stand_up.xml"
+MICRODUCK_STANDUP_XML: Path = _ROBOT_DIR / "robot_standup.xml"
 MICRODUCK_GROUND_PICK_XML: Path = _ROBOT_DIR / "robot_ground_pick.xml"
 
 assert MICRODUCK_WALK_XML.exists(), f"XML not found: {MICRODUCK_WALK_XML}"
