@@ -191,7 +191,7 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
     # ── Rewards: regularisation ───────────────────────────────────────────────
 
     cfg.rewards["action_rate_l2"] = RewardTermCfg(
-        func=mdp.action_rate_l2, weight=-2.0
+        func=mdp.action_rate_l2, weight=-0.1
     )
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
@@ -332,14 +332,15 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
+    # Relaxed compared to ground pick — the jump requires an explosive action delta.
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
         func=mdp.reward_weight,
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
-                {"step": 0,          "weight": -0.4},
-                {"step": 250 * 24,   "weight": -0.8},
-                {"step": 500 * 24,   "weight": -1.0},
+                {"step": 0,          "weight": -0.1},
+                {"step": 250 * 24,   "weight": -0.2},
+                {"step": 500 * 24,   "weight": -0.3},
             ],
         },
     )
