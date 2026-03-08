@@ -38,7 +38,7 @@ IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0
 
 # ── Jump parameters ───────────────────────────────────────────────────────────
 NOMINAL_HEIGHT   = 0.095   # m — standing COM height
-CROUCH_DEPTH     = 0.015   # m — how far below nominal to target during preload
+CROUCH_DEPTH     = 0.020   # m — how far below nominal to target during preload
 CROUCH_STD       = 0.010   # m — Gaussian std for crouch reward
 JUMP_TARGET      = 0.105   # m — target COM height (10 mm above nominal = liftoff required)
 JUMP_STD         = 0.010   # m — Gaussian std for jump height reward
@@ -215,9 +215,9 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
 
-    # Lower torque penalty — allow explosive effort for the jump.
+    # Torque penalty nearly off — large forces are essential for the explosive push.
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-        func=microduck_mdp.joint_torques_l2, weight=-2e-3
+        func=microduck_mdp.joint_torques_l2, weight=-1e-4
     )
 
     cfg.rewards["self_collisions"] = RewardTermCfg(
@@ -349,15 +349,15 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
 
-    # Relaxed compared to ground pick — the jump requires an explosive action delta.
+    # Very relaxed — fast joint extension is the core of the jump.
     cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
         func=mdp.reward_weight,
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
-                {"step": 0,          "weight": -0.1},
-                {"step": 250 * 24,   "weight": -0.2},
-                {"step": 500 * 24,   "weight": -0.3},
+                {"step": 0,          "weight": -0.05},
+                {"step": 500 * 24,   "weight": -0.1},
+                {"step": 1000 * 24,  "weight": -0.15},
             ],
         },
     )
