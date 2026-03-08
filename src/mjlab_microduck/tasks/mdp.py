@@ -1824,6 +1824,37 @@ def set_face_down_orientation(
     env.sim.data.qvel[env_ids, :6] = 0.0
 
 
+def set_random_prone_orientation(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+):
+    """Randomly initialize each env as face-down (belly) or face-up (back), with random yaw.
+
+    Face-down:  +90° pitch → quat = [s*cy, -s*sy,  s*cy,  s*sy]
+    Face-up:    -90° pitch → quat = [s*cy,  s*sy, -s*cy,  s*sy]
+    """
+    if env_ids is None or len(env_ids) == 0:
+        return
+    env_ids = env_ids.to(env.device, dtype=torch.int)
+    num = len(env_ids)
+
+    yaw = torch.rand(num, device=env.device) * 2 * np.pi - np.pi
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    s = 2.0 ** -0.5  # sqrt(2)/2
+
+    face_down = torch.stack([ s * cy, -s * sy,  s * cy,  s * sy], dim=1)
+    face_up   = torch.stack([ s * cy,  s * sy, -s * cy,  s * sy], dim=1)
+
+    # Randomly assign each env to face-down or face-up (50/50)
+    mask = torch.rand(num, device=env.device) < 0.5  # True → face-down
+    new_quat = torch.where(mask.unsqueeze(1), face_down, face_up)
+
+    env.sim.data.qpos[env_ids, 3:7] = new_quat
+    env.sim.data.qvel[env_ids, :6] = 0.0
+
+
 class VelocityCommandCommandOnly(UniformVelocityCommand):
     """Like UniformVelocityCommand but only draws the command arrows (no actual velocity arrows)."""
 

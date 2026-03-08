@@ -279,9 +279,9 @@ def make_microduck_standup_env_cfg(play: bool = False, rough: bool = False) -> M
     cfg.events["reset_base"].params["pose_range"]["z"] = (0.12, 0.15)
     cfg.events["foot_friction"].params["asset_cfg"].geom_names = foot_frictions_geom_names
 
-    # Override orientation to face-down (runs after reset_base sets position)
+    # Override orientation: randomly face-down (belly) or face-up (back), with random yaw.
     cfg.events["set_face_down"] = EventTermCfg(
-        func=microduck_mdp.set_face_down_orientation,
+        func=microduck_mdp.set_random_prone_orientation,
         mode="reset",
     )
 

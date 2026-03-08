@@ -14,8 +14,8 @@ import onnxruntime as ort
 MICRODUCK_XML = "src/mjlab_microduck/robot/microduck/scene.xml"
 
 # Body pose command constants (must match training constants)
-BODY_CMD_MAX_Z = 0.025              # ±25 mm
-BODY_CMD_MAX_ANGLE = math.radians(20)  # ±20°
+BODY_CMD_MAX_Z = 0.03              # ±30 mm
+BODY_CMD_MAX_ANGLE = math.radians(30)  # ±30°
 
 # Default pose used by the policy (legs flexed, standing position)
 # This is the reference pose that:
