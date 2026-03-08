@@ -180,10 +180,10 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
     _NECK_JOINTS = [5, 6, 7, 8]
     cfg.rewards["neck_neutral"] = RewardTermCfg(
         func=microduck_mdp.joint_pose_reward,
-        weight=3.0,
+        weight=0.5,
         params={
             "joint_indices": _NECK_JOINTS,
-            "std": 0.15,
+            "std": 0.3,
         },
     )
 
