@@ -163,15 +163,27 @@ def make_microduck_jump_env_cfg(play: bool = False, rough: bool = False) -> Mana
         },
     )
 
-    # Return phase — neck/head: keep head neutral during jump.
+    # Airborne reward: both feet off the ground during jump phase.
+    # This is the primary jump signal — COM height alone can be gamed by
+    # straightening legs without leaving the ground.
+    cfg.rewards["jump_airborne"] = RewardTermCfg(
+        func=microduck_mdp.jump_airborne_reward,
+        weight=4.0,
+        params={
+            "feet_sensor_name": feet_ground_cfg.name,
+            "command_name": "twist",
+        },
+    )
+
+    # Neck/head: always-on neutral pose — not phase-gated.
+    # Prevents the head from swinging forward during the crouch to "help" with momentum.
     _NECK_JOINTS = [5, 6, 7, 8]
-    cfg.rewards["jump_return_pose_neck"] = RewardTermCfg(
-        func=microduck_mdp.ground_pick_return_pose,
+    cfg.rewards["neck_neutral"] = RewardTermCfg(
+        func=microduck_mdp.joint_pose_reward,
         weight=3.0,
         params={
-            "std": 0.15,
-            "command_name": "twist",
             "joint_indices": _NECK_JOINTS,
+            "std": 0.15,
         },
     )
 

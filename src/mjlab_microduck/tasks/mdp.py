@@ -1993,6 +1993,43 @@ def body_pose_tracking(
 # ==============================================================================
 
 
+def joint_pose_reward(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+    joint_indices: Optional[list] = None,
+    std: float = 0.3,
+) -> torch.Tensor:
+    """Always-on Gaussian reward on joint positions vs default pose.
+
+    Unlike ground_pick_return_pose, this is not phase-gated — useful for
+    keeping specific joints (e.g. neck/head) neutral throughout the episode.
+    """
+    asset = env.scene[asset_cfg.name]
+    joint_pos   = asset.data.joint_pos
+    default_pos = asset.data.default_joint_pos
+    if joint_indices is not None:
+        joint_pos   = joint_pos[:, joint_indices]
+        default_pos = default_pos[:, joint_indices]
+    return torch.exp(-((joint_pos - default_pos) / std) ** 2).mean(dim=-1)
+
+
+def jump_airborne_reward(
+    env: ManagerBasedRlEnv,
+    feet_sensor_name: str,
+    command_name: str = "twist",
+) -> torch.Tensor:
+    """Reward for both feet being off the ground during the jump phase.
+
+    Uses the feet_ground_contact sensor — when no contact is found, the robot
+    is fully airborne.  Weighted by max(0, -sin(2π*phase)).
+    """
+    sensor = env.scene[feet_sensor_name]
+    feet_in_air = ~sensor.data.found[:, 0]  # True when no foot touches terrain
+    cmd = env.command_manager.get_command(command_name)
+    return_weight = torch.clamp(-cmd[:, 1], min=0.0)
+    return return_weight * feet_in_air.float()
+
+
 def jump_crouch_reward(
     env: ManagerBasedRlEnv,
     command_name: str = "twist",
