@@ -553,7 +553,7 @@ def main():
                         policy._update_command()
                         policy._print_body_cmd()
                     else:
-                        policy.set_vel_cmd(0.5, 0.0, 0.0)
+                        policy.set_vel_cmd(0.7, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.down:
                     if policy.head_mode:
                         policy.head_offset[1] = np.clip(policy.head_offset[1] - policy.head_step, -policy.head_max, policy.head_max)
@@ -563,7 +563,7 @@ def main():
                         policy._update_command()
                         policy._print_body_cmd()
                     else:
-                        policy.set_vel_cmd(-0.5, 0.0, 0.0)
+                        policy.set_vel_cmd(-0.7, 0.0, 0.0)
                 elif key == pynput_keyboard.Key.right:
                     if policy.head_mode:
                         policy.head_offset[2] = np.clip(policy.head_offset[2] - policy.head_step, -policy.head_max, policy.head_max)
