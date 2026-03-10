@@ -197,7 +197,7 @@ def make_microduck_ground_pick_env_cfg(play: bool = False, rough: bool = False) 
 
     # Joint torque penalty — increased to further penalise fast/forceful moves.
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-        func=microduck_mdp.joint_torques_l2, weight=-5e-3
+        func=mdp.joint_torques_l2, weight=-5e-3
     )
 
     # Self-collision — head and neck could clip the legs during deep crouch.

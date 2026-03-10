@@ -5,7 +5,6 @@ import math
 import numpy as np
 import torch
 from typing import TYPE_CHECKING, Optional
-import mujoco
 
 from mjlab.envs.manager_based_rl_env import ManagerBasedRlEnv
 from mjlab.managers.scene_entity_config import SceneEntityCfg

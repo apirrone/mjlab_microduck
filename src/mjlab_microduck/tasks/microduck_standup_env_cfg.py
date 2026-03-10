@@ -256,7 +256,7 @@ def make_microduck_standup_env_cfg(play: bool = False, rough: bool = False) -> M
             weight=-0.01,
         ),
         "joint_torques_l2": RewardTermCfg(
-            func=microduck_mdp.joint_torques_l2,
+            func=velocity_mdp.joint_torques_l2,
             weight=-1e-5,
         ),
         "dof_pos_limits": RewardTermCfg(

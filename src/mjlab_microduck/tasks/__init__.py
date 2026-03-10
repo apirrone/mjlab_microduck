@@ -1,7 +1,10 @@
+import logging
 import os
 import sys
 from mjlab.tasks.registry import register_mjlab_task
 from mjlab.tasks.velocity.rl import VelocityOnPolicyRunner
+
+logger = logging.getLogger(__name__)
 
 
 class MicroduckOnPolicyRunner(VelocityOnPolicyRunner):
@@ -17,8 +20,10 @@ class MicroduckOnPolicyRunner(VelocityOnPolicyRunner):
         # Sync the env step counter so curricula resume at the correct stage.
         resumed_steps = self.current_learning_iteration * self.cfg["num_steps_per_env"]
         self.env.unwrapped.common_step_counter = resumed_steps
-        print(f"[INFO] Resumed at iteration {self.current_learning_iteration} "
-              f"→ common_step_counter set to {resumed_steps}")
+        logger.info(
+            "Resumed at iteration %d → common_step_counter set to %d",
+            self.current_learning_iteration, resumed_steps,
+        )
         return infos
 
 from .microduck_velocity_env_cfg import (
@@ -63,7 +68,7 @@ register_mjlab_task(
     rl_cfg=MicroduckStandUpRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
-print("✓ StandUp task registered: Mjlab-StandUp-Flat-MicroDuck")
+logger.info("StandUp task registered: Mjlab-StandUp-Flat-MicroDuck")
 
 register_mjlab_task(
     task_id="Mjlab-StandUp-Rough-MicroDuck",
@@ -72,7 +77,7 @@ register_mjlab_task(
     rl_cfg=MicroduckStandUpRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
-print("✓ StandUp task registered: Mjlab-StandUp-Rough-MicroDuck")
+logger.info("StandUp task registered: Mjlab-StandUp-Rough-MicroDuck")
 
 # Ground pick task — episodic policy: crouch, touch ground with mouth, return to standing
 register_mjlab_task(
@@ -82,7 +87,7 @@ register_mjlab_task(
     rl_cfg=MicroduckGroundPickRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
-print("✓ Ground pick task registered: Mjlab-GroundPick-Flat-MicroDuck")
+logger.info("Ground pick task registered: Mjlab-GroundPick-Flat-MicroDuck")
 
 register_mjlab_task(
     task_id="Mjlab-GroundPick-Rough-MicroDuck",
@@ -91,7 +96,7 @@ register_mjlab_task(
     rl_cfg=MicroduckGroundPickRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
-print("✓ Ground pick task registered: Mjlab-GroundPick-Rough-MicroDuck")
+logger.info("Ground pick task registered: Mjlab-GroundPick-Rough-MicroDuck")
 
 # Imitation motion tracking task
 # Uses frame-based reference motions (reference_motion.pkl)
@@ -116,7 +121,7 @@ if os.path.exists(_imitation_motion_path):
         runner_cls=MicroduckOnPolicyRunner,
     )
     ghost_status = "enabled" if _enable_ghost_vis else "disabled"
-    print(f"✓ Imitation task registered: Mjlab-Imitation-Flat-MicroDuck (ghost vis: {ghost_status})")
+    logger.info("Imitation task registered: Mjlab-Imitation-Flat-MicroDuck (ghost vis: %s)", ghost_status)
 else:
-    print(f"Warning: Imitation motion file not found at {_imitation_motion_path}")
-    print("Imitation task 'Mjlab-Imitation-Flat-MicroDuck' not registered.")
+    logger.warning("Imitation motion file not found at %s", _imitation_motion_path)
+    logger.warning("Imitation task 'Mjlab-Imitation-Flat-MicroDuck' not registered.")
