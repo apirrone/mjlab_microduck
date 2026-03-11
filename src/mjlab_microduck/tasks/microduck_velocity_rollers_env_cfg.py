@@ -12,7 +12,6 @@ ENABLE_JOINT_FRICTION_RANDOMIZATION = False
 ENABLE_JOINT_DAMPING_RANDOMIZATION = False
 ENABLE_VELOCITY_PUSHES = True
 ENABLE_IMU_ORIENTATION_RANDOMIZATION = True
-ENABLE_BASE_ORIENTATION_RANDOMIZATION = False
 ENABLE_NECK_OFFSET_RANDOMIZATION = True
 
 NECK_OFFSET_MAX_ANGLE = 2.5
@@ -29,8 +28,6 @@ JOINT_DAMPING_RANDOMIZATION_RANGE = (0.98, 1.02)
 VELOCITY_PUSH_INTERVAL_S = (3.0, 6.0)
 VELOCITY_PUSH_RANGE = (-0.3, 0.3)
 IMU_ORIENTATION_RANDOMIZATION_ANGLE = 1.0
-BASE_ORIENTATION_MAX_PITCH_DEG = 10.0
-BASE_ORIENTATION_MAX_ROLL_DEG = 5.0
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs.mdp.actions import JointPositionActionCfg
@@ -61,49 +58,41 @@ def make_microduck_velocity_rollers_env_cfg(
 ) -> ManagerBasedRlEnvCfg:
     """Create Microduck roller skate velocity tracking environment configuration."""
 
-    # Roller skates: feet stay near ground so pose stds are tighter on lower body.
-    # Head stds are relaxed as with the walk env.
     std_standing = {
         r".*hip_yaw.*": 0.1,
         r".*hip_roll.*": 0.1,
         r".*hip_pitch.*": 0.1,
         r".*knee.*": 0.1,
         r".*ankle.*": 0.1,
-        r".*neck.*": 0.05,
-        r".*head.*": 0.05,
-        r".*passive_.*": 999.0,  # passive wheel joints: effectively unconstrained
+        r".*neck.*": 0.5,
+        r".*head.*": 0.5,
+        r".*passive_.*": 999.0,
     }
 
     std_walking = {
         r".*hip_yaw.*": 0.3,
-        r".*hip_roll.*": 0.1,
+        r".*hip_roll.*": 0.3,
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
         r".*ankle.*": 0.25,
-        r".*neck.*": 0.1,
-        r".*head.*": 0.1,
+        r".*neck.*": 0.5,
+        r".*head.*": 0.5,
         r".*passive_.*": 999.0,
     }
 
     std_running = {
         r".*hip_yaw.*": 0.5,
-        r".*hip_roll.*": 0.2,
+        r".*hip_roll.*": 0.5,
         r".*hip_pitch.*": 0.8,
         r".*knee.*": 0.8,
         r".*ankle.*": 0.5,
-        r".*neck.*": 0.1,
-        r".*head.*": 0.1,
+        r".*neck.*": 0.5,
+        r".*head.*": 0.5,
         r".*passive_.*": 999.0,
     }
 
-    # The roller XML defines left_foot and right_foot sites (same names as walk robot)
     site_names = ["left_foot", "right_foot"]
 
-    # Contact sensor: roller_foot1 (left) and roller_foot2 (right) as subtree roots.
-    # Each subtree contains both wheels of that side, so the slot is only "in contact"
-    # when at least one wheel on that side touches the ground — and "airborne" only when
-    # the whole skate lifts off. Using individual wheel bodies here would let the robot
-    # cheat by leaning on the rear wheel while lifting the front one.
     feet_ground_cfg = ContactSensorCfg(
         name="feet_ground_contact",
         primary=ContactMatch(
@@ -138,7 +127,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.scene.sensors = (feet_ground_cfg, self_collision_cfg)
     cfg.viewer.body_name = "trunk_base"
 
-    # Action configuration — identical to the walk env (passive wheels have no actuators)
+    # Action configuration
     joint_pos_action = cfg.actions["joint_pos"]
     assert isinstance(joint_pos_action, JointPositionActionCfg)
     joint_pos_action.scale = 1.0
@@ -146,76 +135,47 @@ def make_microduck_velocity_rollers_env_cfg(
         joint_pos_action.class_type = microduck_mdp.NeckOffsetJointPositionAction
 
     # === REWARDS ===
+    # Strip everything back to the minimum: pose, upright, com_height, velocity tracking.
+    # Let the robot discover the skating gait through exploration.
+
+    # Keep only what we want; delete everything else from the base env
+    keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2"}
+    for name in list(cfg.rewards.keys()):
+        if name not in keep:
+            del cfg.rewards[name]
+
     cfg.rewards["pose"].params["std_standing"] = std_standing
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 2.0
-
-    cfg.rewards["self_collisions"] = RewardTermCfg(
-        func=mdp.self_collision_cost,
-        weight=-1.0,
-        params={"sensor_name": self_collision_cfg.name},
-    )
+    cfg.rewards["pose"].weight = 1.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 4.0  # strong continuous penalty for tilting
+    cfg.rewards["upright"].weight = 2.0
 
-    # Large one-shot penalty when the episode ends due to falling (non-timeout termination).
-    # Without this, falling forward gives free velocity reward before termination.
-    cfg.rewards["termination_penalty"] = RewardTermCfg(
-        func=mdp.is_terminated,
-        weight=-10.0,
-    )
-
-    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
-
-    # Remove gait-lifting rewards: skating strokes are lateral pushes, not vertical lifts.
-    # These rewards incentivise flailing that destabilises the robot on its wheels.
-    del cfg.rewards["air_time"]
-    del cfg.rewards["foot_clearance"]
-    del cfg.rewards["foot_swing_height"]
-    del cfg.rewards["foot_slip"]
-    del cfg.rewards["soft_landing"]
-
-    cfg.rewards["body_ang_vel"].weight = -0.05
-    cfg.rewards["angular_momentum"].weight = -0.02
-
-    cfg.rewards["track_linear_velocity"].weight = 5.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)  # tight: real gradient at 0.3 m/s error
-    cfg.rewards["track_angular_velocity"].weight = 0.0  # ang_vel command is 0; skip for now
-
-    cfg.rewards["action_rate_l2"].weight = -0.4  # smoothness from the first step — critical for wheel stability
-
-
-    cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
-    )
+    cfg.rewards["track_linear_velocity"].weight = 10.0
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25)
 
     cfg.rewards["com_height_target"] = RewardTermCfg(
         func=microduck_mdp.com_height_target,
-        weight=1.2,
+        weight=2.0,
         params={
             "target_height_min": 0.0935,  # 0.08 + 0.0135 (roller height offset)
             "target_height_max": 0.1235,  # 0.11 + 0.0135
         },
     )
 
+    # Regularization — same values as velocity env
+    cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
+    cfg.rewards["body_ang_vel"].weight = -0.05
+    cfg.rewards["angular_momentum"].weight = -0.02
+    cfg.rewards["action_rate_l2"].weight = -0.6
+    cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
+    )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
-    )
-
-    # Skating stroke: reward lateral hip movements correlated with forward command.
-    # Forward propulsion on roller skates requires pushing feet sideways — this gives
-    # a dense gradient toward discovering the skating gait.
-    cfg.rewards["skating_stroke"] = RewardTermCfg(
-        func=microduck_mdp.skating_stroke,
-        weight=2.0,
-        params={
-            "command_name": "twist",
-            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
-        },
     )
 
     # === EVENTS ===
@@ -236,11 +196,9 @@ def make_microduck_velocity_rollers_env_cfg(
             params={"max_offset": NECK_OFFSET_MAX_ANGLE},
         )
 
-    # foot_friction event uses named geoms (left_foot_collision / right_foot_collision)
-    # which don't exist in the roller model — delete it
     del cfg.events["foot_friction"]
 
-    cfg.events["reset_base"].params["pose_range"]["z"] = (0.1335, 0.1435)  # +0.0135 roller height offset
+    cfg.events["reset_base"].params["pose_range"]["z"] = (0.1335, 0.1435)
 
     if ENABLE_VELOCITY_PUSHES:
         interval = (0.5, 1.0) if play else VELOCITY_PUSH_INTERVAL_S
@@ -294,32 +252,6 @@ def make_microduck_velocity_rollers_env_cfg(
             },
         )
 
-    if ENABLE_JOINT_FRICTION_RANDOMIZATION:
-        cfg.events["randomize_joint_friction"] = EventTermCfg(
-            func=mdp.randomize_field,
-            mode="reset",
-            domain_randomization=True,
-            params={
-                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
-                "operation": "scale",
-                "field": "dof_frictionloss",
-                "ranges": JOINT_FRICTION_RANDOMIZATION_RANGE,
-            },
-        )
-
-    if ENABLE_JOINT_DAMPING_RANDOMIZATION:
-        cfg.events["randomize_joint_damping"] = EventTermCfg(
-            func=mdp.randomize_field,
-            mode="reset",
-            domain_randomization=True,
-            params={
-                "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*",)),
-                "operation": "scale",
-                "field": "dof_damping",
-                "ranges": JOINT_DAMPING_RANDOMIZATION_RANGE,
-            },
-        )
-
     if ENABLE_IMU_ORIENTATION_RANDOMIZATION:
         cfg.events["randomize_imu_orientation"] = EventTermCfg(
             func=microduck_mdp.randomize_imu_orientation,
@@ -327,17 +259,6 @@ def make_microduck_velocity_rollers_env_cfg(
             params={
                 "asset_cfg": SceneEntityCfg("robot"),
                 "max_angle_deg": IMU_ORIENTATION_RANDOMIZATION_ANGLE,
-            },
-        )
-
-    if ENABLE_BASE_ORIENTATION_RANDOMIZATION:
-        cfg.events["randomize_base_orientation"] = EventTermCfg(
-            func=microduck_mdp.randomize_base_orientation,
-            mode="reset",
-            params={
-                "asset_cfg": SceneEntityCfg("robot"),
-                "max_pitch_deg": BASE_ORIENTATION_MAX_PITCH_DEG,
-                "max_roll_deg": BASE_ORIENTATION_MAX_ROLL_DEG,
             },
         )
 
@@ -350,13 +271,6 @@ def make_microduck_velocity_rollers_env_cfg(
     )
 
     gravity_term_name = "projected_gravity" if USE_PROJECTED_GRAVITY else "raw_accelerometer"
-
-    if not USE_PROJECTED_GRAVITY:
-        del cfg.observations["policy"].terms["projected_gravity"]
-        cfg.observations["policy"].terms["raw_accelerometer"] = ObservationTermCfg(
-            func=microduck_mdp.raw_accelerometer,
-            scale=1.0,
-        )
 
     cfg.observations["policy"].terms[gravity_term_name] = deepcopy(
         cfg.observations["policy"].terms[gravity_term_name]
@@ -378,16 +292,14 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.observations["policy"].terms["joint_pos"].noise = Unoise(n_min=-0.0006, n_max=0.0006)
     cfg.observations["policy"].terms["joint_vel"].noise = Unoise(n_min=-0.024, n_max=0.024)
 
-    # Exclude passive wheel joints from joint_pos and joint_vel observations.
-    # Wheel angles accumulate unboundedly; exclude them to keep the obs space clean.
-    # Wheel velocity is added to the critic only (not sim2real safe).
+    # Exclude passive wheel joints from joint_pos and joint_vel observations
     passive_excluded = SceneEntityCfg("robot", joint_names=(r"^(?!passive_).*",))
     cfg.observations["policy"].terms["joint_pos"].params["asset_cfg"] = passive_excluded
     cfg.observations["policy"].terms["joint_vel"].params["asset_cfg"] = passive_excluded
     cfg.observations["critic"].terms["joint_pos"].params["asset_cfg"] = deepcopy(passive_excluded)
     cfg.observations["critic"].terms["joint_vel"].params["asset_cfg"] = deepcopy(passive_excluded)
 
-    # Add wheel velocities to critic only (not available on real robot).
+    # Wheel velocities in critic only (not sim2real safe)
     wheel_cfg = SceneEntityCfg("robot", joint_names=(r"^passive_.*",))
     cfg.observations["critic"].terms["wheel_vel"] = ObservationTermCfg(
         func=mdp.joint_vel_rel,
@@ -399,41 +311,26 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.2, 0.4)   # always forward, always significant: no near-zero standing reward
-    command.ranges.lin_vel_y = (0.0, 0.0)   # lateral motion impossible on roller skates
-    command.ranges.ang_vel_z = (0.0, 0.0)   # angular commands disabled for now
+    command.ranges.lin_vel_x = (0.2, 0.5)
+    command.ranges.lin_vel_y = (0.0, 0.0)
+    command.ranges.ang_vel_z = (0.0, 0.0)
     command.viz.z_offset = 0.5
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
-    # Flat terrain only for now
     cfg.scene.terrain.terrain_type = "plane"
     cfg.scene.terrain.terrain_generator = None
 
     # === CURRICULUM ===
-    cfg.curriculum["standing_envs"] = CurriculumTermCfg(
-        func=microduck_mdp.standing_envs_curriculum,
-        params={
-            "command_name": "twist",
-            "standing_stages": [
-                {"step": 0,           "rel_standing_envs": 0.0},   # no standing: force velocity commands
-                {"step": 1000 * 24,   "rel_standing_envs": 0.05},
-                {"step": 1500 * 24,   "rel_standing_envs": 0.1},
-                {"step": 2000 * 24,   "rel_standing_envs": 0.15},
-            ],
-        },
-    )
-
     cfg.curriculum["velocity_command_ranges"] = CurriculumTermCfg(
         func=microduck_mdp.velocity_command_ranges_curriculum,
         params={
             "command_name": "twist",
-            "update_lin_vel_y": False,   # lateral motion impossible on roller skates
-            "update_ang_vel_z": False,   # angular commands disabled for now
+            "update_lin_vel_y": False,
+            "update_ang_vel_z": False,
             "velocity_stages": [
-                {"step": 0,           "lin_vel_range": 0.4,  "ang_vel_range": 0.0},
-                {"step": 1000 * 24,   "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
-                {"step": 2000 * 24,   "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
-                {"step": 3000 * 24,   "lin_vel_range": 1.0,  "ang_vel_range": 0.0},
+                {"step": 0,          "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
+                {"step": 1000 * 24,  "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
+                {"step": 2000 * 24,  "lin_vel_range": 1.0,  "ang_vel_range": 0.0},
             ],
         },
     )
@@ -445,20 +342,10 @@ def make_microduck_velocity_rollers_env_cfg(
                 "event_name": "randomize_neck_offset_target",
                 "offset_stages": [
                     {"step": 0,          "max_offset": 0.0},
-                    {"step": 500 * 24,   "max_offset": 0.1},
-                    {"step": 750 * 24,   "max_offset": 0.2},
-                    {"step": 1000 * 24,  "max_offset": 0.3},
-                    {"step": 1500 * 24,  "max_offset": 0.5},
-                    {"step": 2000 * 24,  "max_offset": 0.7},
-                    {"step": 2500 * 24,  "max_offset": 0.9},
-                    {"step": 3000 * 24,  "max_offset": 1.1},
-                    {"step": 3500 * 24,  "max_offset": 1.3},
-                    {"step": 4000 * 24,  "max_offset": 1.5},
-                    {"step": 4500 * 24,  "max_offset": 1.7},
-                    {"step": 5000 * 24,  "max_offset": 1.9},
-                    {"step": 5500 * 24,  "max_offset": 2.1},
-                    {"step": 6000 * 24,  "max_offset": 2.3},
-                    {"step": 6500 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
+                    {"step": 500 * 24,   "max_offset": 0.3},
+                    {"step": 1000 * 24,  "max_offset": 0.7},
+                    {"step": 2000 * 24,  "max_offset": 1.3},
+                    {"step": 3000 * 24,  "max_offset": NECK_OFFSET_MAX_ANGLE},
                 ],
             },
         )
@@ -482,7 +369,7 @@ MicroduckRollersRlCfg = RslRlOnPolicyRunnerCfg(
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.01,
+        entropy_coef=0.03,
         num_learning_epochs=5,
         num_mini_batches=4,
         learning_rate=1.0e-3,
