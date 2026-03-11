@@ -150,7 +150,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 2.0
+    cfg.rewards["pose"].weight = 0.5  # reduced: home pose = standing still, penalizes skating motion
 
     cfg.rewards["self_collisions"] = RewardTermCfg(
         func=mdp.self_collision_cost,
@@ -181,22 +181,13 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
 
-    cfg.rewards["track_linear_velocity"].weight = 3.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.15)
+    cfg.rewards["track_linear_velocity"].weight = 5.0
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)  # tighter: steeper gradient away from 0
     cfg.rewards["track_angular_velocity"].weight = 3.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.40)
+    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25)
 
     cfg.rewards["action_rate_l2"].weight = -0.6
 
-    cfg.rewards["stillness_at_zero_command"] = RewardTermCfg(
-        func=microduck_mdp.stillness_at_zero_command,
-        weight=3.0,
-        params={
-            "command_name": "twist",
-            "command_threshold": 0.01,
-            "vel_std": 0.1,
-        },
-    )
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.1
@@ -386,7 +377,7 @@ def make_microduck_velocity_rollers_env_cfg(
 
     # === COMMANDS ===
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
-    command.rel_standing_envs = 0.02
+    command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.3, 0.3)
     command.ranges.lin_vel_y = (-0.3, 0.3)
@@ -416,12 +407,10 @@ def make_microduck_velocity_rollers_env_cfg(
         params={
             "command_name": "twist",
             "standing_stages": [
-                {"step": 0,           "rel_standing_envs": 0.02},
-                {"step": 500 * 24,    "rel_standing_envs": 0.05},
-                {"step": 750 * 24,    "rel_standing_envs": 0.1},
-                {"step": 1000 * 24,   "rel_standing_envs": 0.15},
-                {"step": 1500 * 24,   "rel_standing_envs": 0.2},
-                {"step": 2000 * 24,   "rel_standing_envs": 0.25},
+                {"step": 0,           "rel_standing_envs": 0.0},   # no standing: force velocity commands
+                {"step": 1000 * 24,   "rel_standing_envs": 0.05},
+                {"step": 1500 * 24,   "rel_standing_envs": 0.1},
+                {"step": 2000 * 24,   "rel_standing_envs": 0.15},
             ],
         },
     )
