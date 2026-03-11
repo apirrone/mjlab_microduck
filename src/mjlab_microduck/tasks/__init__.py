@@ -42,13 +42,42 @@ from .microduck_velocity_rollers_env_cfg import (
     MicroduckRollersRlCfg,
 )
 
+_ROLLER_PASSIVE_JOINTS = frozenset({
+    "passive_LFwheel", "passive_LRwheel",
+    "passive_RFwheel", "passive_RRwheel",
+})
+
+
+class MicroduckRollersOnPolicyRunner(MicroduckOnPolicyRunner):
+    """Runner for the roller skate task.
+
+    Overrides save() to exclude passive wheel joints from ONNX export metadata:
+    those joints have no actuators and would cause a KeyError in get_base_metadata
+    when it tries to look up their ctrl IDs.
+    """
+
+    def save(self, path, *args, **kwargs):
+        robot = self.env.unwrapped.scene["robot"]
+        had_instance_attr = "joint_names" in robot.__dict__
+        orig_names = list(robot.joint_names)
+        robot.__dict__["joint_names"] = [
+            n for n in orig_names if n not in _ROLLER_PASSIVE_JOINTS
+        ]
+        try:
+            super().save(path, *args, **kwargs)
+        finally:
+            if had_instance_attr:
+                robot.__dict__["joint_names"] = orig_names
+            else:
+                robot.__dict__.pop("joint_names", None)
+
 # Roller skate velocity task
 register_mjlab_task(
     task_id="Mjlab-Velocity-Flat-MicroDuck-Rollers",
     env_cfg=make_microduck_velocity_rollers_env_cfg(),
     play_env_cfg=make_microduck_velocity_rollers_env_cfg(play=True),
     rl_cfg=MicroduckRollersRlCfg,
-    runner_cls=MicroduckOnPolicyRunner,
+    runner_cls=MicroduckRollersOnPolicyRunner,
 )
 print("✓ Rollers task registered: Mjlab-Velocity-Flat-MicroDuck-Rollers")
 
