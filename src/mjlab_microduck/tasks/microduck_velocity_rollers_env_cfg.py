@@ -160,7 +160,14 @@ def make_microduck_velocity_rollers_env_cfg(
     )
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 1.0
+    cfg.rewards["upright"].weight = 4.0  # strong continuous penalty for tilting
+
+    # Large one-shot penalty when the episode ends due to falling (non-timeout termination).
+    # Without this, falling forward gives free velocity reward before termination.
+    cfg.rewards["termination_penalty"] = RewardTermCfg(
+        func=mdp.is_terminated,
+        weight=-10.0,
+    )
 
     # Foot-specific site names — foot_clearance and foot_swing_height stay on
     # (skating requires lifting feet for each stroke), foot_slip is removed
