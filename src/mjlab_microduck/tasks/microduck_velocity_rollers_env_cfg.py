@@ -155,7 +155,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["upright"].weight = 2.0
 
     cfg.rewards["track_linear_velocity"].weight = 10.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25)
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)
 
     cfg.rewards["com_height_target"] = RewardTermCfg(
         func=microduck_mdp.com_height_target,
@@ -313,7 +313,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.2, 0.5)
+    command.ranges.lin_vel_x = (0.4, 0.6)
     command.ranges.lin_vel_y = (0.0, 0.0)
     command.ranges.ang_vel_z = (0.0, 0.0)
     command.viz.z_offset = 0.5
@@ -330,9 +330,9 @@ def make_microduck_velocity_rollers_env_cfg(
             "update_lin_vel_y": False,
             "update_ang_vel_z": False,
             "velocity_stages": [
-                {"step": 0,          "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
-                {"step": 1000 * 24,  "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
-                {"step": 2000 * 24,  "lin_vel_range": 1.0,  "ang_vel_range": 0.0},
+                {"step": 0,          "lin_vel_range": 0.6,  "ang_vel_range": 0.0},
+                {"step": 1000 * 24,  "lin_vel_range": 0.8,  "ang_vel_range": 0.0},
+                {"step": 2000 * 24,  "lin_vel_range": 1.2,  "ang_vel_range": 0.0},
             ],
         },
     )
