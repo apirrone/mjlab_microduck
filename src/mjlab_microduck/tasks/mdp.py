@@ -1299,6 +1299,7 @@ def velocity_command_ranges_curriculum(
     env_ids: torch.Tensor,
     command_name: str,
     velocity_stages: list[dict],
+    update_lin_vel_y: bool = True,
 ) -> torch.Tensor:
     """Update velocity command ranges based on training progress.
 
@@ -1341,7 +1342,8 @@ def velocity_command_ranges_curriculum(
 
     # Update command ranges (symmetric around zero)
     cfg.ranges.lin_vel_x = (-current_lin_vel, current_lin_vel)
-    cfg.ranges.lin_vel_y = (-current_lin_vel, current_lin_vel)
+    if update_lin_vel_y:
+        cfg.ranges.lin_vel_y = (-current_lin_vel, current_lin_vel)
     cfg.ranges.ang_vel_z = (-current_ang_vel, current_ang_vel)
 
     return torch.tensor([current_lin_vel])

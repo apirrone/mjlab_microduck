@@ -382,7 +382,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.3, 0.3)
-    command.ranges.lin_vel_y = (-0.3, 0.3)
+    command.ranges.lin_vel_y = (0.0, 0.0)  # lateral motion impossible on roller skates
     command.ranges.ang_vel_z = (-1.5, 1.5)
     command.viz.z_offset = 0.5
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
@@ -421,6 +421,7 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.velocity_command_ranges_curriculum,
         params={
             "command_name": "twist",
+            "update_lin_vel_y": False,  # lateral motion impossible on roller skates
             "velocity_stages": [
                 {"step": 0,          "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
                 {"step": 500 * 24,   "lin_vel_range": 0.35, "ang_vel_range": 1.6},
