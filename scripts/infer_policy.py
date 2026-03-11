@@ -12,6 +12,7 @@ import mujoco.viewer
 import onnxruntime as ort
 
 MICRODUCK_XML = "src/mjlab_microduck/robot/microduck/scene.xml"
+MICRODUCK_ROLLERS_XML = "src/mjlab_microduck/robot/microduck/robot_walk_rollers.xml"
 
 # Body pose command constants (must match training constants)
 BODY_CMD_MAX_Z = 0.03              # ±30 mm
@@ -123,6 +124,16 @@ class PolicyInference:
 
         # Joint information
         self.n_joints = model.nu
+
+        # For robots with passive/interspersed joints (e.g. roller skates), the actuated
+        # joints are not contiguous in qpos/qvel. Compute the correct indices from the
+        # actuator transmission joint IDs so extraction works for any joint ordering.
+        self.joint_qpos_indices = [
+            int(model.jnt_qposadr[model.actuator_trnid[i, 0]]) for i in range(model.nu)
+        ]
+        self.joint_qvel_indices = [
+            int(model.jnt_dofadr[model.actuator_trnid[i, 0]]) for i in range(model.nu)
+        ]
 
         # Default pose for the policy (flexed legs)
         self.default_pose = DEFAULT_POSE[:self.n_joints]
@@ -282,12 +293,12 @@ class PolicyInference:
 
     def get_joint_pos_relative(self):
         """Get joint positions relative to default pose."""
-        current_pos = self.data.qpos[7:7 + self.n_joints].copy().astype(np.float32)
+        current_pos = self.data.qpos[self.joint_qpos_indices].copy().astype(np.float32)
         return current_pos - self.default_pose
 
     def get_joint_vel(self):
         """Get joint velocities."""
-        return self.data.qvel[6:6 + self.n_joints].copy().astype(np.float32)
+        return self.data.qvel[self.joint_qvel_indices].copy().astype(np.float32)
 
     def get_imitation_phase_obs(self):
         """Get imitation phase observation as [cos(2π*phase), sin(2π*phase)]."""
@@ -419,6 +430,7 @@ class PolicyInference:
 
 def main():
     parser = argparse.ArgumentParser(description="Run ONNX policy in MuJoCo")
+    parser.add_argument("--roller", action="store_true", help="Use roller skate robot XML (robot_walk_rollers.xml)")
     parser.add_argument("--walking", type=str, default=None, help="Path to walking policy ONNX file")
     parser.add_argument("--standing", "-s", type=str, default=None, help="Path to standing policy ONNX file")
     parser.add_argument("--ground-pick", type=str, default=None, help="Path to ground pick policy ONNX file (press G to activate)")
@@ -458,8 +470,9 @@ def main():
             return
 
     # Load MuJoCo model
-    print(f"Loading MuJoCo model from: {MICRODUCK_XML}")
-    model = mujoco.MjModel.from_xml_path(MICRODUCK_XML)
+    xml_path = MICRODUCK_ROLLERS_XML if args.roller else MICRODUCK_XML
+    print(f"Loading MuJoCo model from: {xml_path}")
+    model = mujoco.MjModel.from_xml_path(xml_path)
     model.opt.timestep = 0.005
     data = mujoco.MjData(model)
 
@@ -485,9 +498,10 @@ def main():
     qpos_adr = model.jnt_qposadr[freejoint_id]
     data.qpos[qpos_adr + 0] = 0.0
     data.qpos[qpos_adr + 1] = 0.0
-    data.qpos[qpos_adr + 2] = 0.125
+    data.qpos[qpos_adr + 2] = 0.1385 if args.roller else 0.125  # rollers add 13.5mm height
     data.qpos[qpos_adr + 3:qpos_adr + 7] = [1, 0, 0, 0]
-    data.qpos[7:7 + policy.n_joints] = policy.default_pose
+    for i, qpos_idx in enumerate(policy.joint_qpos_indices):
+        data.qpos[qpos_idx] = policy.default_pose[i]
     data.ctrl[:] = policy.default_pose
     mujoco.mj_forward(model, data)
 

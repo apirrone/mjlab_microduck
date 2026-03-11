@@ -261,12 +261,22 @@ def run_export(task_id: str, cfg: ExportConfig):
         filename=onnx_path,
     )
 
-    attach_onnx_metadata(
-        runner.env.unwrapped,
-        cfg.checkpoint_file,  # type: ignore
-        path=path,
-        filename=onnx_path,
-    )
+    import mjlab.tasks.velocity.rl.exporter as _vel_exporter
+    from mjlab_microduck.tasks import _make_roller_get_base_metadata
+    _is_rollers = "Rollers" in task_id
+    if _is_rollers:
+        _orig_get_base_metadata = _vel_exporter.get_base_metadata
+        _vel_exporter.get_base_metadata = _make_roller_get_base_metadata()
+    try:
+        attach_onnx_metadata(
+            runner.env.unwrapped,
+            cfg.checkpoint_file,  # type: ignore
+            path=path,
+            filename=onnx_path,
+        )
+    finally:
+        if _is_rollers:
+            _vel_exporter.get_base_metadata = _orig_get_base_metadata
 
     # Add extra metadata for imitation tasks
     if is_imitation_tracking:

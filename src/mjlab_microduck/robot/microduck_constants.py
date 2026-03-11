@@ -101,14 +101,21 @@ MICRODUCK_GROUND_PICK_ROBOT_CFG = EntityCfg(
     ),
 )
 
-# Roller skate robot: passive wheel joints have no actuators in the XML,
-# so they are free DOFs driven only by contact physics.
+# Roller skate robot: passive wheel joints have no actuators in the XML.
+# Use a separate actuator config that explicitly excludes passive joints so
+# the action space stays 14-dimensional (same as the walk robot).
+roller_actuators = DelayedActuatorCfg(
+    delay_min_lag=0,
+    delay_max_lag=3,
+    base_cfg=XmlPositionActuatorCfg(joint_names_expr=(r"^(?!passive_).*",)),
+)
+
 MICRODUCK_WALK_ROLLERS_ROBOT_CFG = EntityCfg(
     spec_fn=get_walk_rollers_spec,
     init_state=HOME_FRAME,
     collisions=(),  # roller wheel collision geoms have no explicit names; XML defaults apply
     articulation=EntityArticulationInfoCfg(
-        actuators=(actuators,),
+        actuators=(roller_actuators,),
         soft_joint_pos_limit_factor=0.9,
     ),
 )
