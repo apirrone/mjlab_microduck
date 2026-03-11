@@ -828,6 +828,35 @@ def joint_torques_l2(
     return torch.sum(torch.square(actuator_forces), dim=1)
 
 
+def skating_stroke(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
+) -> torch.Tensor:
+    """Reward lateral hip movements when commanded to move forward.
+
+    On roller skates, forward propulsion requires pushing feet laterally outward —
+    the "skating stroke". This reward shapes the policy toward discovering that gait
+    by giving a dense signal: high reward when hip_roll joints are active and there
+    is a non-zero forward command.
+
+    The reward is proportional to the total absolute hip_roll velocity multiplied by
+    the signed forward command magnitude, so it's zero when standing still and grows
+    as the robot makes larger lateral pushes.
+    """
+    robot: Entity = env.scene[asset_cfg.name]
+    cmd_x = env.command_manager.get_command(command_name)[:, 0]  # forward command
+
+    # Hip-roll velocity for both legs — (num_envs, 2)
+    hip_roll_vel = robot.data.joint_vel[:, asset_cfg.joint_ids]
+
+    # Sum of absolute lateral push velocities
+    lateral_push = torch.sum(torch.abs(hip_roll_vel), dim=1)
+
+    # Only reward when there is a forward (or backward) command
+    return torch.abs(cmd_x) * lateral_push
+
+
 def contact_frequency_penalty(
     env: ManagerBasedRlEnv,
     sensor_name: str = "feet_ground_contact",

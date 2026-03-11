@@ -206,6 +206,18 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
     )
 
+    # Skating stroke: reward lateral hip movements correlated with forward command.
+    # Forward propulsion on roller skates requires pushing feet sideways — this gives
+    # a dense gradient toward discovering the skating gait.
+    cfg.rewards["skating_stroke"] = RewardTermCfg(
+        func=microduck_mdp.skating_stroke,
+        weight=2.0,
+        params={
+            "command_name": "twist",
+            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
+        },
+    )
+
     # === EVENTS ===
     cfg.events["reset_action_history"] = EventTermCfg(
         func=microduck_mdp.reset_action_history,
