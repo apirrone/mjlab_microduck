@@ -150,7 +150,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 0.5  # reduced: home pose = standing still, penalizes skating motion
+    cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["self_collisions"] = RewardTermCfg(
         func=mdp.self_collision_cost,
@@ -161,21 +161,22 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["upright"].weight = 1.0
 
-    # Foot-specific site names
-    for reward_name in ["foot_clearance", "foot_slip"]:
+    # Foot-specific site names — foot_clearance and foot_swing_height stay on
+    # (skating requires lifting feet for each stroke), foot_slip is removed
+    # (rolling/sliding is inherent to skating)
+    for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
-    # Roller skates: remove gait rewards that assume a stepping motion
-    # (wheels stay on ground, no air time or foot lifting needed)
-    del cfg.rewards["foot_clearance"]
-    del cfg.rewards["foot_swing_height"]
-    del cfg.rewards["air_time"]
+    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].params["command_threshold"] = 0.01
+    del cfg.rewards["foot_slip"]  # skating involves rolling/sliding — don't penalise it
 
-    # Lateral foot slip is still harmful on roller skates (causes falls)
-    cfg.rewards["foot_slip"].weight = -0.1
-    cfg.rewards["foot_slip"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
 
     cfg.rewards["soft_landing"].weight = -1e-05
     cfg.rewards["body_ang_vel"].weight = -0.05
