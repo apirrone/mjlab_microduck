@@ -42,34 +42,66 @@ from .microduck_velocity_rollers_env_cfg import (
     MicroduckRollersRlCfg,
 )
 
-_ROLLER_PASSIVE_JOINTS = frozenset({
-    "passive_LFwheel", "passive_LRwheel",
-    "passive_RFwheel", "passive_RRwheel",
-})
+def _make_roller_get_base_metadata():
+    """Return a get_base_metadata replacement that skips joints with no actuator.
+
+    Needed for the roller skate robot where passive wheel joints exist as DOFs
+    but have no position actuators, causing a KeyError in the stock implementation.
+    """
+    import torch
+    from mjlab.envs.mdp.actions.joint_actions import JointAction
+
+    def roller_get_base_metadata(env, run_path):
+        robot = env.scene["robot"]
+        joint_action = env.action_manager.get_term("joint_pos")
+        assert isinstance(joint_action, JointAction)
+
+        joint_name_to_ctrl_id = {
+            act.target.split("/")[-1]: act.id
+            for act in robot.spec.actuators
+        }
+
+        # Filter to joints that have an actuator, preserving natural order
+        all_names = list(robot.joint_names)
+        actuated_idx = [i for i, n in enumerate(all_names) if n in joint_name_to_ctrl_id]
+        joint_names = [all_names[i] for i in actuated_idx]
+        ctrl_ids = [joint_name_to_ctrl_id[n] for n in joint_names]
+
+        joint_stiffness = env.sim.mj_model.actuator_gainprm[ctrl_ids, 0]
+        joint_damping = -env.sim.mj_model.actuator_biasprm[ctrl_ids, 2]
+
+        return {
+            "run_path": run_path,
+            "joint_names": joint_names,
+            "joint_stiffness": joint_stiffness.tolist(),
+            "joint_damping": joint_damping.tolist(),
+            "default_joint_pos": robot.data.default_joint_pos[0][actuated_idx].cpu().tolist(),
+            "command_names": list(env.command_manager.active_terms),
+            "observation_names": env.observation_manager.active_terms["policy"],
+            "action_scale": joint_action._scale[0].cpu().tolist()
+            if isinstance(joint_action._scale, torch.Tensor)
+            else joint_action._scale,
+        }
+
+    return roller_get_base_metadata
 
 
 class MicroduckRollersOnPolicyRunner(MicroduckOnPolicyRunner):
     """Runner for the roller skate task.
 
-    Overrides save() to exclude passive wheel joints from ONNX export metadata:
-    those joints have no actuators and would cause a KeyError in get_base_metadata
-    when it tries to look up their ctrl IDs.
+    Overrides save() to patch get_base_metadata in the velocity exporter module
+    for the duration of the call, filtering out passive wheel joints that have no
+    actuators and would cause a KeyError in the stock implementation.
     """
 
     def save(self, path, *args, **kwargs):
-        robot = self.env.unwrapped.scene["robot"]
-        had_instance_attr = "joint_names" in robot.__dict__
-        orig_names = list(robot.joint_names)
-        robot.__dict__["joint_names"] = [
-            n for n in orig_names if n not in _ROLLER_PASSIVE_JOINTS
-        ]
+        import mjlab.tasks.velocity.rl.exporter as _vel_exporter
+        orig = _vel_exporter.get_base_metadata
+        _vel_exporter.get_base_metadata = _make_roller_get_base_metadata()
         try:
             super().save(path, *args, **kwargs)
         finally:
-            if had_instance_attr:
-                robot.__dict__["joint_names"] = orig_names
-            else:
-                robot.__dict__.pop("joint_names", None)
+            _vel_exporter.get_base_metadata = orig
 
 # Roller skate velocity task
 register_mjlab_task(
