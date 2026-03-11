@@ -188,7 +188,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["track_angular_velocity"].weight = 3.0
     cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25)
 
-    cfg.rewards["action_rate_l2"].weight = -0.6
+    cfg.rewards["action_rate_l2"].weight = 0.0  # starts at 0, ramped up by curriculum
 
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
@@ -370,12 +370,20 @@ def make_microduck_velocity_rollers_env_cfg(
 
     # Exclude passive wheel joints from joint_pos and joint_vel observations.
     # Wheel angles accumulate unboundedly; exclude them to keep the obs space clean.
-    # (Wheel velocity is also excluded for simplicity; add a custom obs term later if needed.)
+    # Wheel velocity is added to the critic only (not sim2real safe).
     passive_excluded = SceneEntityCfg("robot", joint_names=(r"^(?!passive_).*",))
     cfg.observations["policy"].terms["joint_pos"].params["asset_cfg"] = passive_excluded
     cfg.observations["policy"].terms["joint_vel"].params["asset_cfg"] = passive_excluded
     cfg.observations["critic"].terms["joint_pos"].params["asset_cfg"] = deepcopy(passive_excluded)
     cfg.observations["critic"].terms["joint_vel"].params["asset_cfg"] = deepcopy(passive_excluded)
+
+    # Add wheel velocities to critic only (not available on real robot).
+    wheel_cfg = SceneEntityCfg("robot", joint_names=(r"^passive_.*",))
+    cfg.observations["critic"].terms["wheel_vel"] = ObservationTermCfg(
+        func=mdp.joint_vel_rel,
+        scale=1.0,
+        params={"asset_cfg": wheel_cfg},
+    )
 
     # === COMMANDS ===
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
@@ -383,7 +391,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command.rel_heading_envs = 0.0
     command.ranges.lin_vel_x = (-0.3, 0.3)
     command.ranges.lin_vel_y = (0.0, 0.0)  # lateral motion impossible on roller skates
-    command.ranges.ang_vel_z = (-1.5, 1.5)
+    command.ranges.ang_vel_z = (0.0, 0.0)  # disable turning: focus on forward/backward skating first
     command.viz.z_offset = 0.5
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
@@ -397,9 +405,11 @@ def make_microduck_velocity_rollers_env_cfg(
         params={
             "reward_name": "action_rate_l2",
             "weight_stages": [
-                {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.8},
-                {"step": 500 * 24, "weight": -1.0},
+                {"step": 0,          "weight": 0.0},
+                {"step": 500 * 24,   "weight": -0.3},
+                {"step": 1000 * 24,  "weight": -0.6},
+                {"step": 1500 * 24,  "weight": -0.8},
+                {"step": 2000 * 24,  "weight": -1.0},
             ],
         },
     )
@@ -421,7 +431,8 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.velocity_command_ranges_curriculum,
         params={
             "command_name": "twist",
-            "update_lin_vel_y": False,  # lateral motion impossible on roller skates
+            "update_lin_vel_y": False,   # lateral motion impossible on roller skates
+            "update_ang_vel_z": False,   # angular commands disabled for now
             "velocity_stages": [
                 {"step": 0,          "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
                 {"step": 500 * 24,   "lin_vel_range": 0.35, "ang_vel_range": 1.6},
