@@ -139,7 +139,8 @@ def make_microduck_velocity_rollers_env_cfg(
     # Let the robot discover the skating gait through exploration.
 
     # Keep only what we want; delete everything else from the base env
-    keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2"}
+    keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2",
+            "air_time", "foot_clearance", "foot_swing_height", "soft_landing"}
     for name in list(cfg.rewards.keys()):
         if name not in keep:
             del cfg.rewards[name]
@@ -165,6 +166,17 @@ def make_microduck_velocity_rollers_env_cfg(
             "target_height_max": 0.1235,  # 0.11 + 0.0135
         },
     )
+
+    # Foot lifting rewards — same values as velocity env (skating requires lifting feet for strokes)
+    for reward_name in ["foot_clearance", "foot_swing_height"]:
+        cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
+    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].params["command_threshold"] = 0.01
+    cfg.rewards["soft_landing"].weight = -1e-05
+    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
+    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
+    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
 
     # Regularization — same values as velocity env
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
