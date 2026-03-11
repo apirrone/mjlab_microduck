@@ -151,7 +151,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 2.0
+    cfg.rewards["pose"].weight = 4.0  # strong anchor to home position — key for wheel stability
 
     cfg.rewards["self_collisions"] = RewardTermCfg(
         func=mdp.self_collision_cost,
@@ -169,33 +169,24 @@ def make_microduck_velocity_rollers_env_cfg(
         weight=-10.0,
     )
 
-    # Foot-specific site names — foot_clearance and foot_swing_height stay on
-    # (skating requires lifting feet for each stroke), foot_slip is removed
-    # (rolling/sliding is inherent to skating)
-    for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
-        cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
-
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
 
-    cfg.rewards["air_time"].weight = 5.0
-    cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    del cfg.rewards["foot_slip"]  # skating involves rolling/sliding — don't penalise it
+    # Remove gait-lifting rewards: skating strokes are lateral pushes, not vertical lifts.
+    # These rewards incentivise flailing that destabilises the robot on its wheels.
+    del cfg.rewards["air_time"]
+    del cfg.rewards["foot_clearance"]
+    del cfg.rewards["foot_swing_height"]
+    del cfg.rewards["foot_slip"]
+    del cfg.rewards["soft_landing"]
 
-    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
-    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
-
-    cfg.rewards["soft_landing"].weight = -1e-05
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
 
-    cfg.rewards["track_linear_velocity"].weight = 5.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)  # tighter: steeper gradient away from 0
-    cfg.rewards["track_angular_velocity"].weight = 3.0
-    cfg.rewards["track_angular_velocity"].params["std"] = math.sqrt(0.25)
+    cfg.rewards["track_linear_velocity"].weight = 3.0
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25)  # more forgiving early on
+    cfg.rewards["track_angular_velocity"].weight = 0.0  # ang_vel command is 0; skip for now
 
-    cfg.rewards["action_rate_l2"].weight = 0.0  # starts at 0, ramped up by curriculum
+    cfg.rewards["action_rate_l2"].weight = -0.4  # smoothness from the first step — critical for wheel stability
 
 
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
@@ -396,9 +387,9 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.3, 0.3)
-    command.ranges.lin_vel_y = (0.0, 0.0)  # lateral motion impossible on roller skates
-    command.ranges.ang_vel_z = (0.0, 0.0)  # disable turning: focus on forward/backward skating first
+    command.ranges.lin_vel_x = (-0.1, 0.1)  # start small; curriculum ramps this up
+    command.ranges.lin_vel_y = (0.0, 0.0)   # lateral motion impossible on roller skates
+    command.ranges.ang_vel_z = (0.0, 0.0)   # angular commands disabled for now
     command.viz.z_offset = 0.5
     command.class_type = microduck_mdp.VelocityCommandCommandOnly
 
@@ -407,20 +398,6 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.scene.terrain.terrain_generator = None
 
     # === CURRICULUM ===
-    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "action_rate_l2",
-            "weight_stages": [
-                {"step": 0,          "weight": 0.0},
-                {"step": 500 * 24,   "weight": -0.3},
-                {"step": 1000 * 24,  "weight": -0.6},
-                {"step": 1500 * 24,  "weight": -0.8},
-                {"step": 2000 * 24,  "weight": -1.0},
-            ],
-        },
-    )
-
     cfg.curriculum["standing_envs"] = CurriculumTermCfg(
         func=microduck_mdp.standing_envs_curriculum,
         params={
@@ -441,9 +418,11 @@ def make_microduck_velocity_rollers_env_cfg(
             "update_lin_vel_y": False,   # lateral motion impossible on roller skates
             "update_ang_vel_z": False,   # angular commands disabled for now
             "velocity_stages": [
-                {"step": 0,          "lin_vel_range": 0.3,  "ang_vel_range": 1.5},
-                {"step": 500 * 24,   "lin_vel_range": 0.35, "ang_vel_range": 1.6},
-                {"step": 1000 * 24,  "lin_vel_range": 0.4,  "ang_vel_range": 1.7},
+                {"step": 0,           "lin_vel_range": 0.1,  "ang_vel_range": 0.0},
+                {"step": 500 * 24,    "lin_vel_range": 0.2,  "ang_vel_range": 0.0},
+                {"step": 1000 * 24,   "lin_vel_range": 0.3,  "ang_vel_range": 0.0},
+                {"step": 2000 * 24,   "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
+                {"step": 3000 * 24,   "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
             ],
         },
     )
