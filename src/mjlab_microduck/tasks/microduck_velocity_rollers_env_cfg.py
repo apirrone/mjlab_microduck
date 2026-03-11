@@ -214,6 +214,8 @@ def make_microduck_velocity_rollers_env_cfg(
                 "asset_cfg": SceneEntityCfg("robot"),
             },
         )
+    else:
+        del cfg.events["push_robot"]
 
     if ENABLE_COM_RANDOMIZATION:
         cfg.events["randomize_com"] = EventTermCfg(
