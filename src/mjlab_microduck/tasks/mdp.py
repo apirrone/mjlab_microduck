@@ -26,7 +26,6 @@ _NECK_JOINT_INDICES = list(range(5, 9))
 # Time constant (seconds) for smooth offset interpolation toward target
 _NECK_OFFSET_SMOOTHING_TAU = 0.5
 
-
 class NeckOffsetJointPositionAction(_JointPositionActionCfg.class_type):
     """JointPositionAction that adds a random offset to neck/head joint targets.
 

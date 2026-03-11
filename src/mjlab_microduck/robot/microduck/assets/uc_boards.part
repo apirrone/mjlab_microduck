@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "804927696f06d877f3f1803e",
-    "documentMicroversion": "55323342ef2b2bf186231029",
+    "documentMicroversion": "a51ab009e4a5e27826487f0b",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
     "id": "MCSTW/DioVVSKcs1Z",
     "isStandardContent": false,
     "name": "uc_boards <1>",
-    "partId": "R3JD",
+    "partId": "RKKD",
     "suppressed": false,
     "type": "Part"
 }

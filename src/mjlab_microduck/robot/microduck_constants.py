@@ -11,10 +11,12 @@ _ROBOT_DIR: Path = Path(os.path.dirname(__file__)) / "microduck"
 MICRODUCK_WALK_XML: Path = _ROBOT_DIR / "robot_walk.xml"
 MICRODUCK_STANDUP_XML: Path = _ROBOT_DIR / "robot_standup.xml"
 MICRODUCK_GROUND_PICK_XML: Path = _ROBOT_DIR / "robot_ground_pick.xml"
+MICRODUCK_WALK_ROLLERS_XML: Path = _ROBOT_DIR / "robot_walk_rollers.xml"
 
 assert MICRODUCK_WALK_XML.exists(), f"XML not found: {MICRODUCK_WALK_XML}"
 assert MICRODUCK_STANDUP_XML.exists(), f"XML not found: {MICRODUCK_STANDUP_XML}"
 assert MICRODUCK_GROUND_PICK_XML.exists(), f"XML not found: {MICRODUCK_GROUND_PICK_XML}"
+assert MICRODUCK_WALK_ROLLERS_XML.exists(), f"XML not found: {MICRODUCK_WALK_ROLLERS_XML}"
 
 
 def get_walk_spec() -> mujoco.MjSpec:
@@ -27,6 +29,10 @@ def get_standup_spec() -> mujoco.MjSpec:
 
 def get_ground_pick_spec() -> mujoco.MjSpec:
     return mujoco.MjSpec.from_file(str(MICRODUCK_GROUND_PICK_XML))
+
+
+def get_walk_rollers_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(MICRODUCK_WALK_ROLLERS_XML))
 
 
 HOME_FRAME = EntityCfg.InitialStateCfg(
@@ -62,6 +68,7 @@ actuators = DelayedActuatorCfg(
     base_cfg=XmlPositionActuatorCfg(joint_names_expr=(r".*",)),
 )
 
+
 # actuators=XmlPositionActuatorCfg(joint_names_expr=(r".*",))
 
 MICRODUCK_WALK_ROBOT_CFG = EntityCfg(
@@ -88,6 +95,18 @@ MICRODUCK_GROUND_PICK_ROBOT_CFG = EntityCfg(
     spec_fn=get_ground_pick_spec,
     init_state=HOME_FRAME,
     collisions=(FULL_COLLISION,),
+    articulation=EntityArticulationInfoCfg(
+        actuators=(actuators,),
+        soft_joint_pos_limit_factor=0.9,
+    ),
+)
+
+# Roller skate robot: passive wheel joints have no actuators in the XML,
+# so they are free DOFs driven only by contact physics.
+MICRODUCK_WALK_ROLLERS_ROBOT_CFG = EntityCfg(
+    spec_fn=get_walk_rollers_spec,
+    init_state=HOME_FRAME,
+    collisions=(),  # roller wheel collision geoms have no explicit names; XML defaults apply
     articulation=EntityArticulationInfoCfg(
         actuators=(actuators,),
         soft_joint_pos_limit_factor=0.9,

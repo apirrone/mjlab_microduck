@@ -37,6 +37,20 @@ from .microduck_standup_env_cfg import (
     make_microduck_standup_env_cfg,
     MicroduckStandUpRlCfg,
 )
+from .microduck_velocity_rollers_env_cfg import (
+    make_microduck_velocity_rollers_env_cfg,
+    MicroduckRollersRlCfg,
+)
+
+# Roller skate velocity task
+register_mjlab_task(
+    task_id="Mjlab-Velocity-Flat-MicroDuck-Rollers",
+    env_cfg=make_microduck_velocity_rollers_env_cfg(),
+    play_env_cfg=make_microduck_velocity_rollers_env_cfg(play=True),
+    rl_cfg=MicroduckRollersRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
+print("✓ Rollers task registered: Mjlab-Velocity-Flat-MicroDuck-Rollers")
 
 # Standard velocity task (no imitation)
 register_mjlab_task(

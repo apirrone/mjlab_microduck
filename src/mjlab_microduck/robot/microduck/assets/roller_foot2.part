@@ -4,10 +4,10 @@
     "documentMicroversion": "a51ab009e4a5e27826487f0b",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
-    "id": "MBAOk9g7UWUwzVrNF",
+    "id": "MDz5SxoF3UPmk7O5j",
     "isStandardContent": false,
-    "name": "head_yaw_to_roll <1>",
-    "partId": "RuGD",
+    "name": "roller_foot2 <2>",
+    "partId": "R9QH",
     "suppressed": false,
     "type": "Part"
 }

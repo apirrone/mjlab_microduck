@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "804927696f06d877f3f1803e",
-    "documentMicroversion": "55323342ef2b2bf186231029",
+    "documentMicroversion": "a51ab009e4a5e27826487f0b",
     "elementId": "6a7320ab42427c3c6d1a75ee",
     "fullConfiguration": "default",
     "id": "M7VNUfi7tDVa8iLNw",
     "isStandardContent": false,
     "name": "neck_reinforcement <1>",
-    "partId": "R+PD",
+    "partId": "RRQD",
     "suppressed": false,
     "type": "Part"
 }
