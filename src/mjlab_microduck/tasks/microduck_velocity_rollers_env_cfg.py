@@ -151,7 +151,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 4.0  # strong anchor to home position — key for wheel stability
+    cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["self_collisions"] = RewardTermCfg(
         func=mdp.self_collision_cost,
@@ -182,8 +182,8 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
 
-    cfg.rewards["track_linear_velocity"].weight = 3.0
-    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.25)  # more forgiving early on
+    cfg.rewards["track_linear_velocity"].weight = 5.0
+    cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)  # tight: real gradient at 0.3 m/s error
     cfg.rewards["track_angular_velocity"].weight = 0.0  # ang_vel command is 0; skip for now
 
     cfg.rewards["action_rate_l2"].weight = -0.4  # smoothness from the first step — critical for wheel stability
@@ -387,7 +387,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (-0.1, 0.1)  # start small; curriculum ramps this up
+    command.ranges.lin_vel_x = (0.2, 0.4)   # always forward, always significant: no near-zero standing reward
     command.ranges.lin_vel_y = (0.0, 0.0)   # lateral motion impossible on roller skates
     command.ranges.ang_vel_z = (0.0, 0.0)   # angular commands disabled for now
     command.viz.z_offset = 0.5
@@ -418,11 +418,10 @@ def make_microduck_velocity_rollers_env_cfg(
             "update_lin_vel_y": False,   # lateral motion impossible on roller skates
             "update_ang_vel_z": False,   # angular commands disabled for now
             "velocity_stages": [
-                {"step": 0,           "lin_vel_range": 0.1,  "ang_vel_range": 0.0},
-                {"step": 500 * 24,    "lin_vel_range": 0.2,  "ang_vel_range": 0.0},
-                {"step": 1000 * 24,   "lin_vel_range": 0.3,  "ang_vel_range": 0.0},
-                {"step": 2000 * 24,   "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
-                {"step": 3000 * 24,   "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
+                {"step": 0,           "lin_vel_range": 0.4,  "ang_vel_range": 0.0},
+                {"step": 1000 * 24,   "lin_vel_range": 0.5,  "ang_vel_range": 0.0},
+                {"step": 2000 * 24,   "lin_vel_range": 0.7,  "ang_vel_range": 0.0},
+                {"step": 3000 * 24,   "lin_vel_range": 1.0,  "ang_vel_range": 0.0},
             ],
         },
     )
