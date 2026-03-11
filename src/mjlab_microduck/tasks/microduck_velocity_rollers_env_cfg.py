@@ -99,12 +99,14 @@ def make_microduck_velocity_rollers_env_cfg(
     # The roller XML defines left_foot and right_foot sites (same names as walk robot)
     site_names = ["left_foot", "right_foot"]
 
-    # Contact sensor: roller_foot1 (left) and roller_foot2 (right) subtrees
+    # Contact sensor: one slot per side, matching the wheel bodies directly.
+    # Left side: roller_wheel (LF) + roller_wheel_2 (LR)
+    # Right side: skateboard_bearing (RF) + skateboard_bearing_2 (RR)
     feet_ground_cfg = ContactSensorCfg(
         name="feet_ground_contact",
         primary=ContactMatch(
             mode="subtree",
-            pattern=r"^(roller_foot1|roller_foot2)$",
+            pattern=r"^(roller_wheel|roller_wheel_2|skateboard_bearing|skateboard_bearing_2)$",
             entity="robot",
         ),
         secondary=ContactMatch(mode="body", pattern="terrain"),
