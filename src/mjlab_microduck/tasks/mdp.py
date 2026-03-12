@@ -806,16 +806,21 @@ def leg_joint_vel_l2(
     # Return L2 squared norm of leg joint velocities
     return torch.sum(torch.square(leg_joint_vel), dim=1)
 
+_NECK_JOINT_CFG = SceneEntityCfg("robot", joint_names=(r".*(neck|head).*",))
+
+
 def neck_joint_pos_l2(
-    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _NECK_JOINT_CFG,
 ) -> torch.Tensor:
     """Penalize neck/head joint position deviation from default (L2 squared).
 
-    Separate from the pose reward so the gradient is never diluted by leg joint errors.
+    Uses name-based joint lookup so indices are correct regardless of whether
+    passive wheel joints are present (roller env) or not (walking env).
     Always has non-zero gradient regardless of how far displaced.
     """
     asset: Entity = env.scene[asset_cfg.name]
-    error = asset.data.joint_pos[:, _NECK_JOINT_INDICES] - asset.data.default_joint_pos[:, _NECK_JOINT_INDICES]
+    error = asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]
     return torch.sum(torch.square(error), dim=1)
 
 
