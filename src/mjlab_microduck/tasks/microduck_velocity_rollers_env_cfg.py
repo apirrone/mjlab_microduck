@@ -190,7 +190,7 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.neck_action_acceleration_l2, weight=-3.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
-        func=microduck_mdp.joint_torques_l2, weight=-5e-3
+        func=microduck_mdp.joint_torques_l2, weight=-1e-3
     )
 
     # === EVENTS ===
