@@ -807,6 +807,21 @@ def leg_joint_vel_l2(
     return torch.sum(torch.square(leg_joint_vel), dim=1)
 
 _NECK_JOINT_CFG = SceneEntityCfg("robot", joint_names=(r".*(neck|head).*",))
+_HIP_PITCH_KNEE_CFG = SceneEntityCfg("robot", joint_names=(r".*(hip_pitch|knee).*",))
+
+
+def hip_pitch_knee_vel_l2(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _HIP_PITCH_KNEE_CFG,
+) -> torch.Tensor:
+    """Penalize hip_pitch and knee joint velocities (L2 squared).
+
+    Walking requires rapid oscillation of these sagittal-plane joints.
+    Skating uses hip_roll laterally and glides with minimal sagittal movement.
+    This penalizes the oscillation without preventing static balance adjustments.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    return torch.sum(torch.square(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
 
 
 def neck_joint_pos_l2(

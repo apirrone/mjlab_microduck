@@ -189,6 +189,18 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_joint_pos_l2, weight=-2.0
     )
+    cfg.rewards["hip_pitch_knee_vel_l2"] = RewardTermCfg(
+        func=microduck_mdp.hip_pitch_knee_vel_l2, weight=-0.05
+    )
+    cfg.rewards["contact_frequency"] = RewardTermCfg(
+        func=microduck_mdp.contact_frequency_penalty,
+        weight=-1.0,
+        params={
+            "sensor_name": "feet_ground_contact",
+            "max_contact_changes_per_sec": 1.5,
+            "command_threshold": 0.01,
+        },
+    )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
     )
