@@ -59,13 +59,13 @@ def make_microduck_velocity_rollers_env_cfg(
     """Create Microduck roller skate velocity tracking environment configuration."""
 
     std_standing = {
-        r".*hip_yaw.*": 0.1,
-        r".*hip_roll.*": 0.1,
-        r".*hip_pitch.*": 0.1,
-        r".*knee.*": 0.1,
-        r".*ankle.*": 0.1,
-        r".*neck.*": 0.5,
-        r".*head.*": 0.5,
+        r".*hip_yaw.*": 0.05,
+        r".*hip_roll.*": 0.05,
+        r".*hip_pitch.*": 0.05,
+        r".*knee.*": 0.05,
+        r".*ankle.*": 0.05,
+        r".*neck.*": 0.3,
+        r".*head.*": 0.3,
         r".*passive_.*": 999.0,
     }
 
@@ -150,7 +150,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
     cfg.rewards["pose"].params["running_threshold"] = 0.5
-    cfg.rewards["pose"].weight = 1.0
+    cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["upright"].weight = 2.0
@@ -182,9 +182,9 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["action_rate_l2"].weight = -0.6
+    cfg.rewards["action_rate_l2"].weight = -1.0
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-0.1
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
@@ -325,7 +325,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.4, 0.6)
+    command.ranges.lin_vel_x = (0.3, 0.6)
     command.ranges.lin_vel_y = (0.0, 0.0)
     command.ranges.ang_vel_z = (0.0, 0.0)
     command.viz.z_offset = 0.5
@@ -341,10 +341,12 @@ def make_microduck_velocity_rollers_env_cfg(
             "command_name": "twist",
             "update_lin_vel_y": False,
             "update_ang_vel_z": False,
+            "forward_only": True,
             "velocity_stages": [
                 {"step": 0,          "lin_vel_range": 0.6,  "ang_vel_range": 0.0},
                 {"step": 1000 * 24,  "lin_vel_range": 0.8,  "ang_vel_range": 0.0},
                 {"step": 2000 * 24,  "lin_vel_range": 1.2,  "ang_vel_range": 0.0},
+                {"step": 3000 * 24,  "lin_vel_range": 1.5,  "ang_vel_range": 0.0},
             ],
         },
     )
