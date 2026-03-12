@@ -71,9 +71,9 @@ def make_microduck_velocity_rollers_env_cfg(
 
     std_walking = {
         r".*hip_yaw.*": 0.3,
-        r".*hip_roll.*": 0.3,
-        r".*hip_pitch.*": 0.4,
-        r".*knee.*": 0.4,
+        r".*hip_roll.*": 0.3,  # loose — skating stroke uses hip_roll
+        r".*hip_pitch.*": 0.2,  # tighter — discourage walking-like sagittal motions
+        r".*knee.*": 0.2,       # tighter — same
         r".*ankle.*": 0.25,
         r".*neck.*": 0.1,
         r".*head.*": 0.1,
@@ -149,7 +149,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].params["running_threshold"] = 0.5
+    cfg.rewards["pose"].params["running_threshold"] = 100.0  # always use walking stds
     cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
