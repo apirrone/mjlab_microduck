@@ -811,58 +811,28 @@ def neck_joint_pos_l2(
 ) -> torch.Tensor:
     """Penalize neck/head joint position deviation from default (L2 squared).
 
-    Unlike the Gaussian pose reward, this has a non-zero gradient everywhere,
-    so the policy can always be corrected back toward the home position even
-    when far from it.
+    Unlike the Gaussian pose reward, this always has non-zero gradient even
+    when far from home, preventing the policy from getting stuck in weird positions.
     """
     asset: Entity = env.scene[asset_cfg.name]
-    neck_indices = _NECK_JOINT_INDICES  # [5, 6, 7, 8]
-    error = asset.data.joint_pos[:, neck_indices] - asset.data.default_joint_pos[:, neck_indices]
+    error = asset.data.joint_pos[:, _NECK_JOINT_INDICES] - asset.data.default_joint_pos[:, _NECK_JOINT_INDICES]
     return torch.sum(torch.square(error), dim=1)
 
 
-# Ankle joint indices: left ankle=4, right ankle=13
 _ANKLE_JOINT_INDICES = [4, 13]
 
 
 def ankle_joint_pos_l2(
     env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
 ) -> torch.Tensor:
-    """Penalize ankle joint position deviation from default (L2 squared).
+    """Penalize ankle joint deviation from default (L2 squared).
 
-    Prevents the robot from learning to tilt the roller wheels onto their edges.
-    Has non-zero gradient everywhere unlike a tight Gaussian.
+    Prevents learning to tilt the roller wheels onto their edges.
+    Always has non-zero gradient unlike a tight Gaussian.
     """
     asset: Entity = env.scene[asset_cfg.name]
     error = asset.data.joint_pos[:, _ANKLE_JOINT_INDICES] - asset.data.default_joint_pos[:, _ANKLE_JOINT_INDICES]
     return torch.sum(torch.square(error), dim=1)
-
-
-def feet_flat_penalty(
-    env: ManagerBasedRlEnv,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("roller_foot1", "roller_foot2")),
-) -> torch.Tensor:
-    """Penalize foot bodies not being parallel to the ground.
-
-    Uses projected gravity in each foot body frame — if the foot is flat,
-    gravity projects entirely onto the foot's z-axis (xy ≈ 0). Any tilt
-    (from ankle, hip_roll, or their combination) shows up as non-zero xy.
-    Returns sum of squared xy components of the *unit* gravity vector across both feet.
-    Max value = 2.0 per foot (fully sideways), total max = 4.0.
-    """
-    from mjlab.utils.lab_api.math import quat_apply_inverse
-
-    asset: Entity = env.scene[asset_cfg.name]
-    gravity_w = asset.data.gravity_vec_w
-    gravity_w_n = gravity_w / torch.norm(gravity_w)  # normalize to unit vector
-
-    foot_quats = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]  # (B, N_feet, 4)
-
-    total = torch.zeros(env.num_envs, device=env.device)
-    for i in range(foot_quats.shape[1]):
-        proj = quat_apply_inverse(foot_quats[:, i, :], gravity_w_n)  # (B, 3)
-        total += torch.sum(torch.square(proj[:, :2]), dim=1)
-    return total
 
 
 def joint_torques_l2(
