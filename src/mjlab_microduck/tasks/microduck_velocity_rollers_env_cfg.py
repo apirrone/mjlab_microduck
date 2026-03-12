@@ -170,7 +170,7 @@ def make_microduck_velocity_rollers_env_cfg(
     # Foot lifting rewards — same values as velocity env (skating requires lifting feet for strokes)
     for reward_name in ["foot_clearance", "foot_swing_height"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
-    cfg.rewards["air_time"].weight = 2.5
+    cfg.rewards["air_time"].weight = 5.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["soft_landing"].weight = -1e-05
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
