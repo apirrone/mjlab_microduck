@@ -170,7 +170,7 @@ def make_microduck_velocity_rollers_env_cfg(
     # Foot lifting rewards — same values as velocity env (skating requires lifting feet for strokes)
     for reward_name in ["foot_clearance", "foot_swing_height"]:
         cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
-    cfg.rewards["air_time"].weight = 5.0
+    cfg.rewards["air_time"].weight = 2.0
     cfg.rewards["air_time"].params["command_threshold"] = 0.01
     cfg.rewards["soft_landing"].weight = -1e-05
     cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
@@ -182,9 +182,12 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["action_rate_l2"].weight = -1.0
+    cfg.rewards["action_rate_l2"].weight = -0.4  # ramped up by curriculum
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
+    )
+    cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
+        func=microduck_mdp.neck_joint_pos_l2, weight=-10.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
@@ -365,6 +368,18 @@ def make_microduck_velocity_rollers_env_cfg(
                 ],
             },
         )
+
+    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "action_rate_l2",
+            "weight_stages": [
+                {"step": 0, "weight": -0.4},
+                {"step": 250 * 24, "weight": -0.8},
+                {"step": 500 * 24, "weight": -1.0},
+            ],
+        },
+    )
 
     del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
