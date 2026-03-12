@@ -808,6 +808,31 @@ def leg_joint_vel_l2(
 
 _NECK_JOINT_CFG = SceneEntityCfg("robot", joint_names=(r".*(neck|head).*",))
 _HIP_PITCH_KNEE_CFG = SceneEntityCfg("robot", joint_names=(r".*(hip_pitch|knee).*",))
+_ROLLER_FEET_CFG = SceneEntityCfg("robot", body_names=("roller_foot1", "roller_foot2"))
+
+
+def feet_flat_penalty(
+    env: ManagerBasedRlEnv,
+    asset_cfg: SceneEntityCfg = _ROLLER_FEET_CFG,
+) -> torch.Tensor:
+    """Penalize foot bodies not being parallel to the ground.
+
+    Projects a unit gravity vector into each foot's body frame. When flat,
+    gravity projects entirely onto the foot z-axis (xy ≈ 0). Any tilt shows
+    up as non-zero xy components. Max value = 2.0 per foot (sideways), total 4.0.
+    """
+    from mjlab.utils.lab_api.math import quat_apply_inverse
+
+    asset: Entity = env.scene[asset_cfg.name]
+    gravity_w = asset.data.gravity_vec_w
+    gravity_w_n = gravity_w / torch.norm(gravity_w)
+
+    foot_quats = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]  # (B, N_feet, 4)
+    total = torch.zeros(env.num_envs, device=env.device)
+    for i in range(foot_quats.shape[1]):
+        proj = quat_apply_inverse(foot_quats[:, i, :], gravity_w_n)  # (B, 3)
+        total += torch.sum(torch.square(proj[:, :2]), dim=1)
+    return total
 
 
 def hip_pitch_knee_vel_l2(
