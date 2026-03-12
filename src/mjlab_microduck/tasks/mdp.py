@@ -847,19 +847,20 @@ def feet_flat_penalty(
     Uses projected gravity in each foot body frame — if the foot is flat,
     gravity projects entirely onto the foot's z-axis (xy ≈ 0). Any tilt
     (from ankle, hip_roll, or their combination) shows up as non-zero xy.
-    Returns sum of squared xy gravity components across both feet.
+    Returns sum of squared xy components of the *unit* gravity vector across both feet.
+    Max value = 2.0 per foot (fully sideways), total max = 4.0.
     """
     from mjlab.utils.lab_api.math import quat_apply_inverse
 
     asset: Entity = env.scene[asset_cfg.name]
-    gravity_w = asset.data.gravity_vec_w  # (3,)
+    gravity_w = asset.data.gravity_vec_w
+    gravity_w_n = gravity_w / torch.norm(gravity_w)  # normalize to unit vector
 
-    # body_link_quat_w: (num_envs, num_bodies_total, 4)
-    foot_quats = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]  # (B, 2, 4)
+    foot_quats = asset.data.body_link_quat_w[:, asset_cfg.body_ids, :]  # (B, N_feet, 4)
 
     total = torch.zeros(env.num_envs, device=env.device)
     for i in range(foot_quats.shape[1]):
-        proj = quat_apply_inverse(foot_quats[:, i, :], gravity_w)  # (B, 3)
+        proj = quat_apply_inverse(foot_quats[:, i, :], gravity_w_n)  # (B, 3)
         total += torch.sum(torch.square(proj[:, :2]), dim=1)
     return total
 
