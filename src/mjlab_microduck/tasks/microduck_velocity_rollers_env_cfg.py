@@ -182,7 +182,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["action_rate_l2"].weight = -1.0
+    cfg.rewards["action_rate_l2"].weight = -0.4
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
@@ -335,6 +335,18 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.scene.terrain.terrain_generator = None
 
     # === CURRICULUM ===
+    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
+        func=mdp.reward_weight,
+        params={
+            "reward_name": "action_rate_l2",
+            "weight_stages": [
+                {"step": 0, "weight": -0.4},
+                {"step": 250 * 24, "weight": -0.8},
+                {"step": 500 * 24, "weight": -1.0},
+            ],
+        },
+    )
+
     cfg.curriculum["velocity_command_ranges"] = CurriculumTermCfg(
         func=microduck_mdp.velocity_command_ranges_curriculum,
         params={
