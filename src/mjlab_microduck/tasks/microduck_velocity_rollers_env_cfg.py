@@ -149,7 +149,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].params["running_threshold"] = 100.0  # always use walking stds — rollers go fast without big joint movements
+    cfg.rewards["pose"].params["running_threshold"] = 0.5
     cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -182,15 +182,9 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["action_rate_l2"].weight = -0.4  # start low, ramped up by curriculum
+    cfg.rewards["action_rate_l2"].weight = -1.0
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
-    )
-    cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_joint_pos_l2, weight=-5.0
-    )
-    cfg.rewards["ankle_joint_pos_l2"] = RewardTermCfg(
-        func=microduck_mdp.ankle_joint_pos_l2, weight=-5.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
@@ -371,18 +365,6 @@ def make_microduck_velocity_rollers_env_cfg(
                 ],
             },
         )
-
-    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "action_rate_l2",
-            "weight_stages": [
-                {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.8},
-                {"step": 500 * 24, "weight": -1.0},
-            ],
-        },
-    )
 
     del cfg.curriculum["terrain_levels"]
     del cfg.curriculum["command_vel"]
