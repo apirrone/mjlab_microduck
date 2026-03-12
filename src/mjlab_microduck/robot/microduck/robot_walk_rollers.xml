@@ -32,7 +32,7 @@
       <joint damping="0.0" frictionloss="0.0" armature="0.0001"/>
     </default>
     <default class="roller_wheel_geom">
-      <geom group="3" friction="0.8 0.001 0.00001"/>
+      <geom group="3" friction="0.8 0.0001 0.000001"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->
