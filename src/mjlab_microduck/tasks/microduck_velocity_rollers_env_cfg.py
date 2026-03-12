@@ -153,7 +153,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
-    cfg.rewards["upright"].weight = 2.0
+    cfg.rewards["upright"].weight = 3.0
 
     cfg.rewards["track_linear_velocity"].weight = 10.0
     cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)
@@ -187,7 +187,7 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
     cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_joint_pos_l2, weight=-5.0
+        func=microduck_mdp.neck_joint_pos_l2, weight=-2.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
@@ -375,8 +375,12 @@ def make_microduck_velocity_rollers_env_cfg(
             "reward_name": "action_rate_l2",
             "weight_stages": [
                 {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.8},
-                {"step": 500 * 24, "weight": -1.0},
+                {"step": 250 * 24, "weight": -0.5},
+                {"step": 500 * 24, "weight": -0.6},
+                {"step": 750 * 24, "weight": -0.7},
+                {"step": 1000 * 24, "weight": -0.8},
+                {"step": 1250 * 24, "weight": -0.9},
+                {"step": 1500 * 24, "weight": -1.0},
             ],
         },
     )
