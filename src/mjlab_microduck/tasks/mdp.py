@@ -817,23 +817,28 @@ def feet_flat_penalty(
 ) -> torch.Tensor:
     """Penalize foot sites not being parallel to the ground.
 
-    Projects a unit gravity vector into each foot site's local frame. When flat,
-    gravity projects entirely onto the site z-axis (xy ≈ 0). Any tilt shows
-    up as non-zero xy components. Max value = 2.0 per foot (sideways), total 4.0.
-    Uses foot sites (left_foot, right_foot) which have the correct contact-frame
-    orientation baked in.
+    The foot site frame has Z+ pointing up when flat. We project a unit gravity
+    vector (pointing down) into each foot site's local frame. When flat, gravity
+    maps to [0,0,-1] in site frame (xy=0, penalty=0). Any tilt rotates Z away
+    from world-up, giving nonzero xy components.
+
+    Max value ≈ 2.0 per foot (foot fully sideways), total ≈ 4.0.
+
+    Bug note: must normalize gravity PER ENV with dim=-1. Using torch.norm()
+    without dim computes a scalar over all envs × 3 dims, making the vector
+    ~1/sqrt(num_envs) in magnitude → penalty ~num_envs times too small.
     """
     from mjlab.utils.lab_api.math import quat_apply_inverse
+    import torch.nn.functional as F
 
     asset: Entity = env.scene[asset_cfg.name]
-    gravity_w = asset.data.gravity_vec_w
-    gravity_w_n = gravity_w / torch.norm(gravity_w)
+    gravity_w_n = F.normalize(asset.data.gravity_vec_w, dim=-1)  # (B, 3), unit vector per env
 
     foot_quats = asset.data.site_quat_w[:, asset_cfg.site_ids, :]  # (B, N_feet, 4)
     total = torch.zeros(env.num_envs, device=env.device)
     for i in range(foot_quats.shape[1]):
         proj = quat_apply_inverse(foot_quats[:, i, :], gravity_w_n)  # (B, 3)
-        total += torch.sum(torch.square(proj[:, :2]), dim=1)
+        total += torch.sum(torch.square(proj[:, :2]), dim=1)  # xy² only
     return total
 
 
