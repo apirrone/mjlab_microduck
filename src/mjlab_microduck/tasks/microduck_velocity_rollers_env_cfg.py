@@ -71,9 +71,9 @@ def make_microduck_velocity_rollers_env_cfg(
 
     std_walking = {
         r".*hip_yaw.*": 0.3,
-        r".*hip_roll.*": 0.3,  # loose — skating stroke uses hip_roll
-        r".*hip_pitch.*": 0.2,  # tighter — discourage walking-like sagittal motions
-        r".*knee.*": 0.2,       # tighter — same
+        r".*hip_roll.*": 0.3,
+        r".*hip_pitch.*": 0.4,
+        r".*knee.*": 0.4,
         r".*ankle.*": 0.25,
         r".*neck.*": 0.1,
         r".*head.*": 0.1,
@@ -139,8 +139,7 @@ def make_microduck_velocity_rollers_env_cfg(
     # Let the robot discover the skating gait through exploration.
 
     # Keep only what we want; delete everything else from the base env
-    keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2",
-            "air_time", "foot_clearance", "foot_swing_height", "soft_landing"}
+    keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2"}
     for name in list(cfg.rewards.keys()):
         if name not in keep:
             del cfg.rewards[name]
@@ -167,17 +166,6 @@ def make_microduck_velocity_rollers_env_cfg(
         },
     )
 
-    # Foot lifting rewards — same values as velocity env (skating requires lifting feet for strokes)
-    for reward_name in ["foot_clearance", "foot_swing_height"]:
-        cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
-    cfg.rewards["air_time"].weight = 2.0
-    cfg.rewards["air_time"].params["command_threshold"] = 0.01
-    cfg.rewards["soft_landing"].weight = -1e-05
-    cfg.rewards["foot_clearance"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_clearance"].params["target_height"] = 0.02
-    cfg.rewards["foot_swing_height"].params["command_threshold"] = 0.01
-    cfg.rewards["foot_swing_height"].params["target_height"] = 0.02
-
     # Regularization — same values as velocity env
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
@@ -188,18 +176,6 @@ def make_microduck_velocity_rollers_env_cfg(
     )
     cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_joint_pos_l2, weight=-2.0
-    )
-    cfg.rewards["hip_pitch_knee_vel_l2"] = RewardTermCfg(
-        func=microduck_mdp.hip_pitch_knee_vel_l2, weight=-0.05
-    )
-    cfg.rewards["contact_frequency"] = RewardTermCfg(
-        func=microduck_mdp.contact_frequency_penalty,
-        weight=-1.0,
-        params={
-            "sensor_name": "feet_ground_contact",
-            "max_contact_changes_per_sec": 1.5,
-            "command_threshold": 0.01,
-        },
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
