@@ -140,7 +140,7 @@ def make_microduck_velocity_rollers_env_cfg(
 
     # Keep only what we want; delete everything else from the base env
     keep = {"pose", "upright", "track_linear_velocity", "body_ang_vel", "angular_momentum", "action_rate_l2",
-            "air_time", "foot_clearance", "foot_swing_height", "soft_landing", "com_height_target"}
+            "air_time", "foot_clearance", "foot_swing_height", "soft_landing"}
     for name in list(cfg.rewards.keys()):
         if name not in keep:
             del cfg.rewards[name]
@@ -184,10 +184,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["angular_momentum"].weight = -0.02
     cfg.rewards["action_rate_l2"].weight = -1.0
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_rate_l2, weight=-3.0
-    )
-    cfg.rewards["neck_action_acceleration_l2"] = RewardTermCfg(
-        func=microduck_mdp.neck_action_acceleration_l2, weight=-3.0
+        func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
