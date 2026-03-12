@@ -821,6 +821,23 @@ def neck_joint_pos_l2(
     return torch.sum(torch.square(error), dim=1)
 
 
+# Ankle joint indices: left ankle=4, right ankle=13
+_ANKLE_JOINT_INDICES = [4, 13]
+
+
+def ankle_joint_pos_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """Penalize ankle joint position deviation from default (L2 squared).
+
+    Prevents the robot from learning to tilt the roller wheels onto their edges.
+    Has non-zero gradient everywhere unlike a tight Gaussian.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    error = asset.data.joint_pos[:, _ANKLE_JOINT_INDICES] - asset.data.default_joint_pos[:, _ANKLE_JOINT_INDICES]
+    return torch.sum(torch.square(error), dim=1)
+
+
 def joint_torques_l2(
     env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
 ) -> torch.Tensor:

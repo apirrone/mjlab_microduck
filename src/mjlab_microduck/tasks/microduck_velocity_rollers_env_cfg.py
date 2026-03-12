@@ -74,7 +74,7 @@ def make_microduck_velocity_rollers_env_cfg(
         r".*hip_roll.*": 0.3,
         r".*hip_pitch.*": 0.4,
         r".*knee.*": 0.4,
-        r".*ankle.*": 0.25,
+        r".*ankle.*": 0.1,
         r".*neck.*": 0.3,
         r".*head.*": 0.3,
         r".*passive_.*": 999.0,
@@ -85,7 +85,7 @@ def make_microduck_velocity_rollers_env_cfg(
         r".*hip_roll.*": 0.5,
         r".*hip_pitch.*": 0.8,
         r".*knee.*": 0.8,
-        r".*ankle.*": 0.5,
+        r".*ankle.*": 0.15,
         r".*neck.*": 0.3,
         r".*head.*": 0.3,
         r".*passive_.*": 999.0,
@@ -149,7 +149,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["pose"].params["std_walking"] = std_walking
     cfg.rewards["pose"].params["std_running"] = std_running
     cfg.rewards["pose"].params["walking_threshold"] = 0.01
-    cfg.rewards["pose"].params["running_threshold"] = 0.5
+    cfg.rewards["pose"].params["running_threshold"] = 100.0
     cfg.rewards["pose"].weight = 2.0
 
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
@@ -188,6 +188,9 @@ def make_microduck_velocity_rollers_env_cfg(
     )
     cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_joint_pos_l2, weight=-2.0
+    )
+    cfg.rewards["ankle_joint_pos_l2"] = RewardTermCfg(
+        func=microduck_mdp.ankle_joint_pos_l2, weight=-2.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
