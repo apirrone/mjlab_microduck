@@ -189,8 +189,8 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["neck_joint_pos_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_joint_pos_l2, weight=-2.0
     )
-    cfg.rewards["ankle_joint_pos_l2"] = RewardTermCfg(
-        func=microduck_mdp.ankle_joint_pos_l2, weight=-2.0
+    cfg.rewards["feet_flat"] = RewardTermCfg(
+        func=microduck_mdp.feet_flat_penalty, weight=-2.0
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
