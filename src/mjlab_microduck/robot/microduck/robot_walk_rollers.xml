@@ -25,11 +25,14 @@
     <default class="chosen_actuator">
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.048" frictionloss="0.006" armature="0.002"/>
-      <position kp="0.52" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/>
+      <position kp="2.52" kv="0.0" forcerange="-0.91 0.91" ctrlrange="-10.0 10.0"/>
     </default>
     <default class="passive_wheel">
       <geom contype="0" conaffinity="0"/>
       <joint damping="0.0" frictionloss="0.0" armature="0.0001"/>
+    </default>
+    <default class="roller_wheel_geom">
+      <geom group="3" friction="0.8 0.001 0.00001"/>
     </default>
   </default>
   <!-- Additional sensors.xml -->
@@ -170,7 +173,7 @@
                   <inertial pos="0 -3.66504e-17 1.58337e-17" mass="0.0161876" fullinertia="9.91939e-07 9.91939e-07 1.81535e-06 1.05863e-33 -9.54902e-21 2.14728e-33"/>
                   <!-- Part roller_wheel -->
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
-                  <geom type="mesh" class="collision" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
+                  <geom type="mesh" class="roller_wheel_geom" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
                   <!-- Part skateboard_bearing -->
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 1.38648e-31" mesh="skateboard_bearing" material="skateboard_bearing_material"/>
                 </body>
@@ -183,7 +186,7 @@
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 1.38648e-31" mesh="skateboard_bearing" material="skateboard_bearing_material"/>
                   <!-- Part roller_wheel_2 -->
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
-                  <geom type="mesh" class="collision" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
+                  <geom type="mesh" class="roller_wheel_geom" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -1.55431e-15 1.59951e-15" mesh="roller_wheel" material="roller_wheel_material"/>
                 </body>
               </body>
             </body>
@@ -349,7 +352,7 @@
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 3.61875e-45" mesh="skateboard_bearing" material="skateboard_bearing_material"/>
                   <!-- Part roller_wheel_3 -->
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
-                  <geom type="mesh" class="collision" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
+                  <geom type="mesh" class="roller_wheel_geom" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
                 </body>
                 <!-- Link skateboard_bearing_2 -->
                 <body name="skateboard_bearing_2" pos="-0.0282843 -0.017 -0.0145" quat="2.58685e-30 -1 -2.56739e-16 6.65601e-31">
@@ -360,7 +363,7 @@
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 3.61875e-45" mesh="skateboard_bearing" material="skateboard_bearing_material"/>
                   <!-- Part roller_wheel_4 -->
                   <geom type="mesh" class="visual" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
-                  <geom type="mesh" class="collision" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
+                  <geom type="mesh" class="roller_wheel_geom" pos="0.142884 -0.1442 -0.06" quat="0.707107 0.707107 -0 -3.62576e-30" mesh="roller_wheel" material="roller_wheel_material"/>
                 </body>
               </body>
             </body>
