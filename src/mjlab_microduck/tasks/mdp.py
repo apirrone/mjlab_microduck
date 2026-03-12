@@ -806,6 +806,21 @@ def leg_joint_vel_l2(
     # Return L2 squared norm of leg joint velocities
     return torch.sum(torch.square(leg_joint_vel), dim=1)
 
+def neck_joint_pos_l2(
+    env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
+) -> torch.Tensor:
+    """Penalize neck/head joint position deviation from default (L2 squared).
+
+    Unlike the Gaussian pose reward, this has a non-zero gradient everywhere,
+    so the policy can always be corrected back toward the home position even
+    when far from it.
+    """
+    asset: Entity = env.scene[asset_cfg.name]
+    neck_indices = _NECK_JOINT_INDICES  # [5, 6, 7, 8]
+    error = asset.data.joint_pos[:, neck_indices] - asset.data.default_joint_pos[:, neck_indices]
+    return torch.sum(torch.square(error), dim=1)
+
+
 def joint_torques_l2(
     env: ManagerBasedRlEnv, asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG
 ) -> torch.Tensor:
