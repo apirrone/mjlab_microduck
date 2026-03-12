@@ -36,6 +36,7 @@ from mjlab.managers.manager_term_config import (
     EventTermCfg,
     ObservationTermCfg,
     RewardTermCfg,
+    TerminationTermCfg,
 )
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.rl import (
@@ -371,6 +372,12 @@ def make_microduck_velocity_rollers_env_cfg(
                 {"step": 1500 * 24, "weight": -1.0},
             ],
         },
+    )
+
+    # Tighter fall termination — prevents inverted-pendulum wheelie exploit
+    cfg.terminations["fell_over"] = TerminationTermCfg(
+        func=mdp.bad_orientation,
+        params={"limit_angle": math.radians(45.0)},
     )
 
     del cfg.curriculum["terrain_levels"]
