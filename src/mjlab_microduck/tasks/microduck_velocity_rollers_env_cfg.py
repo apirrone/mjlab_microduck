@@ -155,7 +155,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["upright"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["upright"].weight = 3.0
 
-    cfg.rewards["track_linear_velocity"].weight = 15.0
+    cfg.rewards["track_linear_velocity"].weight = 25.0
     cfg.rewards["track_linear_velocity"].params["std"] = math.sqrt(0.08)
 
     cfg.rewards["com_height_target"] = RewardTermCfg(
@@ -171,7 +171,7 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("trunk_base",)
     cfg.rewards["body_ang_vel"].weight = -0.05
     cfg.rewards["angular_momentum"].weight = -0.02
-    cfg.rewards["action_rate_l2"].weight = -0.4  # ramped up by curriculum
+    cfg.rewards["action_rate_l2"].weight = -1.5  # strong from start — penalise wiggling
     cfg.rewards["neck_action_rate_l2"] = RewardTermCfg(
         func=microduck_mdp.neck_action_rate_l2, weight=-0.5
     )
@@ -191,24 +191,6 @@ def make_microduck_velocity_rollers_env_cfg(
         weight=-1.0,
         params={"sensor_name": "self_collision"},
     )
-    cfg.rewards["skating_push"] = RewardTermCfg(
-        func=microduck_mdp.skating_push_reward,
-        weight=1.5,
-        params={
-            "contact_sensor_name": "feet_ground_contact",
-            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
-        },
-    )
-    cfg.rewards["coasting"] = RewardTermCfg(
-        func=microduck_mdp.coasting_reward,
-        weight=3.0,
-        params={
-            "command_name": "twist",
-            "vel_std": 0.3,
-            "stillness_std": 5.0,
-            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*(hip|knee|ankle).*",)),
-        },
-    )
 
     # === EVENTS ===
 
@@ -218,7 +200,7 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.reset_with_forward_velocity,
         mode="reset",
         params={
-            "velocity_range": (0.5, 1.5),
+            "velocity_range": (0.8, 1.5),
             "fraction_stages": [
                 {"step": 0,           "fraction": 0.8},
                 {"step": 500 * 24,    "fraction": 0.6},
@@ -363,7 +345,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.5, 1.0)
+    command.ranges.lin_vel_x = (0.8, 1.2)
     command.ranges.lin_vel_y = (0.0, 0.0)
     command.ranges.ang_vel_z = (0.0, 0.0)
     command.viz.z_offset = 0.5
@@ -404,21 +386,6 @@ def make_microduck_velocity_rollers_env_cfg(
             },
         )
 
-    cfg.curriculum["action_rate_weight"] = CurriculumTermCfg(
-        func=mdp.reward_weight,
-        params={
-            "reward_name": "action_rate_l2",
-            "weight_stages": [
-                {"step": 0, "weight": -0.4},
-                {"step": 250 * 24, "weight": -0.5},
-                {"step": 500 * 24, "weight": -0.6},
-                {"step": 750 * 24, "weight": -0.7},
-                {"step": 1000 * 24, "weight": -0.8},
-                {"step": 1250 * 24, "weight": -0.9},
-                {"step": 1500 * 24, "weight": -1.0},
-            ],
-        },
-    )
 
     # Tighter fall termination — prevents inverted-pendulum wheelie exploit
     cfg.terminations["fell_over"] = TerminationTermCfg(
