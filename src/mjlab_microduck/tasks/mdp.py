@@ -977,6 +977,58 @@ def skating_stroke(
     return torch.abs(cmd_x) * lateral_push
 
 
+def skating_push_reward(
+    env: ManagerBasedRlEnv,
+    contact_sensor_name: str,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
+) -> torch.Tensor:
+    """Reward lateral hip_roll velocity when any foot is in contact with the ground.
+
+    Directly incentivises the skating push stroke: the robot pushes a grounded foot
+    laterally (hip abduction) which the wheel friction converts into forward force.
+    Gating on contact ensures the reward fires during actual ground pushes, not
+    while the foot is swinging through the air.
+    """
+    from mjlab.sensor import ContactSensor
+
+    sensor: ContactSensor = env.scene[contact_sensor_name]
+    in_contact = sensor.data.found.squeeze(-1).float()  # (B,)
+
+    asset: Entity = env.scene[asset_cfg.name]
+    hip_roll_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]  # (B, 2)
+    lateral_push = torch.sum(torch.abs(hip_roll_vel), dim=1)
+
+    return in_contact * lateral_push
+
+
+def coasting_reward(
+    env: ManagerBasedRlEnv,
+    command_name: str,
+    vel_std: float = 0.3,
+    stillness_std: float = 5.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", joint_names=(r".*(hip|knee|ankle).*",)),
+) -> torch.Tensor:
+    """Reward coasting: low leg-joint velocity while at target speed.
+
+    Returns exp(-vel_error / vel_std²) × exp(-sum(joint_vel²) / stillness_std²).
+    Both factors must be high simultaneously — robot is rewarded for being at
+    target speed AND keeping its legs still (gliding), not for either alone.
+
+    Typical values when coasting well: ~0.7–1.0.  When actively stomping at
+    speed the joint_vel term suppresses the reward toward 0.
+    """
+    cmd = env.command_manager.get_command(command_name)
+    vel_b = env.scene["robot"].data.root_lin_vel_b[:, :2]
+    vel_error = torch.sum(torch.square(cmd[:, :2] - vel_b), dim=1)
+    at_speed = torch.exp(-vel_error / vel_std ** 2)
+
+    asset: Entity = env.scene[asset_cfg.name]
+    joint_vel_sq = torch.sum(torch.square(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
+    stillness = torch.exp(-joint_vel_sq / stillness_std ** 2)
+
+    return at_speed * stillness
+
+
 def contact_frequency_penalty(
     env: ManagerBasedRlEnv,
     sensor_name: str = "feet_ground_contact",

@@ -191,6 +191,24 @@ def make_microduck_velocity_rollers_env_cfg(
         weight=-1.0,
         params={"sensor_name": "self_collision"},
     )
+    cfg.rewards["skating_push"] = RewardTermCfg(
+        func=microduck_mdp.skating_push_reward,
+        weight=1.5,
+        params={
+            "contact_sensor_name": "feet_ground_contact",
+            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*hip_roll.*",)),
+        },
+    )
+    cfg.rewards["coasting"] = RewardTermCfg(
+        func=microduck_mdp.coasting_reward,
+        weight=3.0,
+        params={
+            "command_name": "twist",
+            "vel_std": 0.3,
+            "stillness_std": 5.0,
+            "asset_cfg": SceneEntityCfg("robot", joint_names=(r".*(hip|knee|ankle).*",)),
+        },
+    )
 
     # === EVENTS ===
 
