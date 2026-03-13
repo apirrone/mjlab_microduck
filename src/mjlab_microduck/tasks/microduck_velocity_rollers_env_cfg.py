@@ -180,7 +180,7 @@ def make_microduck_velocity_rollers_env_cfg(
     )
     cfg.rewards["feet_flat"] = RewardTermCfg(
         func=microduck_mdp.feet_flat_penalty,
-        weight=-5.0,
+        weight=-20.0,
         params={"asset_cfg": SceneEntityCfg("robot", site_names=("left_foot", "right_foot"))},
     )
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
@@ -195,7 +195,7 @@ def make_microduck_velocity_rollers_env_cfg(
         func=microduck_mdp.reset_with_forward_velocity,
         mode="reset",
         params={
-            "velocity_range": (0.3, 1.0),
+            "velocity_range": (0.5, 1.5),
             "fraction_stages": [
                 {"step": 0,           "fraction": 0.8},
                 {"step": 500 * 24,    "fraction": 0.6},
@@ -340,7 +340,7 @@ def make_microduck_velocity_rollers_env_cfg(
     command: UniformVelocityCommandCfg = cfg.commands["twist"]
     command.rel_standing_envs = 0.0
     command.rel_heading_envs = 0.0
-    command.ranges.lin_vel_x = (0.3, 0.6)
+    command.ranges.lin_vel_x = (0.5, 1.0)
     command.ranges.lin_vel_y = (0.0, 0.0)
     command.ranges.ang_vel_z = (0.0, 0.0)
     command.viz.z_offset = 0.5
@@ -358,10 +358,10 @@ def make_microduck_velocity_rollers_env_cfg(
             "update_ang_vel_z": False,
             "forward_only": True,
             "velocity_stages": [
-                {"step": 0,          "lin_vel_range": 0.6,  "ang_vel_range": 0.0},
-                {"step": 1000 * 24,  "lin_vel_range": 0.8,  "ang_vel_range": 0.0},
-                {"step": 2000 * 24,  "lin_vel_range": 1.2,  "ang_vel_range": 0.0},
-                {"step": 3000 * 24,  "lin_vel_range": 1.5,  "ang_vel_range": 0.0},
+                {"step": 0,          "lin_vel_range": 1.0,  "ang_vel_range": 0.0},
+                {"step": 1000 * 24,  "lin_vel_range": 1.5,  "ang_vel_range": 0.0},
+                {"step": 2000 * 24,  "lin_vel_range": 2.0,  "ang_vel_range": 0.0},
+                {"step": 3000 * 24,  "lin_vel_range": 2.5,  "ang_vel_range": 0.0},
             ],
         },
     )
