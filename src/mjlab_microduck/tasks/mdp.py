@@ -992,7 +992,7 @@ def skating_push_reward(
     from mjlab.sensor import ContactSensor
 
     sensor: ContactSensor = env.scene[contact_sensor_name]
-    in_contact = sensor.data.found.squeeze(-1).float()  # (B,)
+    in_contact = sensor.data.found.reshape(env.num_envs, -1).any(dim=1).float()  # (B,)
 
     asset: Entity = env.scene[asset_cfg.name]
     hip_roll_vel = asset.data.joint_vel[:, asset_cfg.joint_ids]  # (B, 2)
