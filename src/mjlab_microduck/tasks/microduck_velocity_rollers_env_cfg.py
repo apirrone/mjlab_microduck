@@ -186,6 +186,11 @@ def make_microduck_velocity_rollers_env_cfg(
     cfg.rewards["joint_torques_l2"] = RewardTermCfg(
         func=microduck_mdp.joint_torques_l2, weight=-1e-3
     )
+    cfg.rewards["self_collisions"] = RewardTermCfg(
+        func=mdp.self_collision_cost,
+        weight=-1.0,
+        params={"sensor_name": "self_collision"},
+    )
 
     # === EVENTS ===
 
