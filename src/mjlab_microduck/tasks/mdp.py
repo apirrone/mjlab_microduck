@@ -115,6 +115,61 @@ class ImitationRewardState:
             self.phase[env_ids] = torch.rand(len(env_ids), device=self.phase.device)
 
 
+def reset_with_forward_velocity(
+    env: ManagerBasedRlEnv,
+    env_ids: torch.Tensor,
+    velocity_range: tuple[float, float] = (0.3, 0.8),
+    fraction_stages: list[dict] | None = None,
+    asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> None:
+    """Warm-start a fraction of reset environments with a random forward velocity.
+
+    The robot spawns already moving in its body-forward direction, so it first
+    discovers what coasting at speed feels like. The fraction decreases over
+    training, forcing it to progressively earn that speed from rest.
+
+    Args:
+        velocity_range: (min, max) forward speed in m/s.
+        fraction_stages: list of {"step": int, "fraction": float} dicts, sorted by step.
+            The fraction active at the current training step is used.
+            Example: [{"step":0,"fraction":0.8}, {"step":2000*24,"fraction":0.0}]
+        asset_cfg: robot entity config.
+    """
+    from mjlab.utils.lab_api.math import quat_apply
+
+    if fraction_stages is None:
+        fraction_stages = [{"step": 0, "fraction": 0.8}]
+
+    # Determine current fraction from training step
+    step = env.common_step_counter
+    fraction = fraction_stages[0]["fraction"]
+    for stage in fraction_stages:
+        if step >= stage["step"]:
+            fraction = stage["fraction"]
+
+    if len(env_ids) == 0 or fraction <= 0.0:
+        return
+
+    n_warmstart = max(1, int(len(env_ids) * fraction))
+    perm = torch.randperm(len(env_ids), device=env.device)[:n_warmstart]
+    warmstart_ids = env_ids[perm]
+
+    lo, hi = velocity_range
+    vx = lo + torch.rand(n_warmstart, device=env.device) * (hi - lo)
+
+    # Rotate body-forward [1,0,0] to world frame using current root quaternion
+    asset: Entity = env.scene[asset_cfg.name]
+    root_quat = asset.data.root_link_quat_w[warmstart_ids]  # (n, 4)
+    body_fwd = torch.zeros(n_warmstart, 3, device=env.device)
+    body_fwd[:, 0] = 1.0
+    forward_world = quat_apply(root_quat, body_fwd)  # (n, 3)
+
+    velocities = torch.zeros(n_warmstart, 6, device=env.device)
+    velocities[:, :3] = vx.unsqueeze(-1) * forward_world
+
+    asset.write_root_link_velocity_to_sim(velocities, env_ids=warmstart_ids)
+
+
 def reset_action_history(
     env: ManagerBasedRlEnv,
     env_ids: torch.Tensor,
