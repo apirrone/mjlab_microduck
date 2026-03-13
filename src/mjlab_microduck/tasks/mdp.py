@@ -1018,7 +1018,7 @@ def coasting_reward(
     speed the joint_vel term suppresses the reward toward 0.
     """
     cmd = env.command_manager.get_command(command_name)
-    vel_b = env.scene["robot"].data.root_lin_vel_b[:, :2]
+    vel_b = env.scene["robot"].data.root_link_lin_vel_b[:, :2]
     vel_error = torch.sum(torch.square(cmd[:, :2] - vel_b), dim=1)
     at_speed = torch.exp(-vel_error / vel_std ** 2)
 
